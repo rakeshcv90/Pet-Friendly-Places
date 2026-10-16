@@ -33,6 +33,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: theme.typography.sizes.h3,
     color: theme.colors.text,
-    fontWeight: theme.typography.weights.semiBold,
+    fontFamily: theme.typography.fontFamily.semiBold,
   },
 });

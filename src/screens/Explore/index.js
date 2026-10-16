@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: ms(28),
-    fontWeight: '800',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.primary,
     marginBottom: vs(4),
     letterSpacing: -0.5,
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: ms(13),
     color: '#8E8E93',
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   toggleContainer: {
     flexDirection: 'row',
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     fontSize: ms(14),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semiBold,
     color: '#A0A0A0',
     marginLeft: s(6),
   },
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   filterText: {
     fontSize: ms(13),
     color: '#A0A0A0',
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semiBold,
   },
   filterTextActive: {
     color: '#FFFFFF',
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
   },
   verifiedText: {
     fontSize: ms(10),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.primary,
     marginLeft: s(4),
   },
@@ -318,14 +318,14 @@ const styles = StyleSheet.create({
   },
   placeName: {
     fontSize: ms(15),
-    fontWeight: '800',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.primary,
     marginBottom: vs(2),
   },
   placeLocation: {
     fontSize: ms(11),
     color: '#A0A0A0',
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
     marginBottom: vs(6), // Tighten here
   },
   ratingPriceRow: {
@@ -341,16 +341,16 @@ const styles = StyleSheet.create({
   ratingText: {
     fontSize: ms(12),
     color: '#1C1C1E',
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     marginLeft: s(4),
   },
   ratingCount: {
     color: '#A0A0A0',
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   placePrice: {
     fontSize: ms(13),
-    fontWeight: '800',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.primary,
   },
   tagsScroll: {
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
   },
   tagText: {
     fontSize: ms(9),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.primary,
   },
 });

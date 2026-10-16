@@ -4,6 +4,7 @@ export const storage = createMMKV();
 
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'ACCESS_TOKEN',
+  REFRESH_TOKEN: 'REFRESH_TOKEN',
   USER_INFO: 'USER_INFO',
   APP_SETTINGS: 'APP_SETTINGS',
 };

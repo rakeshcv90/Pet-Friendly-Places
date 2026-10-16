@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: theme.typography.sizes.h2,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.primary,
     marginBottom: theme.spacing.s,
     textAlign: 'center',
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: theme.typography.sizes.body1,
     color: theme.colors.textSecondary,
-    fontWeight: theme.typography.weights.medium,
+    fontFamily: theme.typography.fontFamily.medium,
     textAlign: 'center',
     marginBottom: theme.spacing.xxl,
   },
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   backText: {
     color: theme.colors.textSecondary,
     fontSize: theme.typography.sizes.body1,
-    fontWeight: theme.typography.weights.medium,
+    fontFamily: theme.typography.fontFamily.medium,
   },
   imagePlaceholder: {
     alignItems: 'center',

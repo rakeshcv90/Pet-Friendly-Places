@@ -141,14 +141,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: theme.typography.sizes.h2,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.primary,
     marginBottom: theme.spacing.xs,
   },
   subtitle: {
     fontSize: theme.typography.sizes.body1,
     color: theme.colors.textSecondary,
-    fontWeight: theme.typography.weights.medium,
+    fontFamily: theme.typography.fontFamily.medium,
   },
   form: {
     flex: 1,
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: theme.typography.sizes.h2,
     color: theme.colors.text,
-    fontWeight: theme.typography.weights.semiBold,
+    fontFamily: theme.typography.fontFamily.semiBold,
   },
   otpInputActive: {
     borderColor: theme.colors.primary,
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   resendText: {
     fontSize: theme.typography.sizes.body1,
     color: theme.colors.textSecondary,
-    fontWeight: theme.typography.weights.medium,
+    fontFamily: theme.typography.fontFamily.medium,
   },
   timerText: {
     color: theme.colors.primary,

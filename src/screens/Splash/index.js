@@ -114,6 +114,6 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.m,
   },
   buttonText: {
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
   },
 });

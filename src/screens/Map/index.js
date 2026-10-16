@@ -19,6 +19,6 @@ export const MapScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   mapPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#E8E5DF' },
-  emptyTitle: { fontSize: theme.typography.sizes.h4, fontWeight: theme.typography.weights.bold, color: theme.colors.text, marginBottom: 8 },
-  emptyText: { fontSize: theme.typography.sizes.body2, color: theme.colors.textSecondary, textAlign: 'center' },
+  emptyTitle: { fontSize: theme.typography.sizes.h4, fontFamily: theme.typography.fontFamily.bold, color: theme.colors.text, marginBottom: 8 },
+  emptyText: { fontSize: theme.typography.sizes.body2, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.textSecondary, textAlign: 'center' },
 });

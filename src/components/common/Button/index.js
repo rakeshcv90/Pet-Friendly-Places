@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: theme.typography.sizes.body1,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   primaryText: {
     color: theme.colors.surface,

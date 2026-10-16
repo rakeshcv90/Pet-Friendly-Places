@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: ms(13),
     color: theme.colors.primary,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     marginBottom: vs(2),
   },
   locationRow: {
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     fontSize: ms(11),
     color: '#A0A0A0',
     marginLeft: s(4),
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   headerIconBtn: {
     padding: s(4),
@@ -199,6 +199,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: ms(13),
     color: '#1C1C1E',
+    fontFamily: theme.typography.fontFamily.regular,
   },
   heroBanner: {
     height: vs(170), // Adjusted height to match the compact ratio
@@ -225,7 +226,7 @@ const styles = StyleSheet.create({
   heroBtnText: {
     color: theme.colors.primary,
     fontSize: ms(12),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   categoriesContainer: {
     flexDirection: 'row',
@@ -250,7 +251,6 @@ const styles = StyleSheet.create({
     fontSize: ms(10),
     color: theme.colors.primary,
     fontFamily: theme.typography.fontFamily.medium,
-    fontWeight: '600',
     textAlign: 'center',
     lineHeight: ms(12),
   },
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   },
   sectionTitleInner: {
     fontSize: ms(16),
-    fontWeight: '800',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.primary,
   },
   verifiedFeaturedCard: {
@@ -297,13 +297,14 @@ const styles = StyleSheet.create({
   },
   verifiedRowName: {
     fontSize: ms(13),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.primary,
     marginBottom: vs(2),
   },
   verifiedRowLocation: {
     fontSize: ms(11),
     color: '#A0A0A0',
+    fontFamily: theme.typography.fontFamily.regular,
   },
   verifiedRowBottom: {
     flexDirection: 'row',
@@ -317,16 +318,16 @@ const styles = StyleSheet.create({
   ratingText: {
     fontSize: ms(11),
     color: '#1C1C1E',
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semiBold,
     marginLeft: s(4),
   },
   ratingCount: {
     color: '#A0A0A0',
-    fontWeight: '400',
+    fontFamily: theme.typography.fontFamily.regular,
   },
   verifiedRowPrice: {
     fontSize: ms(13),
-    fontWeight: '800',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.primary,
   },
 });

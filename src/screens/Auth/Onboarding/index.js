@@ -482,12 +482,6 @@ export const OnboardingScreen = ({ navigation }) => {
                       color="#FFFFFF"
                       style={styles.buttonIcon}
                     />
-                    <Icon
-                      name={isLastSlide ? 'paw' : 'arrow-forward'}
-                      size={isLastSlide ? s(18) : s(18)}
-                      color="#FFFFFF"
-                      style={styles.buttonIcon}
-                    />
                   </Animated.View>
                 </LinearGradient>
               </Animated.View>
@@ -518,7 +512,7 @@ const styles = StyleSheet.create({
   skipText: {
     color: theme.colors.primaryDark,
     fontSize: theme.typography.sizes.body2,
-    fontWeight: theme.typography.weights.medium,
+    fontFamily: theme.typography.fontFamily.medium,
   },
   slide: {
     width: SCREEN_WIDTH,
@@ -563,12 +557,12 @@ const styles = StyleSheet.create({
   tagText: {
     color: theme.colors.primary,
     fontSize: isSmallDevice ? s(9) : s(10),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     letterSpacing: 1.2,
   },
   title: {
     fontSize: isSmallDevice ? s(20) : theme.typography.sizes.h2,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.primary,
     marginBottom: isSmallDevice ? s(4) : theme.spacing.s,
     lineHeight: isSmallDevice ? s(26) : s(32),
@@ -576,6 +570,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: isSmallDevice ? s(12) : theme.typography.sizes.body1,
     color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.regular,
     lineHeight: isSmallDevice ? s(17) : s(22),
   },
   footer: {
@@ -649,7 +644,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: theme.colors.primaryDark,
     fontSize: theme.typography.sizes.body1,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   nextButtonWrapper: {
     flex: 1,
@@ -682,7 +677,7 @@ const styles = StyleSheet.create({
   nextButtonText: {
     color: '#FFFFFF',
     fontSize: theme.typography.sizes.body1,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     letterSpacing: 0.5,
   },
 });

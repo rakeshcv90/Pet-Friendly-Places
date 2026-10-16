@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xs,
     fontSize: theme.typography.sizes.body2,
     color: theme.colors.primary,
-    fontWeight: theme.typography.weights.medium,
+    fontFamily: theme.typography.fontFamily.medium,
   },
   inputWrapper: {
     height: 48,
@@ -95,6 +95,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.m,
     fontSize: theme.typography.sizes.body1,
     color: theme.colors.text,
+    fontFamily: theme.typography.fontFamily.regular,
   },
   leftIcon: {
     paddingLeft: theme.spacing.m,
@@ -106,5 +107,6 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xs,
     fontSize: theme.typography.sizes.caption,
     color: theme.colors.error,
+    fontFamily: theme.typography.fontFamily.medium,
   },
 });

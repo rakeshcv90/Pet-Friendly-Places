@@ -8,6 +8,9 @@ export const images = {
   home: require('../assets/images/home.png'),
   backgroundimg: require('../assets/images/background.png'),
   backgroundimg1: require('../assets/images/background2.png'),
+  resetPassword: require('../assets/images/reset_password.png'),
+  mailbox: require('../assets/images/mailbox.png'),
+
   onboarding: {
     slide1: require('../assets/images/intro1.png'),
     slide2: require('../assets/images/intro2.png'),

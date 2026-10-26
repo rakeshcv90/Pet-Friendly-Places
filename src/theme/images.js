@@ -1,6 +1,7 @@
 export const images = {
   splashBackground: require('../assets/images/splash.png'),
   splashBackground1: require('../assets/images/splash2.png'),
+  splashVideo: require('../assets/images/video.mp4'),
   logo: require('../assets/images/logonew.png'),
   pass: require('../assets/images/pass.png'),
   pet: require('../assets/images/pet.png'),
@@ -16,4 +17,7 @@ export const images = {
     slide2: require('../assets/images/intro2.png'),
     slide3: require('../assets/images/intro3.png'),
   },
+};
+export const Icons = {
+  logo: require('../assets/icons/logo.png'),
 };

@@ -16,6 +16,7 @@ import FeatherIcon from 'react-native-vector-icons/Feather';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { theme } from '../../../theme';
 import { POPULAR_CITIES } from '../../../utils/cities';
+import { useStore } from '../../../store';
 
 export const CityPickerModal = ({
   visible = false,
@@ -26,6 +27,7 @@ export const CityPickerModal = ({
   title = 'Select your city',
 }) => {
   const insets = useSafeAreaInsets();
+  const isDarkMode = useStore(state => state.isDarkMode);
   const [citySearch, setCitySearch] = useState('');
   const searchInputRef = useRef(null);
 
@@ -65,40 +67,43 @@ export const CityPickerModal = ({
             <View
               style={[
                 styles.modalContent,
+                isDarkMode && styles.modalContentDark,
                 { paddingBottom: Math.max(insets.bottom, s(16)) },
               ]}>
               {/* Drag Grabber Indicator */}
-              <View style={styles.modalGrabber} />
+              <View style={[styles.modalGrabber, isDarkMode && styles.modalGrabberDark]} />
 
               {/* Header */}
               <View style={styles.modalHeader}>
                 <View style={styles.modalHeaderTitleGroup}>
-                  <Text style={styles.modalTitle}>{title}</Text>
-                  <Text style={styles.modalSubtitle}>
+                  <Text style={[styles.modalTitle, isDarkMode && styles.modalTitleDark]}>
+                    {title}
+                  </Text>
+                  <Text style={[styles.modalSubtitle, isDarkMode && styles.modalSubtitleDark]}>
                     {filteredCities.length} {filteredCities.length === 1 ? 'city' : 'cities'} available
                   </Text>
                 </View>
                 <TouchableOpacity
                   onPress={handleClose}
-                  style={styles.modalCloseButton}
+                  style={[styles.modalCloseButton, isDarkMode && styles.modalCloseButtonDark]}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <Ionicons name="close" size={s(18)} color="#64748B" />
+                  <Ionicons name="close" size={s(18)} color={isDarkMode ? '#FFFFFF' : '#64748B'} />
                 </TouchableOpacity>
               </View>
 
               {/* Real-time City Search Bar */}
-              <View style={styles.modalSearchContainer}>
+              <View style={[styles.modalSearchContainer, isDarkMode && styles.modalSearchContainerDark]}>
                 <FeatherIcon
                   name="search"
                   size={s(16)}
-                  color="#94A3B8"
+                  color={isDarkMode ? '#A855F7' : '#94A3B8'}
                   style={styles.searchIcon}
                 />
                 <TextInput
                   ref={searchInputRef}
-                  style={styles.modalSearchInput}
+                  style={[styles.modalSearchInput, isDarkMode && styles.modalSearchInputDark]}
                   placeholder="Search city (e.g. Mumbai, Bengaluru)..."
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={isDarkMode ? '#94A3B8' : '#94A3B8'}
                   value={citySearch}
                   onChangeText={setCitySearch}
                   autoCapitalize="words"
@@ -126,11 +131,13 @@ export const CityPickerModal = ({
                 contentContainerStyle={styles.cityListContent}
                 ListEmptyComponent={
                   <View style={styles.emptySearchContainer}>
-                    <View style={styles.emptyIconBadge}>
+                    <View style={[styles.emptyIconBadge, isDarkMode && styles.emptyIconBadgeDark]}>
                       <FeatherIcon name="map-pin" size={s(26)} color="#94A3B8" />
                     </View>
-                    <Text style={styles.emptySearchTitle}>No cities found</Text>
-                    <Text style={styles.emptySearchSubtitle}>
+                    <Text style={[styles.emptySearchTitle, isDarkMode && styles.emptySearchTitleDark]}>
+                      No cities found
+                    </Text>
+                    <Text style={[styles.emptySearchSubtitle, isDarkMode && styles.emptySearchSubtitleDark]}>
                       No matches found for "{citySearch}".
                     </Text>
                     <TouchableOpacity
@@ -145,25 +152,31 @@ export const CityPickerModal = ({
                   const isSelected = selectedCity === item;
                   return (
                     <TouchableOpacity
-                      style={[styles.cityOption, isSelected && styles.cityOptionSelected]}
+                      style={[
+                        styles.cityOption,
+                        isDarkMode && styles.cityOptionDark,
+                        isSelected && (isDarkMode ? styles.cityOptionSelectedDark : styles.cityOptionSelected),
+                      ]}
                       onPress={() => handleSelect(item)}
                       activeOpacity={0.7}>
                       <View style={styles.cityOptionLeft}>
                         <View
                           style={[
                             styles.cityPinBadge,
+                            isDarkMode && styles.cityPinBadgeDark,
                             isSelected && styles.cityPinBadgeSelected,
                           ]}>
                           <FeatherIcon
                             name="map-pin"
                             size={s(14)}
-                            color={isSelected ? '#FFFFFF' : theme.colors.primaryDark}
+                            color={isSelected ? '#FFFFFF' : isDarkMode ? '#A855F7' : theme.colors.primaryDark}
                           />
                         </View>
                         <Text
                           style={[
                             styles.cityOptionText,
-                            isSelected && styles.cityOptionTextSelected,
+                            isDarkMode && styles.cityOptionTextDark,
+                            isSelected && (isDarkMode ? styles.cityOptionTextSelectedDark : styles.cityOptionTextSelected),
                           ]}>
                           {item}
                         </Text>
@@ -173,7 +186,7 @@ export const CityPickerModal = ({
                           <Ionicons name="checkmark" size={s(13)} color="#FFFFFF" />
                         </View>
                       ) : (
-                        <View style={styles.uncheckedCircle} />
+                        <View style={[styles.uncheckedCircle, isDarkMode && styles.uncheckedCircleDark]} />
                       )}
                     </TouchableOpacity>
                   );
@@ -206,6 +219,13 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 25,
   },
+  modalContentDark: {
+    backgroundColor: '#17092E',
+    borderTopWidth: 1.5,
+    borderTopColor: '#2E1654',
+    shadowColor: '#000000',
+    shadowOpacity: 0.4,
+  },
   modalGrabber: {
     width: s(40),
     height: s(4.5),
@@ -213,6 +233,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#CBD5E1',
     alignSelf: 'center',
     marginBottom: s(14),
+  },
+  modalGrabberDark: {
+    backgroundColor: '#3B1A66',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -229,11 +252,17 @@ const styles = StyleSheet.create({
     color: theme.colors.primaryDark,
     letterSpacing: -0.2,
   },
+  modalTitleDark: {
+    color: '#FFFFFF',
+  },
   modalSubtitle: {
     fontSize: s(12),
     fontFamily: theme.typography.fontFamily.medium,
     color: '#64748B',
     marginTop: s(2),
+  },
+  modalSubtitleDark: {
+    color: '#94A3B8',
   },
   modalCloseButton: {
     width: s(32),
@@ -243,6 +272,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: s(12),
+  },
+  modalCloseButtonDark: {
+    backgroundColor: '#1E0E38',
+    borderWidth: 1,
+    borderColor: '#2E1654',
   },
   modalSearchContainer: {
     flexDirection: 'row',
@@ -255,6 +289,10 @@ const styles = StyleSheet.create({
     height: s(44),
     marginBottom: s(12),
   },
+  modalSearchContainerDark: {
+    backgroundColor: '#1E0E38',
+    borderColor: '#2E1654',
+  },
   searchIcon: {
     marginRight: s(8),
   },
@@ -264,6 +302,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.primaryDark,
     paddingVertical: 0,
+  },
+  modalSearchInputDark: {
+    color: '#FFFFFF',
   },
   clearSearchButton: {
     padding: s(4),
@@ -280,10 +321,39 @@ const styles = StyleSheet.create({
     borderRadius: s(14),
     marginBottom: s(4),
   },
+  cityOptionDark: {
+    backgroundColor: 'transparent',
+  },
   cityOptionSelected: {
     backgroundColor: '#F3E8FF',
     borderWidth: 1.2,
     borderColor: '#DDD6FE',
+  },
+  cityOptionSelectedDark: {
+    backgroundColor: '#27104B',
+    borderWidth: 1.2,
+    borderColor: '#3B1A66',
+  },
+  cityOptionTextDark: {
+    color: '#E2E8F0',
+  },
+  cityOptionTextSelectedDark: {
+    color: '#FFFFFF',
+  },
+  cityPinBadgeDark: {
+    backgroundColor: '#1E0E38',
+  },
+  uncheckedCircleDark: {
+    borderColor: '#3B1A66',
+  },
+  emptyIconBadgeDark: {
+    backgroundColor: '#1E0E38',
+  },
+  emptySearchTitleDark: {
+    color: '#FFFFFF',
+  },
+  emptySearchSubtitleDark: {
+    color: '#94A3B8',
   },
   cityOptionLeft: {
     flexDirection: 'row',

@@ -1,7 +1,5 @@
 import { useState, useCallback } from 'react';
 import { requestLocationPermission } from '../services/permissions/permissions';
-// Note: In a real project, we would use @react-native-community/geolocation or react-native-geolocation-service
-// For this architecture scaffold, we mock the geolocation usage.
 
 export const useLocation = () => {
   const [location, setLocation] = useState(null);

@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, getErrorMessage } from '../services/api/apiClient';
 import { API_ENDPOINTS } from '../services/api/apiList';
 import { setItem, STORAGE_KEYS } from '../services/storage/storage';
@@ -6,6 +6,7 @@ import { useStore } from '../store';
 
 export const useLogin = () => {
   const setAuthInfo = useStore(state => state.setAuthInfo);
+  const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: credentials => api.post(API_ENDPOINTS.AUTH.LOGIN, credentials),
@@ -33,6 +34,7 @@ export const useLogin = () => {
       }
 
       setAuthInfo(user || null, token);
+      queryClient.invalidateQueries({ queryKey: ['user', 'profile'] });
     },
 
     onError: error => {},

@@ -117,3 +117,5 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.bold,
   },
 });
+
+export { MainSplash } from './MainSplash';

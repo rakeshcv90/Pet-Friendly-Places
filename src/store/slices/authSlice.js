@@ -7,16 +7,27 @@ export const createAuthSlice = (set, get) => ({
   isLoading: false,
   error: null,
 
-  setUser: user => set({ user }),
+  setUser: user => {
+    const apiLocation = user?.location || user?.city;
+    if (apiLocation && !getItem(STORAGE_KEYS.SELECTED_LOCATION)) {
+      get().setCurrentLocation?.(apiLocation);
+    }
+    set({ user });
+  },
 
   logout: () => {
     removeItem(STORAGE_KEYS.ACCESS_TOKEN);
     removeItem(STORAGE_KEYS.REFRESH_TOKEN);
     removeItem(STORAGE_KEYS.USER_INFO);
-    set({ user: null, token: null, isAuthenticated: false });
+    removeItem(STORAGE_KEYS.SELECTED_LOCATION);
+    set({ user: null, token: null, isAuthenticated: false, currentLocation: null });
   },
 
   setAuthInfo: (user, token) => {
+    const apiLocation = user?.location || user?.city;
+    if (apiLocation && !getItem(STORAGE_KEYS.SELECTED_LOCATION)) {
+      get().setCurrentLocation?.(apiLocation);
+    }
     set({ user, token, isAuthenticated: !!token });
   },
 });

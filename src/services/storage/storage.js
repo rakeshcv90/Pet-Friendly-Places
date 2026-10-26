@@ -7,6 +7,7 @@ export const STORAGE_KEYS = {
   REFRESH_TOKEN: 'REFRESH_TOKEN',
   USER_INFO: 'USER_INFO',
   APP_SETTINGS: 'APP_SETTINGS',
+  SELECTED_LOCATION: 'SELECTED_LOCATION',
 };
 
 export const setItem = (key, value) => {

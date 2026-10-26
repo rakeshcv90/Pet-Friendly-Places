@@ -12,17 +12,20 @@ export const useUserProfile = (options = {}) => {
     queryFn: async () => {
       const data = await api.get(API_ENDPOINTS.USER.PROFILE);
 
-      const account = data?.account || data?.user || null;
-      const pets = data?.pets || [];
+      const account = data?.account || data?.user || (data?.id ? data : null);
+      const pets = data?.pets || data?.account?.pets || [];
 
-      // 1. Persist to MMKV for offline / instant startup
       if (account) {
         setItem(STORAGE_KEYS.USER_INFO, account);
       }
 
-      // 2. Synchronize to global Zustand store for app-wide reactivity
       if (account) {
         useStore.getState().setUser(account);
+        const apiLocation = account?.location || account?.city;
+        const savedLocation = getItem(STORAGE_KEYS.SELECTED_LOCATION);
+        if (apiLocation && !savedLocation) {
+          useStore.getState().setCurrentLocation(apiLocation);
+        }
       }
       if (pets && Array.isArray(pets)) {
         useStore.getState().setPets(pets);
@@ -31,14 +34,11 @@ export const useUserProfile = (options = {}) => {
       return data;
     },
     enabled: !!token,
-    staleTime: 1000 * 60 * 5, // 5 minutes fresh
+    staleTime: 1000 * 60 * 5,
     ...options,
   });
 };
 
-/**
- * Hook to manually trigger or update user profile
- */
 export const useRefreshProfile = () => {
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: ['user', 'profile'] });

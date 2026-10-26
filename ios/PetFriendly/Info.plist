@@ -34,7 +34,11 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>PetFriendly needs your location to find nearby pet-friendly places and lost pets.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>PetFriendly needs camera access so you can take photos of your pet.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>PetFriendly needs access to your photo library to select photos of your pet.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIAppFonts</key>

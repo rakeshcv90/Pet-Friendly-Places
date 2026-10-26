@@ -4,6 +4,8 @@ import { spacing } from './spacing';
 import { dimensions } from './dimensions';
 import { images } from './images';
 
+export { colors, typography, spacing, dimensions, images };
+
 export const theme = {
   colors,
   typography,
@@ -11,3 +13,5 @@ export const theme = {
   dimensions,
   images,
 };
+
+export default theme;

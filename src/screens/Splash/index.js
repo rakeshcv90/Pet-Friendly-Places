@@ -15,7 +15,7 @@ const IMAGE_RATIO = IMAGE_WIDTH / IMAGE_HEIGHT; // ~ 0.50028
 export const SplashScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const { isAuthenticated } = useStore();
+  const isAuthenticated = useStore(state => state.isAuthenticated);
 
   const handleGetStarted = () => {
     navigation.replace('Onboarding');

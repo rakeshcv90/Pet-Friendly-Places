@@ -9,7 +9,8 @@ import { useStore } from '../store';
 import { getItem, STORAGE_KEYS } from '../services/storage/storage';
 
 export const RootNavigator = () => {
-  const { isAuthenticated, setAuthInfo } = useStore();
+  const isAuthenticated = useStore(state => state.isAuthenticated);
+  const setAuthInfo = useStore(state => state.setAuthInfo);
   const isDarkMode = useStore(state => state.isDarkMode);
   const [showSplash, setShowSplash] = useState(true);
 

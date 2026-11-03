@@ -5,3 +5,4 @@ export { HelpAiModal } from './HelpAiModal';
 export { ProfileVipCard } from './ProfileVipCard';
 export { NavTabs } from './NavTabs';
 export { PawsportCard } from './PawsportCard';
+export { ModernConfirmModal } from './ModernConfirmModal';

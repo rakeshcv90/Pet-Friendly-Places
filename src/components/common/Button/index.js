@@ -16,6 +16,8 @@ export const Button = ({
   leftIcon,
   gradientColors,
   width,
+  testID,
+  ...props
 }) => {
   const isPrimary = variant === 'primary';
   const colors =
@@ -49,6 +51,7 @@ export const Button = ({
   if (isPrimary) {
     return (
       <TouchableOpacity
+        testID={testID}
         onPress={onPress}
         disabled={disabled || isLoading}
         activeOpacity={0.85}
@@ -59,6 +62,7 @@ export const Button = ({
           customWidthStyle,
           style,
         ]}
+        {...props}
       >
         <LinearGradient
           colors={colors}
@@ -74,6 +78,7 @@ export const Button = ({
 
   return (
     <TouchableOpacity
+      testID={testID}
       style={[
         styles.container,
         styles.outlineContainer,
@@ -83,6 +88,7 @@ export const Button = ({
       ]}
       onPress={onPress}
       disabled={disabled || isLoading}
+      {...props}
       activeOpacity={0.8}
     >
       {renderContent()}

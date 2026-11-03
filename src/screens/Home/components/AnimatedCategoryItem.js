@@ -5,7 +5,7 @@ import { s, ms } from 'react-native-size-matters';
 import { theme } from '../../../theme';
 import { useStore } from '../../../store';
 
-export const AnimatedCategoryItem = ({ cat, isSelected, onPress }) => {
+export const AnimatedCategoryItem = React.memo(({ cat, isSelected, onPress }) => {
   const isDarkMode = useStore(state => state.isDarkMode);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -75,13 +75,16 @@ export const AnimatedCategoryItem = ({ cat, isSelected, onPress }) => {
         style={[
           styles.categoryLabel,
           isDarkMode && styles.categoryLabelDark,
-          isSelected && [styles.categoryLabelSelected, { color: isDarkMode ? '#A855F7' : cat.color }],
+          isSelected && [
+            styles.categoryLabelSelected,
+            { color: isDarkMode ? '#A855F7' : cat.color },
+          ],
         ]}>
         {cat.name}
       </Text>
     </Pressable>
   );
-};
+});
 
 const styles = StyleSheet.create({
   categoryItemCenter: {
@@ -116,9 +119,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
   },
   categoryLabel: {
-    fontSize: s(11),
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: '#373244',
+    fontSize: s(10),
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#514660',
+    lineHeight: s(14),
+    letterSpacing: 0,
     textAlign: 'center',
   },
   categoryLabelDark: {

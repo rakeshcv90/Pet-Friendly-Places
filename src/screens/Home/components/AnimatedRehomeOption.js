@@ -5,94 +5,86 @@ import Feather from 'react-native-vector-icons/Feather';
 import { s, ms } from 'react-native-size-matters';
 import { theme } from '../../../theme';
 
-export const AnimatedRehomeOption = ({
-  icon,
-  label,
-  tag,
-  tagColor,
-  tagBg,
-  gradientColors,
-  buttonStyle,
-  labelColor,
-  onPress,
-}) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const translateYAnim = useRef(new Animated.Value(0)).current;
+export const AnimatedRehomeOption = React.memo(
+  ({ icon, label, tag, tagColor, tagBg, gradientColors, buttonStyle, labelColor, onPress }) => {
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+    const translateYAnim = useRef(new Animated.Value(0)).current;
 
-  const handlePressIn = () => {
-    Animated.parallel([
-      Animated.spring(scaleAnim, {
-        toValue: 0.92,
-        tension: 240,
-        friction: 7,
-        useNativeDriver: true,
-      }),
-      Animated.spring(translateYAnim, {
-        toValue: 2,
-        tension: 240,
-        friction: 7,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
+    const handlePressIn = () => {
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 0.92,
+          tension: 240,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+        Animated.spring(translateYAnim, {
+          toValue: 2,
+          tension: 240,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    };
 
-  const handlePressOut = () => {
-    Animated.parallel([
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        tension: 100,
-        friction: 4,
-        useNativeDriver: true,
-      }),
-      Animated.spring(translateYAnim, {
-        toValue: 0,
-        tension: 100,
-        friction: 4,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
+    const handlePressOut = () => {
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 4,
+          useNativeDriver: true,
+        }),
+        Animated.spring(translateYAnim, {
+          toValue: 0,
+          tension: 100,
+          friction: 4,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    };
 
-  return (
-    <Pressable
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      style={styles.fullWidth}>
-      <Animated.View
-        style={[
-          styles.cardBase,
-          buttonStyle,
-          {
-            transform: [{ scale: scaleAnim }, { translateY: translateYAnim }],
-          },
-        ]}>
-        {/* Glowing Gradient Circle for the Icon */}
-        <View style={styles.iconCircleWrapper}>
-          <LinearGradient
-            colors={gradientColors || ['#7B2CFF', '#9333EA']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.iconCircle}>
-            <Feather name={icon} size={ms(15)} color="#FFFFFF" />
-          </LinearGradient>
-        </View>
-
-        {/* Title */}
-        <Text style={[styles.label, { color: labelColor || '#FFFFFF' }]} numberOfLines={1}>
-          {label}
-        </Text>
-
-        {/* Tag Pill */}
-        {tag ? (
-          <View style={[styles.tagPill, { backgroundColor: tagBg }]}>
-            <Text style={[styles.tagText, { color: tagColor }]}>{tag}</Text>
+    return (
+      <Pressable
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={styles.fullWidth}>
+        <Animated.View
+          style={[
+            styles.cardBase,
+            buttonStyle,
+            {
+              transform: [{ scale: scaleAnim }, { translateY: translateYAnim }],
+            },
+          ]}>
+          {/* Glowing Gradient Circle for the Icon */}
+          <View style={styles.iconCircleWrapper}>
+            <LinearGradient
+              colors={gradientColors || ['#7B2CFF', '#9333EA']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.iconCircle}>
+              <Feather name={icon} size={ms(15)} color="#FFFFFF" />
+            </LinearGradient>
           </View>
-        ) : null}
-      </Animated.View>
-    </Pressable>
-  );
-};
+
+          {/* Title */}
+          <Text style={[styles.label, { color: labelColor || '#FFFFFF' }]} numberOfLines={1}>
+            {label}
+          </Text>
+
+          {/* Tag Pill */}
+          {tag ? (
+            <View style={[styles.tagPill, { backgroundColor: tagBg }]}>
+              <Text style={[styles.tagText, { color: tagColor }]}>{tag}</Text>
+            </View>
+          ) : null}
+        </Animated.View>
+      </Pressable>
+    );
+  },
+);
 
 const styles = StyleSheet.create({
   fullWidth: {
@@ -124,8 +116,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   label: {
-    fontSize: s(11),
-    fontFamily: theme.typography.fontFamily.bold,
+    fontSize: s(10),
+    fontFamily: theme.typography.fontFamily.extraBold,
+    lineHeight: s(12),
+    letterSpacing: 0,
     textAlign: 'center',
     marginBottom: s(4),
   },

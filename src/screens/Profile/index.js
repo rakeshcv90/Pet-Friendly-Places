@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StatusBar, Alert, Animated } from 'react-native';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { View, Text, StatusBar, Animated } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../../store';
 import { useUserProfile } from '../../hooks/useUser';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
-import { vs, ms } from 'react-native-size-matters';
+import { s, vs, ms } from 'react-native-size-matters';
 
 import {
   ThreeDMetricCard,
@@ -18,7 +18,9 @@ import {
   ProfileVipCard,
   NavTabs,
   PawsportCard,
+  ModernConfirmModal,
 } from './components';
+import { COMMUNITY_CHANNELS } from './communityData';
 import styles from './styles';
 
 const sanitizePet = (pet, index = 0) => {
@@ -112,6 +114,32 @@ export const ProfileScreen = ({ navigation }) => {
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
 
+  const [confirmModalConfig, setConfirmModalConfig] = useState({
+    visible: false,
+    title: 'Sign Out',
+    subtitle: 'Are you sure you want to sign out of PetFriendly?',
+    badge: 'SECURITY & SESSION',
+    type: 'logout',
+    confirmText: 'Sign Out',
+    cancelText: 'Cancel',
+    singleButton: false,
+    onConfirm: null,
+  });
+
+  const showInfoModal = useCallback((title, subtitle, badge = 'PETFRIENDLY') => {
+    setConfirmModalConfig({
+      visible: true,
+      title,
+      subtitle,
+      badge,
+      type: 'info',
+      confirmText: 'Got It',
+      cancelText: 'Close',
+      singleButton: true,
+      onConfirm: null,
+    });
+  }, []);
+
   // Settings preferences
   const [pushNotifications, setPushNotifications] = useState(true);
   const [travelAlerts, setTravelAlerts] = useState(true);
@@ -119,6 +147,7 @@ export const ProfileScreen = ({ navigation }) => {
 
   // Active Navigation Tab (by default 'dashboard' is selected)
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [communitySubFilter, setCommunitySubFilter] = useState('all');
   const scrollRef = useRef(null);
 
   const handleSelectTab = useCallback(tabId => {
@@ -128,47 +157,21 @@ export const ProfileScreen = ({ navigation }) => {
     }
   }, []);
 
+  const handleBrowseCommunity = useCallback(() => {
+    navigation.navigate('CommunityPostsScreen', { initialTab: communitySubFilter });
+  }, [navigation, communitySubFilter]);
+
+  const handleJoinConversation = useCallback(() => {
+    navigation.navigate('CommunityPostsScreen', { initialTab: communitySubFilter });
+  }, [navigation, communitySubFilter]);
+
+  const displayedChannels = useMemo(() => COMMUNITY_CHANNELS.slice(0, 2), []);
+
   // Metrics
   const petsCount = pets.length;
   const stampsCount = user?.stamps_count || 0;
   const postsCount = user?.posts_count || 0;
   const topRank = user?.rank ? `#${user.rank}` : '—';
-
-  // Ambient FAB glow pulse
-  const fabPulse = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const pulseLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(fabPulse, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fabPulse, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    pulseLoop.start();
-    return () => pulseLoop.stop();
-  }, [fabPulse]);
-
-  const fabPulseStyle = {
-    opacity: fabPulse.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.15, 0.45],
-    }),
-    transform: [
-      {
-        scale: fabPulse.interpolate({
-          inputRange: [0, 1],
-          outputRange: [1, 1.28],
-        }),
-      },
-    ],
-  };
 
   const handleAddPet = newPet => {
     const newId = `pet-${Date.now()}`;
@@ -187,42 +190,92 @@ export const ProfileScreen = ({ navigation }) => {
     const updated = [...pets, createdPet];
     setLocalPets(updated);
     setSelectedPetIndex(updated.length - 1);
-    Alert.alert(
-      '🎉 Pawsport Activated!',
-      `${newPet.name} is now registered on PetFriendly with Passport ID ${newPassportNo}!`,
-    );
+    setConfirmModalConfig({
+      visible: true,
+      title: 'Pawsport Activated! 🎉',
+      subtitle: `${newPet.name} is now registered on PetFriendly with Passport ID ${newPassportNo}!`,
+      badge: 'PACK PASSPORT',
+      type: 'success',
+      confirmText: 'Awesome!',
+      cancelText: 'Close',
+      singleButton: true,
+      onConfirm: null,
+    });
   };
 
   const handleLogout = useCallback(() => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out of PetFriendly?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: () => logout(),
-        },
-      ],
-      { cancelable: true },
-    );
+    setConfirmModalConfig({
+      visible: true,
+      title: 'Sign Out?',
+      subtitle:
+        'Are you sure you want to sign out of PetFriendly? Your pawsport stamps and saved trips will be kept safe for when you return.',
+      badge: 'SECURITY & SESSION',
+      type: 'logout',
+      confirmText: 'Yes, Sign Out',
+      cancelText: 'Stay Logged In',
+      singleButton: false,
+      onConfirm: () => logout(),
+    });
   }, [logout]);
+
+  const handleOpenFollowing = useCallback(() => {
+    setConfirmModalConfig({
+      visible: true,
+      title: 'Pack Following 🐾',
+      subtitle:
+        'You are following verified pet parents, pack explorers, and trainers across India. Stay tuned for their latest road trips, pet cafe reviews, and trail tips!',
+      badge: 'COMMUNITY PACK',
+      type: 'info',
+      confirmText: 'Explore Pack',
+      cancelText: 'Close',
+      singleButton: false,
+      onConfirm: () => handleSelectTab('community_posts'),
+    });
+  }, [handleSelectTab]);
+
+  const handleOpenSavedPlaces = useCallback(() => {
+    navigation?.navigate?.('Saved');
+  }, [navigation]);
+
+  const handleOpenSubmissions = useCallback(() => {
+    setConfirmModalConfig({
+      visible: true,
+      title: 'My Submissions 📍',
+      subtitle:
+        'Track pet-friendly cafes, hotels, and dog parks you have submitted. Our team verifies all community submissions to ensure safe pet environments.',
+      badge: 'VERIFIED PLACES',
+      type: 'info',
+      confirmText: 'Got It',
+      cancelText: 'Close',
+      singleButton: true,
+      onConfirm: null,
+    });
+  }, []);
+
+  const handleOpenMyProfile = useCallback(() => {
+    navigation.navigate('MyProfileScreen');
+  }, [navigation]);
+
+  const handleOpenPrivacy = useCallback(() => {
+    setConfirmModalConfig({
+      visible: true,
+      title: 'Privacy & Security 🛡️',
+      subtitle:
+        'Your profile, booking data, and pet credentials are protected with salted hashes and encrypted transport. You can manage your public profile visibility anytime.',
+      badge: 'DATA PRIVACY',
+      type: 'info',
+      confirmText: 'Privacy Settings',
+      cancelText: 'Close',
+      singleButton: false,
+      onConfirm: () => setSettingsModalVisible(true),
+    });
+  }, []);
 
   const menuSections = useMemo(
     () => [
       {
         sectionTitle: 'OVERVIEW',
         items: [
-          {
-            id: 'dashboard',
-            title: 'Dashboard',
-            icon: 'grid-outline',
-            color: accentColor,
-            bgColor: isDarkMode ? '#2D1652' : '#EDE9FE',
-            active: activeTab === 'dashboard',
-            onPress: () => handleSelectTab('dashboard'),
-          },
           {
             id: 'settings_theme',
             title: 'Settings & Dark Theme',
@@ -234,21 +287,7 @@ export const ProfileScreen = ({ navigation }) => {
           },
         ],
       },
-      {
-        sectionTitle: 'MY PETS',
-        items: [
-          {
-            id: 'pet_profiles',
-            title: 'Pet Profiles',
-            icon: 'paw-outline',
-            color: accentColor,
-            bgColor: isDarkMode ? '#2D1652' : '#EDE9FE',
-            badge: `${pets.length} ${pets.length === 1 ? 'pet' : 'pets'}`,
-            active: activeTab === 'pet_profiles',
-            onPress: () => handleSelectTab('pet_profiles'),
-          },
-        ],
-      },
+
       {
         sectionTitle: 'ACTIVITY',
         items: [
@@ -256,8 +295,9 @@ export const ProfileScreen = ({ navigation }) => {
             id: 'community_posts',
             title: 'Community Posts',
             icon: 'chatbubble-ellipses-outline',
-            color: '#2563EB',
-            bgColor: isDarkMode ? '#1E293B' : '#EFF6FF',
+            color: '#7C3AED',
+            bgColor: isDarkMode ? '#2D1652' : '#F5F3FF',
+            badge: postsCount > 0 ? `${postsCount}` : null,
             active: activeTab === 'community_posts',
             onPress: () => handleSelectTab('community_posts'),
           },
@@ -265,8 +305,8 @@ export const ProfileScreen = ({ navigation }) => {
             id: 'reviews',
             title: 'Reviews',
             icon: 'star-outline',
-            color: '#D97706',
-            bgColor: isDarkMode ? '#332205' : '#FEF3C7',
+            color: '#F59E0B',
+            bgColor: isDarkMode ? '#451A03' : '#FEF3C7',
             active: activeTab === 'reviews',
             onPress: () => handleSelectTab('reviews'),
           },
@@ -276,11 +316,7 @@ export const ProfileScreen = ({ navigation }) => {
             icon: 'map-outline',
             color: '#059669',
             bgColor: isDarkMode ? '#064E3B' : '#ECFDF5',
-            onPress: () =>
-              Alert.alert(
-                'Road Trip Planner',
-                'Plan your next pet-friendly road trip with verified stops.',
-              ),
+            onPress: () => navigation.navigate('CreateTripScreen'),
           },
           {
             id: 'leaderboard',
@@ -291,6 +327,32 @@ export const ProfileScreen = ({ navigation }) => {
             badge: topRank !== '—' ? topRank : 'Explore',
             active: activeTab === 'leaderboard',
             onPress: () => handleSelectTab('leaderboard'),
+          },
+          {
+            id: 'following',
+            title: 'Following',
+            icon: 'people-outline',
+            color: '#3B82F6',
+            bgColor: isDarkMode ? '#1E293B' : '#EFF6FF',
+            badge: 'Pack 🐾',
+            onPress: handleOpenFollowing,
+          },
+          {
+            id: 'saved_places',
+            title: 'Saved Places',
+            icon: 'bookmark-outline',
+            color: '#EC4899',
+            bgColor: isDarkMode ? '#4A0E2E' : '#FDF2F8',
+            onPress: handleOpenSavedPlaces,
+          },
+          {
+            id: 'my_submissions',
+            title: 'My Submissions',
+            icon: 'location-outline',
+            color: '#F59E0B',
+            bgColor: isDarkMode ? '#451A03' : '#FEF3C7',
+            badge: 'Places 📍',
+            onPress: handleOpenSubmissions,
           },
         ],
       },
@@ -304,7 +366,7 @@ export const ProfileScreen = ({ navigation }) => {
             color: '#7C3AED',
             bgColor: isDarkMode ? '#2D1652' : '#F5F3FF',
             aiBadge: 'Pack AI',
-            onPress: () => setHelpModalVisible(true),
+            onPress: () => navigation.navigate('PfpAssistantScreen'),
           },
           {
             id: 'contact_us',
@@ -312,17 +374,38 @@ export const ProfileScreen = ({ navigation }) => {
             icon: 'mail-outline',
             color: '#0284C7',
             bgColor: isDarkMode ? '#082F49' : '#F0F9FF',
-            onPress: () =>
-              Alert.alert(
-                'Contact PetFriendly Support',
-                'Email: support@petfriendly.in\nPhone: +91 800 PET HELP\nAvailable 24x7',
-              ),
+            onPress: () => navigation.navigate('ContactUsScreen'),
           },
         ],
       },
       {
         sectionTitle: 'ACCOUNT',
         items: [
+          {
+            id: 'my_profile',
+            title: 'My Profile',
+            icon: 'person-outline',
+            color: '#6366F1',
+            bgColor: isDarkMode ? '#1E1B4B' : '#EEF2FF',
+            onPress: handleOpenMyProfile,
+          },
+          {
+            id: 'privacy',
+            title: 'Privacy',
+            icon: 'shield-checkmark-outline',
+            color: '#10B981',
+            bgColor: isDarkMode ? '#064E3B' : '#ECFDF5',
+            badge: 'Protected 🔒',
+            onPress: handleOpenPrivacy,
+          },
+          {
+            id: 'change_password',
+            title: 'Change password',
+            icon: 'lock-closed-outline',
+            color: '#7C3AED',
+            bgColor: isDarkMode ? '#2D1652' : '#F5F3FF',
+            onPress: () => navigation.navigate('ChangePasswordScreen'),
+          },
           {
             id: 'logout',
             title: 'Logout',
@@ -336,14 +419,19 @@ export const ProfileScreen = ({ navigation }) => {
       },
     ],
     [
-      accentColor,
       isDarkMode,
       activeTab,
       themeMode,
-      pets.length,
       topRank,
+      postsCount,
       handleSelectTab,
       handleLogout,
+      handleOpenFollowing,
+      handleOpenSavedPlaces,
+      handleOpenSubmissions,
+      handleOpenMyProfile,
+      handleOpenPrivacy,
+      navigation,
     ],
   );
 
@@ -419,6 +507,7 @@ export const ProfileScreen = ({ navigation }) => {
           userEmail={userEmail}
           userInitial={userInitial}
           isDarkMode={isDarkMode}
+          onPressProfile={handleOpenMyProfile}
         />
 
         {/* ── 2b. Executive Section Tabs (Dashboard active by default) ── */}
@@ -469,9 +558,10 @@ export const ProfileScreen = ({ navigation }) => {
                 shadowColor="#B45309"
                 bevelColor="#78350F"
                 onPress={() =>
-                  Alert.alert(
-                    'Stamps',
-                    'Collect digital stamps each time you visit verified pet-friendly places!',
+                  showInfoModal(
+                    'Digital Pawsport Stamps',
+                    'Collect verified digital stamps each time you and your pet check in at verified cafes, parks, and stays!',
+                    'PAWSPORT STAMPS',
                   )
                 }
                 delay={100}
@@ -486,9 +576,10 @@ export const ProfileScreen = ({ navigation }) => {
                 shadowColor="#047857"
                 bevelColor="#064E3B"
                 onPress={() =>
-                  Alert.alert(
+                  showInfoModal(
                     'Community Posts',
-                    'Share tips, meetups, and pet stories with the local community.',
+                    'Share pet travel recommendations, cafe experiences, and tips with our growing pack community.',
+                    'PACK COMMUNITY',
                   )
                 }
                 delay={160}
@@ -503,9 +594,10 @@ export const ProfileScreen = ({ navigation }) => {
                 shadowColor="#991B1B"
                 bevelColor="#450A0A"
                 onPress={() =>
-                  Alert.alert(
-                    'Leaderboard',
-                    'Explore more pet places to rise through community rankings!',
+                  showInfoModal(
+                    'Pack Leaderboard',
+                    'Explore more pet places, write verified reviews, and earn badges to rise through weekly pack rankings!',
+                    'TOP EXPLORERS',
                   )
                 }
                 delay={220}
@@ -550,51 +642,177 @@ export const ProfileScreen = ({ navigation }) => {
           </View>
         )}
 
-        {/* ── TAB CONTENT: COMMUNITY POSTS ── */}
+        {/* ── TAB CONTENT: COMMUNITY POSTS (Web-Matched Design) ── */}
         {activeTab === 'community_posts' && (
           <View style={styles.tabContentContainer}>
-            <View style={styles.dashboardSectionHeader}>
-              <View style={styles.dashboardTitleRow}>
-                <Text style={[styles.dashboardTitle, isDarkMode && styles.dashboardTitleDark]}>
-                  Community Posts
-                </Text>
-                <Text style={styles.waveEmoji}> 💬</Text>
-              </View>
-              <Text style={[styles.dashboardSubtitle, isDarkMode && styles.dashboardSubtitleDark]}>
-                Stories and moments shared with the pack
-              </Text>
-            </View>
-
-            <View style={[styles.tabContentCard, isDarkMode && styles.tabContentCardDark]}>
-              <View style={styles.tabContentEmptyIconWrap}>
-                <Ionicons name="chatbubbles" size={ms(28)} color={accentColor} />
-              </View>
-              <Text style={[styles.tabContentEmptyTitle, isDarkMode && styles.textWhite]}>
-                Share Your First Pet Story
-              </Text>
-              <Text style={[styles.tabContentEmptySub, isDarkMode && styles.textMutedDark]}>
-                Inspire pet parents across India with your favorite pet-friendly trails, stays, and
-                cafe memories.
+            {/* Header: "Community Posts" + "Browse →" */}
+            <View style={styles.communityHeaderRow}>
+              <Text style={[styles.communityTitle, isDarkMode && styles.communityTitleDark]}>
+                Community Posts
               </Text>
               <BouncyPressable
-                style={styles.tabActionBtn}
+                style={styles.communityBrowseBtn}
                 activeScale={0.92}
-                onPress={() =>
-                  Alert.alert('Share Story', 'Travel story publishing form coming soon!')
-                }>
-                <LinearGradient
-                  colors={['#8B5CF6', '#7C3AED', '#6D28D9']}
-                  style={styles.tabActionBtnGrad}>
-                  <Feather
-                    name="plus"
-                    size={ms(14)}
-                    color="#FFFFFF"
-                    style={styles.tabActionBtnIcon}
-                  />
-                  <Text style={styles.tabActionBtnText}>Create a Story</Text>
-                </LinearGradient>
+                onPress={handleBrowseCommunity}>
+                <Text
+                  style={[
+                    styles.communityBrowseText,
+                    isDarkMode && styles.communityBrowseTextDark,
+                  ]}>
+                  Browse
+                </Text>
+                <Feather
+                  name="arrow-right"
+                  size={ms(14)}
+                  color={isDarkMode ? '#A855F7' : '#7C3AED'}
+                />
               </BouncyPressable>
             </View>
+
+            {/* Filter Sub-Tabs: All | Posts | Replies */}
+            <View style={styles.communityFilterRow}>
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'posts', label: 'Posts' },
+                { id: 'replies', label: 'Replies' },
+              ].map(filter => {
+                const isActive = communitySubFilter === filter.id;
+                return (
+                  <BouncyPressable
+                    key={filter.id}
+                    style={[
+                      styles.communityFilterPill,
+                      isDarkMode && styles.communityFilterPillDark,
+                      isActive && styles.communityFilterPillActive,
+                    ]}
+                    activeScale={0.94}
+                    onPress={() => setCommunitySubFilter(filter.id)}>
+                    <Text
+                      style={[
+                        styles.communityFilterText,
+                        isDarkMode && styles.communityFilterTextDark,
+                        isActive && styles.communityFilterTextActive,
+                      ]}>
+                      {filter.label}
+                    </Text>
+                  </BouncyPressable>
+                );
+              })}
+            </View>
+
+            {/* Channel Cards (Top 2 channels matching screenshot) or Empty State */}
+            {communitySubFilter === 'replies' ? (
+              /* Empty State Card matching Web App */
+              <View
+                style={[styles.communityEmptyCard, isDarkMode && styles.communityEmptyCardDark]}>
+                <Ionicons
+                  name="chatbubble-outline"
+                  size={ms(44)}
+                  color={isDarkMode ? '#64748B' : '#94A3B8'}
+                  style={styles.communityEmptyIcon}
+                />
+                <View style={styles.communityEmptyTextRow}>
+                  <Text
+                    style={[
+                      styles.communityEmptyMessage,
+                      isDarkMode && styles.communityEmptyMessageDark,
+                    ]}>
+                    No replies yet.{' '}
+                  </Text>
+                  <BouncyPressable activeScale={0.94} onPress={handleJoinConversation}>
+                    <Text
+                      style={[
+                        styles.communityJoinLink,
+                        isDarkMode && styles.communityJoinLinkDark,
+                      ]}>
+                      Join the conversation
+                    </Text>
+                  </BouncyPressable>
+                </View>
+              </View>
+            ) : (
+              <>
+                {displayedChannels.map(channel => {
+                  const isHealth = channel.id === 'health-vet-advice';
+                  return (
+                    <BouncyPressable
+                      key={channel.id}
+                      testID={`community-channel-${channel.id}`}
+                      style={[
+                        styles.communityChannelCard,
+                        isHealth ? styles.channelBorderHealth : styles.channelBorderTravel,
+                        isDarkMode && styles.communityChannelCardDark,
+                      ]}
+                      activeScale={0.97}
+                      onPress={() =>
+                        navigation.navigate('CommunityPostsScreen', {
+                          initialTab: communitySubFilter,
+                        })
+                      }>
+                      {/* Top Accent Strip matching Screenshot */}
+                      <View
+                        style={[
+                          styles.communityChannelTopAccent,
+                          isHealth ? styles.channelAccentHealth : styles.channelAccentTravel,
+                        ]}
+                      />
+
+                    {/* Emoji + Title */}
+                    <View style={styles.communityChannelHeaderRow}>
+                      <Text style={styles.communityChannelEmoji}>{channel.emoji}</Text>
+                      <Text
+                        style={[
+                          styles.communityChannelTitle,
+                          isDarkMode && styles.textWhite,
+                        ]}>
+                        {channel.title}
+                      </Text>
+                    </View>
+
+                    {/* Description */}
+                    <Text
+                      style={[
+                        styles.communityChannelDesc,
+                        isDarkMode && styles.textMutedDark,
+                      ]}
+                      numberOfLines={2}>
+                      {channel.description}
+                    </Text>
+
+                    {/* Badges: Members & Posts */}
+                    <View style={styles.communityChannelPillsRow}>
+                      <View
+                        style={[
+                          styles.channelMembersPill,
+                          isDarkMode && styles.channelMembersPillDark,
+                        ]}>
+                        <Text
+                          style={[
+                            styles.channelMembersText,
+                            isDarkMode && styles.channelMembersTextDark,
+                          ]}>
+                          👥 {channel.membersCount} members
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.channelPostsPill,
+                          isDarkMode && styles.channelPostsPillDark,
+                        ]}>
+                        <Text
+                          style={[
+                            styles.channelPostsText,
+                            isDarkMode && styles.channelPostsTextDark,
+                          ]}>
+                          📝 {channel.postsCount} posts
+                        </Text>
+                      </View>
+                    </View>
+                  </BouncyPressable>
+                );
+              })}
+              </>
+            )}
           </View>
         )}
 
@@ -754,24 +972,6 @@ export const ProfileScreen = ({ navigation }) => {
         ))}
       </Animated.ScrollView>
 
-      {/* ── 6. 3D Floating Help Widget ── */}
-      <View style={[styles.floatingHelpWrap, { bottom: Math.max(insets.bottom, vs(16)) + vs(12) }]}>
-        <Animated.View style={[styles.floatingHelpPulse, fabPulseStyle]} />
-
-        <BouncyPressable
-          style={styles.floatingHelpBtn3D}
-          activeScale={0.88}
-          onPress={() => setHelpModalVisible(true)}>
-          <LinearGradient
-            colors={['#A855F7', '#7C3AED', '#5B21B6']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.floatingHelpGradient}>
-            <Ionicons name="chatbubble-ellipses" size={ms(22)} color="#FFFFFF" />
-          </LinearGradient>
-        </BouncyPressable>
-      </View>
-
       {/* ── 7. Settings & Dark Theme Bottom Sheet Component ── */}
       <SettingsBottomSheet
         visible={settingsModalVisible}
@@ -788,6 +988,7 @@ export const ProfileScreen = ({ navigation }) => {
         setTravelAlerts={setTravelAlerts}
         publicProfile={publicProfile}
         setPublicProfile={setPublicProfile}
+        onChangePassword={() => navigation.navigate('ChangePasswordScreen')}
       />
 
       {/* ── 8. Add Pet Modal Component ── */}
@@ -806,6 +1007,58 @@ export const ProfileScreen = ({ navigation }) => {
         isDarkMode={isDarkMode}
         accentColor={accentColor}
       />
+
+      {/* ── 10. Modern 3D Confirm / Alert Modal Component ── */}
+      <ModernConfirmModal
+        visible={confirmModalConfig.visible}
+        onClose={() => setConfirmModalConfig(prev => ({ ...prev, visible: false }))}
+        onConfirm={confirmModalConfig.onConfirm}
+        title={confirmModalConfig.title}
+        subtitle={confirmModalConfig.subtitle}
+        badge={confirmModalConfig.badge}
+        type={confirmModalConfig.type}
+        confirmText={confirmModalConfig.confirmText}
+        cancelText={confirmModalConfig.cancelText}
+        singleButton={confirmModalConfig.singleButton}
+        isDarkMode={isDarkMode}
+      />
+
+      {/* ── 11. Ultra-Premium Floating Tails Guide AI Chat Button ── */}
+      <BouncyPressable
+        testID="floating-tails-guide-btn"
+        accessibilityLabel="Ask Tails Guide AI"
+        style={[
+          styles.floatingAiFabWrap,
+          {
+            right: Math.max(insets.right, s(18)),
+            bottom: Math.max(insets.bottom + vs(16), vs(24)),
+          },
+        ]}
+        activeScale={0.88}
+        onPress={() => navigation.navigate('TailsGuideScreen')}>
+        <View style={[styles.floatingAiFabBtn, isDarkMode && styles.floatingAiFabBtnDark]}>
+          <LinearGradient
+            colors={['#9333EA', '#7C3AED', '#581C87']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0.8, y: 1 }}
+            style={styles.floatingAiFab3D}>
+            {/* Sculpted 3D White Speech Bubble */}
+            <View style={styles.sculptedBubble}>
+              <View style={styles.bubbleDotsRow}>
+                <View style={styles.bubbleDot} />
+                <View style={styles.bubbleDot} />
+                <View style={styles.bubbleDot} />
+              </View>
+              <View style={styles.bubbleTail} />
+            </View>
+          </LinearGradient>
+
+          {/* Glowing Champagne Gold AI Sparkle Badge */}
+          <View style={styles.fabAiSparkleBadge}>
+            <Ionicons name="sparkles" size={ms(9)} color="#FDE047" />
+          </View>
+        </View>
+      </BouncyPressable>
     </View>
   );
 };

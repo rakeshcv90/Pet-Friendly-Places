@@ -55,6 +55,47 @@ const STEPS = [
   },
 ];
 
+const CommunityPostCard = React.memo(({ post, isDarkMode }) => (
+  <View style={[styles.communityPostCard, isDarkMode && styles.communityPostCardDark]}>
+    <View style={styles.postCardTop}>
+      <View
+        style={[
+          styles.postBadge,
+          post.type === 'lost'
+            ? styles.badgeLost
+            : post.type === 'found'
+            ? styles.badgeFound
+            : styles.badgeAdopt,
+        ]}>
+        <Text
+          style={[
+            styles.postBadgeText,
+            post.type === 'lost'
+              ? styles.badgeTextLost
+              : post.type === 'found'
+              ? styles.badgeTextFound
+              : styles.badgeTextAdopt,
+          ]}>
+          {(post.type || 'LOST').toUpperCase()}
+        </Text>
+      </View>
+      <Text style={styles.postTimeText}>{post.timeAgo}</Text>
+    </View>
+    <Text style={[styles.postName, isDarkMode && styles.postNameDark]}>{post.name}</Text>
+    <Text style={[styles.postBreed, isDarkMode && styles.postBreedDark]}>{post.breed}</Text>
+    <View style={styles.postLocationRow}>
+      <Ionicons
+        name="location-outline"
+        size={ms(13)}
+        color={isDarkMode ? '#A78BFA' : colors.reunite.textMuted}
+      />
+      <Text style={[styles.postLocationText, isDarkMode && styles.postLocationTextDark]}>
+        {post.location}
+      </Text>
+    </View>
+  </View>
+));
+
 export const ReuniteScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const initialTab = route?.params?.initialTab || 'all';
@@ -358,6 +399,19 @@ export const ReuniteScreen = ({ navigation, route }) => {
     }
     return result;
   }, [posts, activeTab, selectedPetFilter]);
+
+  // Progressive Windowing for Post Feed Virtualization
+  const INITIAL_POSTS_LIMIT = 8;
+  const [postsLimit, setPostsLimit] = useState(INITIAL_POSTS_LIMIT);
+
+  useEffect(() => {
+    setPostsLimit(INITIAL_POSTS_LIMIT);
+  }, [activeTab, selectedPetFilter]);
+
+  const visiblePosts = useMemo(
+    () => filteredPosts.slice(0, postsLimit),
+    [filteredPosts, postsLimit],
+  );
 
 
   return (
@@ -787,40 +841,27 @@ export const ReuniteScreen = ({ navigation, route }) => {
 
           {/* Community Posts Cards or Empty State */}
           {filteredPosts.length > 0 ? (
-            filteredPosts.map(post => (
-              <View key={post.id} style={[styles.communityPostCard, isDarkMode && styles.communityPostCardDark]}>
-                <View style={styles.postCardTop}>
-                  <View
-                    style={[
-                      styles.postBadge,
-                      post.type === 'lost'
-                        ? styles.badgeLost
-                        : post.type === 'found'
-                        ? styles.badgeFound
-                        : styles.badgeAdopt,
-                    ]}>
-                    <Text
-                      style={[
-                        styles.postBadgeText,
-                        post.type === 'lost'
-                          ? styles.badgeTextLost
-                          : post.type === 'found'
-                          ? styles.badgeTextFound
-                          : styles.badgeTextAdopt,
-                      ]}>
-                      {post.type.toUpperCase()}
-                    </Text>
-                  </View>
-                  <Text style={styles.postTimeText}>{post.timeAgo}</Text>
-                </View>
-                <Text style={[styles.postName, isDarkMode && styles.postNameDark]}>{post.name}</Text>
-                <Text style={[styles.postBreed, isDarkMode && styles.postBreedDark]}>{post.breed}</Text>
-                <View style={styles.postLocationRow}>
-                  <Ionicons name="location-outline" size={ms(13)} color={isDarkMode ? '#A78BFA' : colors.reunite.textMuted} />
-                  <Text style={[styles.postLocationText, isDarkMode && styles.postLocationTextDark]}>{post.location}</Text>
-                </View>
-              </View>
-            ))
+            <>
+              {visiblePosts.map(post => (
+                <CommunityPostCard key={post.id} post={post} isDarkMode={isDarkMode} />
+              ))}
+
+              {filteredPosts.length > postsLimit && (
+                <BouncyPressable
+                  style={[styles.loadMoreBtn, isDarkMode && styles.loadMoreBtnDark]}
+                  activeScale={0.95}
+                  onPress={() => setPostsLimit(prev => prev + 8)}>
+                  <Text style={[styles.loadMoreText, isDarkMode && styles.loadMoreTextDark]}>
+                    Show more posts ({filteredPosts.length - postsLimit} remaining)
+                  </Text>
+                  <Feather
+                    name="chevron-down"
+                    size={ms(14)}
+                    color={isDarkMode ? '#C084FC' : '#7B2CFF'}
+                  />
+                </BouncyPressable>
+              )}
+            </>
           ) : (
             /* Empty State Matching Design with Playful Polaroid Flutter */
             <View style={[styles.emptyStateCard, isDarkMode && styles.emptyStateCardDark]}>
@@ -2205,6 +2246,26 @@ const styles = StyleSheet.create({
     color: colors.reunite.textMuted,
     marginLeft: s(4),
   },
+  loadMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F3FF',
+    borderRadius: s(16),
+    paddingVertical: s(13),
+    paddingHorizontal: s(16),
+    marginVertical: s(8),
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    borderBottomWidth: 3,
+    borderBottomColor: '#D8B4FE',
+    gap: s(6),
+  },
+  loadMoreText: {
+    fontSize: s(12),
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#7B2CFF',
+  },
 
   /* ── Modals & Form Styles ── */
   modalOverlay: {
@@ -2733,6 +2794,14 @@ const styles = StyleSheet.create({
   },
   postLocationTextDark: {
     color: '#94A3B8',
+  },
+  loadMoreBtnDark: {
+    backgroundColor: '#1E0E38',
+    borderColor: '#3B1D6E',
+    borderBottomColor: '#260F45',
+  },
+  loadMoreTextDark: {
+    color: '#C084FC',
   },
   premiumModalCardDark: {
     backgroundColor: '#170A2E',

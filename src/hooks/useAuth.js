@@ -16,7 +16,7 @@ export const useLogin = () => {
     onSuccess: data => {
       const token = data?.access_token;
       const refreshToken = data?.refresh_token;
-      const user = data?.account;
+      const user = data?.account || data?.user || (data?.id ? data : null);
 
       if (!data?.ok || !token) {
         console.warn('[Login] Missing success status or access token.');
@@ -35,6 +35,7 @@ export const useLogin = () => {
 
       setAuthInfo(user || null, token);
       queryClient.invalidateQueries({ queryKey: ['user', 'profile'] });
+      queryClient.invalidateQueries({ queryKey: ['discovery', 'home'] });
     },
 
     onError: error => {},

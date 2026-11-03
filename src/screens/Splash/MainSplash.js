@@ -17,7 +17,7 @@ import { useStore } from '../../store';
 
 export const MainSplash = ({ navigation, onFinish }) => {
   const insets = useSafeAreaInsets();
-  const { isAuthenticated } = useStore();
+  const isAuthenticated = useStore(state => state.isAuthenticated);
   const isDarkMode = useStore(state => state.isDarkMode);
   const hasFinishedRef = useRef(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -32,10 +32,7 @@ export const MainSplash = ({ navigation, onFinish }) => {
   // Prevent hardware back press from breaking the splash video
   useEffect(() => {
     const backAction = () => true;
-    const backHandler = BackHandler.addEventListener(
-      'hardwareBackPress',
-      backAction,
-    );
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
     return () => backHandler.remove();
   }, []);
 
@@ -54,11 +51,11 @@ export const MainSplash = ({ navigation, onFinish }) => {
       if (typeof onFinish === 'function') {
         onFinish();
       } else if (navigation) {
-        if (isAuthenticated) {
-          navigation.replace('App');
-        } else {
-          navigation.replace('Splash');
-        }
+        // if (isAuthenticated) {
+        //   navigation.replace('App');
+        // } else {
+        //   navigation.replace('Splash');
+        // }
       }
     });
   }, [fadeAnim, onFinish, navigation, isAuthenticated]);
@@ -85,7 +82,7 @@ export const MainSplash = ({ navigation, onFinish }) => {
             bottom: bottomInset,
           },
         ]}
-        resizeMode="stretch"
+        resizeMode="cover"
         repeat={false}
         paused={false}
         muted={true}
@@ -102,11 +99,7 @@ export const MainSplash = ({ navigation, onFinish }) => {
 
       {/* Skip Button */}
       {videoLoaded && (
-        <View
-          style={[
-            styles.skipContainer,
-            { top: Math.max(insets.top, s(16)) + s(10) },
-          ]}>
+        <View style={[styles.skipContainer, { top: Math.max(insets.top, s(16)) + s(10) }]}>
           <Pressable
             style={styles.skipButton}
             onPress={handleProceed}

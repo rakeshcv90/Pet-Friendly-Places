@@ -1,0 +1,233 @@
+import { StyleSheet, Platform } from 'react-native';
+import { s, vs, ms } from 'react-native-size-matters';
+import { theme } from '../../../theme';
+
+const font = theme.typography.fontFamily;
+
+/** Layout only; colours come from listingPalette() so light/dark share one stylesheet. */
+export const styles = StyleSheet.create({
+  fill: { flex: 1 },
+
+  /* gallery + viewer */
+  galleryClip: { overflow: 'hidden' },
+  galleryShade: { ...StyleSheet.absoluteFillObject },
+  galleryCounter: {
+    position: 'absolute',
+    right: s(16),
+    bottom: vs(50),
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(5),
+    paddingHorizontal: s(10),
+    paddingVertical: vs(4),
+    borderRadius: 999,
+    backgroundColor: 'rgba(15, 7, 29, 0.6)',
+  },
+  galleryCounterText: { fontSize: ms(11), fontFamily: font.semiBold, color: '#FFFFFF' },
+  dots: {
+    position: 'absolute',
+    bottom: vs(52),
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: s(5),
+  },
+  dot: { width: s(6), height: s(6), borderRadius: s(3), backgroundColor: 'rgba(255,255,255,0.5)' },
+  dotActive: { width: s(18), backgroundColor: '#FFFFFF' },
+  viewerRoot: { flex: 1, backgroundColor: '#07030F' },
+  viewerClose: {
+    position: 'absolute',
+    right: s(16),
+    width: s(40),
+    height: s(40),
+    borderRadius: s(20),
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
+  },
+  viewerCounter: {
+    position: 'absolute',
+    alignSelf: 'center',
+    fontSize: ms(13),
+    fontFamily: font.semiBold,
+    color: '#FFFFFF',
+  },
+
+  /* header card */
+  headerCard: {
+    marginHorizontal: s(16),
+    marginTop: -vs(40),
+    borderRadius: s(20),
+    padding: s(16),
+  },
+  headerShadow: { shadowColor: '#7B2CFF' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: s(8), marginBottom: vs(10) },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(5),
+    paddingHorizontal: s(10),
+    paddingVertical: vs(4),
+    borderRadius: 999,
+  },
+  chipText: { fontSize: ms(11), fontFamily: font.semiBold },
+  name: { fontSize: ms(21), lineHeight: ms(28), fontFamily: font.extraBold, letterSpacing: -0.3 },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: s(5), marginTop: vs(8) },
+  locationText: { flex: 1, fontSize: ms(12.5), fontFamily: font.medium },
+  summary: { marginTop: vs(10), fontSize: ms(13), lineHeight: ms(20), fontFamily: font.regular },
+  statRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: s(14), marginTop: vs(12) },
+  stat: { flexDirection: 'row', alignItems: 'center', gap: s(5) },
+  statText: { fontSize: ms(12), fontFamily: font.semiBold },
+
+  levelChip: { alignSelf: 'flex-start', marginTop: vs(10) },
+  gapTop: { marginTop: vs(14) },
+  notesBox: { marginTop: vs(6) },
+  firstSubHeading: { marginTop: 0 },
+  viewAll: { fontSize: ms(12), fontFamily: font.bold },
+
+  /* quick actions */
+  actionRow: { flexDirection: 'row', gap: s(10), marginHorizontal: s(16), marginTop: vs(14) },
+  actionTile: {
+    flex: 1,
+    height: vs(46),
+    borderRadius: s(14),
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: s(8),
+  },
+  actionText: { fontSize: ms(13), fontFamily: font.bold },
+
+  /* sections */
+  section: { marginHorizontal: s(16), marginTop: vs(14), borderRadius: s(18), padding: s(16) },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: s(10), marginBottom: vs(12) },
+  sectionIcon: {
+    width: s(30),
+    height: s(30),
+    borderRadius: s(10),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionTitle: { flex: 1, fontSize: ms(15.5), fontFamily: font.bold, letterSpacing: -0.2 },
+  sectionRule: { height: StyleSheet.hairlineWidth, marginBottom: vs(12), marginTop: -vs(2) },
+  bodyText: { fontSize: ms(13.5), lineHeight: ms(22), fontFamily: font.regular },
+  subHeading: { fontSize: ms(11), fontFamily: font.bold, letterSpacing: 0.8, marginTop: vs(16), marginBottom: vs(8) },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: s(8) },
+  petPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(8),
+    paddingHorizontal: s(14),
+    paddingVertical: vs(8),
+    borderRadius: 999,
+  },
+  petEmoji: { fontSize: ms(16) },
+  petPillText: { fontSize: ms(13), fontFamily: font.bold },
+
+  /* quick facts grid */
+  factGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: s(10) },
+  factTile: { width: '48%', flexGrow: 1, borderRadius: s(14), padding: s(12) },
+  factTileIcon: {
+    width: s(30),
+    height: s(30),
+    borderRadius: s(15),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: vs(8),
+  },
+  factTileLabel: { fontSize: ms(11), fontFamily: font.medium },
+  factTileValue: { marginTop: vs(2), fontSize: ms(13), lineHeight: ms(18), fontFamily: font.bold },
+
+  /* policy rows */
+  factRow: { flexDirection: 'row', alignItems: 'flex-start', gap: s(12), paddingVertical: vs(9) },
+  factRowBorder: { borderTopWidth: StyleSheet.hairlineWidth },
+  factIcon: { width: s(30), height: s(30), borderRadius: s(15), alignItems: 'center', justifyContent: 'center' },
+  factTexts: { flex: 1 },
+  factLabel: { fontSize: ms(11), fontFamily: font.medium },
+  factValue: { marginTop: vs(1), fontSize: ms(13.5), lineHeight: ms(19), fontFamily: font.semiBold },
+  bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: s(10), paddingVertical: vs(5) },
+  bulletText: { flex: 1, fontSize: ms(13), lineHeight: ms(20), fontFamily: font.regular },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: vs(14),
+    paddingVertical: vs(12),
+    paddingHorizontal: s(14),
+    borderRadius: s(12),
+  },
+  toggleText: { flex: 1, fontSize: ms(12.5), fontFamily: font.bold },
+  readMore: { marginTop: vs(6), fontSize: ms(12), fontFamily: font.bold },
+
+  /* verification */
+  verifiedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(12),
+    padding: s(12),
+    borderRadius: s(14),
+  },
+  verifiedBadge: {
+    width: s(42),
+    height: s(42),
+    borderRadius: s(21),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifiedTitle: { fontSize: ms(15), fontFamily: font.bold },
+  verifiedDate: { fontSize: ms(11.5), fontFamily: font.medium, marginTop: vs(1) },
+  trustText: { marginTop: vs(10), fontSize: ms(13), lineHeight: ms(20), fontFamily: font.medium },
+  trustNotes: { marginTop: vs(8), fontSize: ms(12), lineHeight: ms(18), fontFamily: font.regular },
+
+  /* contact bar */
+  bar: {
+    ...Platform.select({
+      ios: {
+        shadowColor: '#3B108F',
+        shadowOffset: { width: 0, height: -6 },
+        shadowOpacity: 0.12,
+        shadowRadius: 14,
+      },
+      android: { elevation: 18 },
+    }),
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(10),
+    paddingHorizontal: s(16),
+    paddingTop: vs(10),
+    borderTopWidth: 1,
+  },
+  primaryBtn: {
+    flex: 1,
+    height: vs(46),
+    borderRadius: s(14),
+    overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: s(8),
+  },
+  primaryBtnText: { fontSize: ms(14), fontFamily: font.bold, color: '#FFFFFF' },
+  iconBtn: {
+    width: vs(46),
+    height: vs(46),
+    borderRadius: s(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+
+  /* states */
+  centerBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: s(28) },
+  centerTitle: { marginTop: vs(12), fontSize: ms(17), fontFamily: font.bold, textAlign: 'center' },
+  centerText: { marginTop: vs(6), fontSize: ms(13), lineHeight: ms(19), fontFamily: font.regular, textAlign: 'center' },
+  retryBtn: { marginTop: vs(16), paddingHorizontal: s(22), paddingVertical: vs(10), borderRadius: s(12) },
+  retryText: { fontSize: ms(13), fontFamily: font.bold },
+});

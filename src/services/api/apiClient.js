@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+ 
 import axios from 'axios';
 import { QueryClient } from '@tanstack/react-query';
 import { getItem, setItem, removeItem, STORAGE_KEYS } from '../storage/storage';
@@ -37,9 +37,9 @@ const handleForceLogout = () => {
     removeItem(STORAGE_KEYS.USER_INFO);
     useStore.getState().logout();
   } catch (e) {
-    if (__DEV__) {
-      console.warn('[apiClient] Error during forced logout:', e);
-    }
+    // if (__DEV__) {
+    //   console.warn('[apiClient] Error during forced logout:', e);
+    // }
   }
 };
 
@@ -64,10 +64,14 @@ apiClient.interceptors.request.use(
     } catch (e) {}
 
     if (__DEV__) {
-      console.log(
-        `🚀 [API ${config.method?.toUpperCase() || 'REQUEST'}] ${config.url}`,
-        config.data ? config.data : '',
+      const sanitizedUrl = config.url?.replace(
+        /\/chat\/(?!session|ai-guide)[^/?#]+/g,
+        '/chat/[REDACTED]',
       );
+      // console.log(
+      //   `🚀 [API ${config.method?.toUpperCase() || 'REQUEST'}] ${sanitizedUrl || config.url}`,
+      //   config.data ? config.data : '',
+      // );
     }
 
     return config;
@@ -79,16 +83,24 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   response => {
     if (__DEV__) {
-      console.log(`🟢 [API SUCCESS] ${response.config?.url} [${response.status}]:`, response.data);
+      const sanitizedUrl = response.config?.url?.replace(
+        /\/chat\/(?!session|ai-guide)[^/?#]+/g,
+        '/chat/[REDACTED]',
+      );
+      // console.log(`🟢 [API SUCCESS] ${sanitizedUrl || response.config?.url} [${response.status}]:`, response.data);
     }
     return response;
   },
   async error => {
     if (__DEV__) {
-      console.log(
-        `🔴 [API ERROR] ${error.config?.url} [${error.response?.status}]:`,
-        error.response?.data || error.message,
+      const sanitizedUrl = error.config?.url?.replace(
+        /\/chat\/(?!session|ai-guide)[^/?#]+/g,
+        '/chat/[REDACTED]',
       );
+      // console.log(
+      //   `🔴 [API ERROR] ${sanitizedUrl || error.config?.url} [${error.response?.status}]:`,
+      //   error.response?.data || error.message,
+      // );
     }
 
     const originalRequest = error.config;
@@ -215,9 +227,7 @@ export const getErrorMessage = err => {
   }
 
   const serverMsg =
-    err?.response?.data?.error ||
-    err?.response?.data?.message ||
-    err?.response?.data?.msg;
+    err?.response?.data?.error || err?.response?.data?.message || err?.response?.data?.msg;
 
   if (
     typeof serverMsg === 'string' &&

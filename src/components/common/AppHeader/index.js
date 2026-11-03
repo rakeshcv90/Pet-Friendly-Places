@@ -76,7 +76,7 @@ export const SearchBar = ({
         <TextInput
           style={[styles.searchInput, isDarkMode && styles.searchInputDark, inputStyle]}
           placeholder={searchPlaceholder}
-          placeholderTextColor={isDarkMode ? '#94A3B8' : '#A09AA8'}
+          placeholderTextColor={isDarkMode ? '#94A3B8' : '#A49AAF'}
           value={query}
           onChangeText={setQuery}
           onSubmitEditing={handleSubmit}

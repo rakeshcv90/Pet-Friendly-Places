@@ -1,143 +1,150 @@
-import React, { useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Animated,
-  Modal,
-  Easing,
-  Dimensions,
-} from 'react-native';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { View, Text, Image, StyleSheet, Animated, Modal, Easing, Platform } from 'react-native';
 import { theme } from '../../../theme';
+import { useStore } from '../../../store';
 import { s } from 'react-native-size-matters';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// Sized through u(): change SCALE to make the whole loader bigger or smaller
+const SCALE = 1;
+const u = n => s(n * SCALE);
+
+const BADGE = u(84);
 
 /**
- * Premium Animated Loader Modal
- * Features rotating glow ring, breathing branded logo, smooth entrance, and status text.
+ * Round branded loader: the logo inside a spinning gradient ring with a soft pulse,
+ * and the message underneath. Native-driver animations, created once, stopped on close.
  */
-export const Loader = ({
-  visible = false,
-  fullScreen = false,
-  title = 'Please wait...',
-  subtitle = 'Connecting to server...',
-}) => {
-  const spinValue = useRef(new Animated.Value(0)).current;
-  const pulseValue = useRef(new Animated.Value(1)).current;
-  const fadeValue = useRef(new Animated.Value(0)).current;
-  const cardScale = useRef(new Animated.Value(0.92)).current;
+const useLoaderMotion = active => {
+  const v = useRef({
+    entrance: new Animated.Value(0),
+    spin: new Animated.Value(0),
+    spinSlow: new Animated.Value(0),
+    pulse: new Animated.Value(0),
+  }).current;
 
   useEffect(() => {
-    if (visible || fullScreen) {
-      // Fade in & scale entrance
-      Animated.parallel([
-        Animated.timing(fadeValue, {
+    if (!active) {
+      v.entrance.setValue(0);
+      return undefined;
+    }
+    const running = [
+      Animated.spring(v.entrance, { toValue: 1, friction: 7, tension: 90, useNativeDriver: true }),
+      Animated.loop(
+        Animated.timing(v.spin, {
           toValue: 1,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.spring(cardScale, {
-          toValue: 1,
-          friction: 6,
-          tension: 70,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      // Continuous 360-degree rotation animation
-      const spinAnimation = Animated.loop(
-        Animated.timing(spinValue, {
-          toValue: 1,
-          duration: 2000,
+          duration: 1100,
           easing: Easing.linear,
           useNativeDriver: true,
         }),
-      );
-
-      // Continuous breathing pulse animation
-      const pulseAnimation = Animated.loop(
+      ),
+      Animated.loop(
+        Animated.timing(v.spinSlow, {
+          toValue: 1,
+          duration: 2600,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ),
+      Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseValue, {
-            toValue: 1.08,
-            duration: 800,
+          Animated.timing(v.pulse, {
+            toValue: 1,
+            duration: 900,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
-          Animated.timing(pulseValue, {
-            toValue: 0.98,
-            duration: 800,
+          Animated.timing(v.pulse, {
+            toValue: 0,
+            duration: 900,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
         ]),
-      );
+      ),
+    ];
+    running.forEach(a => a.start());
+    return () => {
+      running.forEach(a => a.stop());
+      Object.values(v).forEach(value => value.setValue(0));
+    };
+  }, [active, v]);
 
-      spinAnimation.start();
-      pulseAnimation.start();
+  return useMemo(
+    () => ({
+      entrance: v.entrance,
+      scale: v.entrance.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }),
+      spin: v.spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }),
+      spinReverse: v.spinSlow.interpolate({ inputRange: [0, 1], outputRange: ['360deg', '0deg'] }),
+      haloScale: v.pulse.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.22] }),
+      haloOpacity: v.pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0.12] }),
+      logoScale: v.pulse.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1.06] }),
+    }),
+    [v],
+  );
+};
 
-      return () => {
-        spinAnimation.stop();
-        pulseAnimation.stop();
-      };
-    } else {
-      fadeValue.setValue(0);
-      cardScale.setValue(0.92);
-    }
-  }, [visible, fullScreen, fadeValue, cardScale, spinValue, pulseValue]);
+/**
+ * Loader. Modal when `visible`, inline when `fullScreen` (`transparent` keeps the parent's background).
+ * `message` is accepted as an alias of `title` (some screens pass it).
+ */
+export const Loader = ({
+  visible = false,
+  fullScreen = false,
+  transparent = false,
+  title,
+  subtitle,
+  message,
+}) => {
+  const isDarkMode = useStore(state => state.isDarkMode) || false;
+  const m = useLoaderMotion(visible || fullScreen);
 
-  const spin = spinValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
+  const heading = title ?? message ?? 'Please wait...';
+  const detail = subtitle ?? (title || message ? '' : 'Connecting to server...');
 
-  const LoaderCard = (
-    <Animated.View
-      style={[
-        styles.card,
-        {
-          opacity: fadeValue,
-          transform: [{ scale: cardScale }],
-        },
-      ]}>
-      {/* Animated Graphic Container */}
-      <View style={styles.graphicContainer}>
-        {/* Rotating outer accent ring */}
+  // the modal sits on a dark backdrop, so its text is light; inline follows the theme
+  const lightText = visible || isDarkMode;
+
+  const content = (
+    <Animated.View style={[styles.wrap, { opacity: m.entrance, transform: [{ scale: m.scale }] }]}>
+      <View style={styles.graphic}>
         <Animated.View
           style={[
-            styles.outerRing,
-            {
-              transform: [{ rotate: spin }],
-            },
+            styles.halo,
+            lightText && styles.haloLight,
+            { opacity: m.haloOpacity, transform: [{ scale: m.haloScale }] },
           ]}
         />
 
-        {/* Pulsing Center with Branded Logo */}
+        {/* round badge */}
+        <View style={[styles.badge, isDarkMode && styles.badgeDark]}>
+          <Animated.View style={{ transform: [{ scale: m.logoScale }] }}>
+            <Image source={theme.images.logo} style={styles.logo} resizeMode="contain" />
+          </Animated.View>
+        </View>
+
+        {/* outer ring (fast) + thin inner ring (slow, reverse) */}
+        <Animated.View
+          style={[styles.ring, { transform: [{ rotate: m.spin }] }]}
+          pointerEvents="none"
+        />
         <Animated.View
           style={[
-            styles.logoContainer,
-            {
-              transform: [{ scale: pulseValue }],
-            },
-          ]}>
-          <Animated.Image
-            source={theme.images.logo}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </Animated.View>
+            styles.ringInner,
+            lightText && styles.ringInnerLight,
+            { transform: [{ rotate: m.spinReverse }] },
+          ]}
+          pointerEvents="none"
+        />
       </View>
 
-      {/* Status Typography */}
-      {title ? <Text style={styles.title}>{title}</Text> : null}
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-
-      {/* Decorative Progress Dots */}
-      <View style={styles.dotsRow}>
-        <View style={[styles.dot, styles.dot1]} />
-        <View style={[styles.dot, styles.dot2]} />
-        <View style={[styles.dot, styles.dot3]} />
-      </View>
+      <Text numberOfLines={2} style={[styles.title, lightText && styles.titleLight]}>
+        {heading}
+      </Text>
+      {detail ? (
+        <Text numberOfLines={2} style={[styles.subtitle, lightText && styles.subtitleLight]}>
+          {detail}
+        </Text>
+      ) : null}
     </Animated.View>
   );
 
@@ -149,17 +156,20 @@ export const Loader = ({
         animationType="none"
         statusBarTranslucent
         onRequestClose={() => {}}>
-        <Animated.View style={[styles.overlay, { opacity: fadeValue }]}>
-          {LoaderCard}
-        </Animated.View>
+        <View style={styles.overlay}>{content}</View>
       </Modal>
     );
   }
 
   if (fullScreen) {
     return (
-      <View style={styles.fullScreenContainer}>
-        {LoaderCard}
+      <View
+        style={[
+          styles.fullScreenContainer,
+          isDarkMode && styles.fullScreenContainerDark,
+          transparent && styles.fullScreenTransparent,
+        ]}>
+        {content}
       </View>
     );
   }
@@ -170,7 +180,7 @@ export const Loader = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 6, 32, 0.65)', // Deep translucent purple-tinted backdrop
+    backgroundColor: 'rgba(15, 6, 32, 0.62)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: s(24),
@@ -180,90 +190,107 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAF8F2',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: s(24),
   },
-  card: {
-    width: Math.min(SCREEN_WIDTH - s(48), s(290)),
-    backgroundColor: '#FFFFFF',
-    borderRadius: s(24),
-    paddingVertical: s(28),
-    paddingHorizontal: s(22),
+  fullScreenContainerDark: {
+    backgroundColor: '#0F071D',
+  },
+  fullScreenTransparent: {
+    backgroundColor: 'transparent',
+  },
+  wrap: {
     alignItems: 'center',
-    shadowColor: theme.colors.primaryDark,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.28,
-    shadowRadius: 24,
-    elevation: 12,
-    borderWidth: 1.2,
-    borderColor: 'rgba(123, 44, 255, 0.12)',
+    maxWidth: s(250),
   },
-  graphicContainer: {
-    width: s(96),
-    height: s(96),
+  graphic: {
+    width: BADGE + u(26),
+    height: BADGE + u(26),
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: s(16),
+    marginBottom: u(10),
   },
-  outerRing: {
+  halo: {
     position: 'absolute',
-    width: s(90),
-    height: s(90),
-    borderRadius: s(45),
-    borderWidth: 3,
-    borderColor: 'rgba(123, 44, 255, 0.2)',
-    borderTopColor: theme.colors.primary,
-    borderRightColor: theme.colors.primaryDark,
+    width: BADGE,
+    height: BADGE,
+    borderRadius: BADGE / 2,
+    backgroundColor: 'rgba(123, 44, 255, 0.3)',
   },
-  logoContainer: {
-    width: s(72),
-    height: s(72),
-    borderRadius: s(36),
-    backgroundColor: '#F5EEFF',
-    justifyContent: 'center',
+  haloLight: {
+    backgroundColor: 'rgba(196, 173, 255, 0.45)',
+  },
+  badge: {
+    width: BADGE,
+    height: BADGE,
+    borderRadius: BADGE / 2,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(123, 44, 255, 0.15)',
+    borderColor: 'rgba(123, 44, 255, 0.12)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#3B108F',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.28,
+        shadowRadius: 14,
+      },
+      android: { elevation: 10 },
+    }),
+  },
+  badgeDark: {
+    backgroundColor: '#1E1038',
+    borderColor: 'rgba(168, 85, 247, 0.3)',
   },
   logo: {
-    width: s(50),
-    height: s(50),
+    width: u(46),
+    height: u(46),
+  },
+  ring: {
+    position: 'absolute',
+    width: BADGE + u(14),
+    height: BADGE + u(14),
+    borderRadius: (BADGE + u(14)) / 2,
+    borderWidth: 3,
+    borderColor: 'transparent',
+    borderTopColor: '#7B2CFF',
+    borderRightColor: '#C4ADFF',
+  },
+  ringInner: {
+    position: 'absolute',
+    width: BADGE + u(24),
+    height: BADGE + u(24),
+    borderRadius: (BADGE + u(24)) / 2,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    borderBottomColor: 'rgba(59, 16, 143, 0.55)',
+    borderLeftColor: 'rgba(123, 44, 255, 0.3)',
+  },
+  ringInnerLight: {
+    borderBottomColor: 'rgba(255, 255, 255, 0.7)',
+    borderLeftColor: 'rgba(196, 173, 255, 0.5)',
   },
   title: {
-    fontSize: s(17),
+    fontSize: s(14.5),
+    lineHeight: s(20),
     fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.primaryDark,
+    color: '#1E0A4D',
     textAlign: 'center',
-    marginBottom: s(6),
+  },
+  titleLight: {
+    color: '#FFFFFF',
   },
   subtitle: {
-    fontSize: s(13),
+    marginTop: u(3),
+    fontSize: s(12),
+    lineHeight: s(17),
     fontFamily: theme.typography.fontFamily.medium,
     color: '#64748B',
     textAlign: 'center',
-    lineHeight: s(18),
-    paddingHorizontal: s(8),
   },
-  dotsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: s(16),
-  },
-  dot: {
-    width: s(7),
-    height: s(7),
-    borderRadius: s(3.5),
-    marginHorizontal: s(4),
-  },
-  dot1: {
-    backgroundColor: theme.colors.primary,
-    opacity: 0.9,
-  },
-  dot2: {
-    backgroundColor: theme.colors.primaryLight,
-    opacity: 0.65,
-  },
-  dot3: {
-    backgroundColor: theme.colors.primaryDark,
-    opacity: 0.4,
+  subtitleLight: {
+    color: '#DDD0FF',
   },
 });
+
+export default Loader;

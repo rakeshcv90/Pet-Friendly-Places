@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,10 @@ import {
   Platform,
   Share,
   RefreshControl,
+  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import Feather from 'react-native-vector-icons/Feather';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -23,6 +24,8 @@ import { useStore } from '../../store';
 import { useTravelStories, resolveImageUrl } from '../../hooks/useDiscovery';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { Loader } from '../../components/common/Loader';
+import { ScreenHeader } from '../../components/common/AppHeader/ScreenHeader';
+import { AmbientBackground } from './components';
 
 export const TravelStoryScreen = React.memo(function TravelStoryScreen({
   navigation,
@@ -32,6 +35,7 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
 }) {
   const insets = useSafeAreaInsets();
   const isDarkMode = useStore(state => state.isDarkMode);
+  const scrollY = useRef(new Animated.Value(0)).current;
   const {
     data: apiStoriesData,
     isLoading: isStoriesLoading,
@@ -343,39 +347,27 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
 
       {/* ── 1. Top Navigation Bar ── */}
       {!hideTopNav && (
-        <View
-          style={[
-            styles.navBar,
-            isDarkMode && styles.navBarDark,
-            { paddingTop: Math.max(insets.top, s(10)) },
-          ]}>
-          <View style={styles.navLeftGroup}>
-            <BouncyPressable
-              style={[styles.navSquircleBtn, isDarkMode && styles.navSquircleBtnDark]}
-              activeScale={0.88}
-              onPress={() => navigation.goBack()}>
-              <Feather name="arrow-left" size={ms(18)} color={isDarkMode ? '#FFFFFF' : '#1E1035'} />
-            </BouncyPressable>
-
-            <View style={styles.navTitleGroup}>
-              <Text style={[styles.navOverline, isDarkMode && styles.navOverlineDark]}>
-                TRAVEL WITH TAILS
-              </Text>
-              <Text style={[styles.navTitle, isDarkMode && styles.navTitleDark]}>Stories</Text>
-            </View>
-          </View>
-
-          <BouncyPressable
-            style={[styles.navSquircleBtn, isDarkMode && styles.navSquircleBtnDark]}
-            activeScale={0.88}
-            onPress={() => setIsSearchVisible(prev => !prev)}>
-            <Ionicons
-              name={isSearchVisible ? 'close' : 'search-outline'}
-              size={ms(19)}
-              color={isDarkMode ? '#A78BFA' : '#1E1035'}
-            />
-          </BouncyPressable>
-        </View>
+        <>
+          <AmbientBackground scrollY={scrollY} isDarkMode={isDarkMode} />
+          <ScreenHeader
+            title="Stories"
+            subtitle="TRAVEL WITH TAILS"
+            onBack={() => navigation.goBack()}
+            testID="travel-story-back-btn"
+            rightComponent={
+              <BouncyPressable
+                style={[styles.navSquircleBtn, isDarkMode && styles.navSquircleBtnDark]}
+                activeScale={0.88}
+                onPress={() => setIsSearchVisible(prev => !prev)}>
+                <Ionicons
+                  name={isSearchVisible ? 'close' : 'search-outline'}
+                  size={ms(19)}
+                  color={isDarkMode ? '#A78BFA' : '#1E1035'}
+                />
+              </BouncyPressable>
+            }
+          />
+        </>
       )}
 
       {/* Optional Search Bar Popup */}
@@ -407,11 +399,14 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
       )}
 
       {/* ── Scrollable Body ── */}
-      <ScrollView
+      <Animated.ScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + s(30) }]}
         showsVerticalScrollIndicator={false}
-        onScroll={onScroll}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: true,
+          listener: onScroll,
+        })}
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
@@ -429,15 +424,9 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.heroCard}>
-          {/* Subtle Decorative Floating Glyphs */}
-          <View style={[styles.ambientGlyph, styles.glyphPaw]}>
-            <Ionicons name="paw" size={ms(20)} color="rgba(255, 255, 255, 0.12)" />
-          </View>
-          <View style={[styles.ambientGlyph, styles.glyphMusic]}>
-            <Ionicons name="musical-notes" size={ms(18)} color="rgba(255, 255, 255, 0.10)" />
-          </View>
-          <View style={[styles.ambientGlyph, styles.glyphHeart]}>
-            <Ionicons name="heart" size={ms(20)} color="rgba(255, 255, 255, 0.10)" />
+          <View style={styles.heroCircle} />
+          <View style={styles.heroGlassBadge}>
+            <Ionicons name="book-outline" size={ms(24)} color="#FFFFFF" />
           </View>
 
           <Text style={styles.heroOverline}>REAL JOURNEYS ACROSS INDIA</Text>
@@ -741,7 +730,7 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
             )}
           </BouncyPressable>
         </LinearGradient>
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* ── 8. Full Story Reader Modal ── */}
       <Modal
@@ -1072,7 +1061,7 @@ const styles = StyleSheet.create({
 
   /* ── 2. Hero Card ── */
   heroCard: {
-    borderRadius: s(22),
+    borderRadius: s(24),
     padding: s(20),
     marginTop: s(4),
     marginBottom: s(16),
@@ -1083,6 +1072,28 @@ const styles = StyleSheet.create({
     borderBottomWidth: 3.5,
     borderBottomColor: '#1E0A45',
     elevation: 4,
+  },
+  heroCircle: {
+    position: 'absolute',
+    right: -s(40),
+    bottom: -s(50),
+    width: s(150),
+    height: s(150),
+    borderRadius: s(75),
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  heroGlassBadge: {
+    position: 'absolute',
+    top: s(16),
+    right: s(16),
+    width: s(52),
+    height: s(52),
+    borderRadius: s(18),
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   ambientGlyph: {
     position: 'absolute',
@@ -1374,28 +1385,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: s(22),
-    padding: s(12),
-    marginBottom: s(12),
-    borderWidth: 1.2,
-    borderColor: '#EDE9E2',
+    borderRadius: s(20),
+    padding: s(10),
+    marginBottom: s(14),
+    // 3D slab: bright top lip, tinted sides and a thick darker bottom edge
+    borderWidth: 1,
+    borderColor: '#EDE9FE',
     borderTopWidth: 1.5,
     borderTopColor: '#FFFFFF',
-    borderLeftWidth: 1.2,
-    borderRightWidth: 1.2,
-    borderLeftColor: '#F3EFE6',
-    borderRightColor: '#F3EFE6',
-    borderBottomWidth: 3.5,
-    borderBottomColor: '#DCD4C6',
+    borderLeftColor: 'rgba(124, 58, 237, 0.18)',
+    borderRightColor: 'rgba(124, 58, 237, 0.18)',
+    borderBottomWidth: 4,
+    borderBottomColor: '#5B3FA8',
     ...Platform.select({
       ios: {
-        shadowColor: '#2B1A4A',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.05,
-        shadowRadius: 5,
+        shadowColor: '#4C1D95',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.18,
+        shadowRadius: 12,
       },
       android: {
-        elevation: 2,
+        elevation: 7,
+        shadowColor: '#4C1D95',
       },
     }),
   },
@@ -1404,8 +1415,9 @@ const styles = StyleSheet.create({
     borderTopColor: '#2E1654',
     borderLeftColor: '#260F45',
     borderRightColor: '#260F45',
-    borderBottomColor: '#120524',
+    borderBottomColor: '#4C1D95',
     borderColor: '#260F45',
+    shadowColor: '#000000',
   },
   storyThumbnailWrap: {
     width: s(96),

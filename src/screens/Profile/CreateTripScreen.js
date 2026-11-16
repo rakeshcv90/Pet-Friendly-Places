@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
   Keyboard,
   Modal,
+  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -23,7 +24,35 @@ import { theme } from '../../theme';
 import { useStore } from '../../store';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { ModernConfirmModal } from './components/ModernConfirmModal';
-import { getItem, setItem, STORAGE_KEYS } from '../../services/storage/storage';
+import { Loader } from '../../components/common/Loader';
+import { ScreenHeader } from '../../components/common/AppHeader/ScreenHeader';
+import { AmbientBackground } from '../Home/components';
+import { api, getErrorMessage } from '../../services/api/apiClient';
+import { API_ENDPOINTS } from '../../services/api/apiList';
+
+const SectionCard = ({ icon, title, hint, step, done, isDarkMode, children }) => (
+  <View style={[styles.sectionCard, isDarkMode && styles.sectionCardDark]}>
+    <View style={styles.sectionHeader}>
+      <LinearGradient colors={['#8B5CF6', '#6D28D9']} style={styles.sectionIconWrap}>
+        <Ionicons name={icon} size={ms(15)} color="#FFFFFF" />
+      </LinearGradient>
+      <View style={styles.sectionHeaderText}>
+        <Text style={[styles.sectionTitle, isDarkMode && styles.textWhite]}>{title}</Text>
+        {!!hint && (
+          <Text style={[styles.sectionHint, isDarkMode && styles.pageSubtitleDark]}>{hint}</Text>
+        )}
+      </View>
+      {done ? (
+        <View style={styles.sectionDoneBadge}>
+          <Feather name="check" size={ms(12)} color="#FFFFFF" />
+        </View>
+      ) : (
+        <Text style={styles.sectionStep}>{step}</Text>
+      )}
+    </View>
+    {children}
+  </View>
+);
 
 export const CreateTripScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -31,14 +60,16 @@ export const CreateTripScreen = ({ navigation }) => {
   const storePets = useStore(state => state.pets);
   const storeUser = useStore(state => state.user);
 
-  // Form states matching Add a Pet design language
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
   const [destination, setDestination] = useState('');
   const [selectedPetIds, setSelectedPetIds] = useState([]);
   const [placeQuery, setPlaceQuery] = useState('');
-  const [placesVisited, setPlacesVisited] = useState([]);
+  // Selected stops: { listingId, name, city, state, stopNote }
+  const [stops, setStops] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Focus states for input 3D highlight
   const [focusedField, setFocusedField] = useState(null);
@@ -46,6 +77,8 @@ export const CreateTripScreen = ({ navigation }) => {
 
   // Scroll View Ref for smooth scrolling
   const scrollViewRef = useRef(null);
+  // Drives the background glows, as on the Home screen
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   // Date Picker states
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -56,49 +89,63 @@ export const CreateTripScreen = ({ navigation }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // Quick place suggestions
-  const SUGGESTED_PLACES = ['Beach Walk', 'Dog Park', 'Pet-Friendly Cafe', 'Nature Trail'];
+  // Search listings once at least two characters are typed (debounced)
+  useEffect(() => {
+    const q = placeQuery.trim();
+    if (q.length < 2) {
+      setSuggestions([]);
+      setIsSearching(false);
+      return undefined;
+    }
 
-  // Sanitize pets so "REPLACE_ME" and placeholders are cleaned up
+    let cancelled = false;
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const data = await api.get(API_ENDPOINTS.LISTINGS.SEARCH, {
+          params: { q, limit: 8 },
+        });
+        if (!cancelled) {
+          setSuggestions(Array.isArray(data?.listings) ? data.listings : []);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setSuggestions([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsSearching(false);
+        }
+      }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [placeQuery]);
+
+  // Use only API values; placeholders such as REPLACE_ME become ''
+  const cleanText = (...values) => {
+    const found = values.find(
+      v =>
+        typeof v === 'string' &&
+        v.trim() !== '' &&
+        v !== 'undefined' &&
+        v !== 'null' &&
+        !v.includes('REPLACE_ME'),
+    );
+    return found ? found.trim() : '';
+  };
+
   const sanitizePet = (pet, index) => {
     if (!pet) return null;
-    let name = pet.name || pet.pet_name;
-    if (
-      !name ||
-      name === 'undefined' ||
-      name === 'null' ||
-      name === 'REPLACE_ME' ||
-      (typeof name === 'string' && name.includes('REPLACE_ME')) ||
-      name.trim() === ''
-    ) {
-      name = index === 0 ? 'Simba' : `Pet ${index + 1}`;
-    }
-
-    let breed = pet.breed || pet.pet_breed || pet.breed_name;
-    if (
-      !breed ||
-      breed === 'undefined' ||
-      breed === 'null' ||
-      breed === 'REPLACE_ME' ||
-      (typeof breed === 'string' && breed.includes('REPLACE_ME')) ||
-      breed.trim() === ''
-    ) {
-      const isCat = pet.type === 'Cat' || pet.pet_type === 'Cat';
-      breed = isCat ? 'Indie Cat' : 'Golden Retriever';
-    }
-
-    let type = pet.type || pet.pet_type || pet.species || 'Dog';
-    if (type !== 'Dog' && type !== 'Cat') {
-      type = 'Dog';
-    }
-
-    const id = pet.id || pet._id || `pet-${index + 1}`;
     return {
       ...pet,
-      id,
-      name,
-      breed,
-      type,
+      id: pet.id || pet._id || `pet-${index + 1}`,
+      name: cleanText(pet.petName, pet.name, pet.pet_name),
+      breed: cleanText(pet.breed, pet.pet_breed, pet.breed_name),
+      type: cleanText(pet.species, pet.type, pet.pet_type),
     };
   };
 
@@ -112,9 +159,7 @@ export const CreateTripScreen = ({ navigation }) => {
 
   const handleSelectPet = petId => {
     setSelectedPetIds(prev =>
-      prev.includes(petId)
-        ? prev.filter(id => id !== petId)
-        : [...prev, petId]
+      prev.includes(petId) ? prev.filter(id => id !== petId) : [...prev, petId],
     );
 
     if (errors.pets) {
@@ -197,22 +242,47 @@ export const CreateTripScreen = ({ navigation }) => {
     setShowDatePicker(true);
   };
 
-  const handleAddPlace = placeToAdd => {
-    const p = (placeToAdd || placeQuery).trim();
-    if (!p) return;
-    if (!placesVisited.includes(p)) {
-      setPlacesVisited(prev => [...prev, p]);
-    }
+  const selectPlace = listing => {
+    setStops(current =>
+      current.some(stop => stop.listingId === listing.id)
+        ? current
+        : [
+            ...current,
+            {
+              listingId: listing.id, // numeric ID from the search result
+              name: listing.name,
+              city: listing.city,
+              state: listing.state,
+              stopNote: '',
+            },
+          ],
+    );
     setPlaceQuery('');
+    setSuggestions([]);
   };
 
   const handleRemovePlace = indexToRemove => {
-    setPlacesVisited(prev => prev.filter((_, idx) => idx !== indexToRemove));
+    setStops(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  // dd/mm/yyyy (display) -> YYYY-MM-DD (API)
+  const toApiDate = value => {
+    const parsed = parseDateString(value) || new Date();
+    const yyyy = parsed.getFullYear();
+    const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+    const dd = String(parsed.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
   };
 
   const isFormValid =
-    title.trim().length > 0 &&
-    (availablePets.length === 0 || selectedPetIds.length > 0);
+    title.trim().length > 0 && (availablePets.length === 0 || selectedPetIds.length > 0);
+
+  const progressSteps = [
+    title.trim().length > 0,
+    availablePets.length === 0 || selectedPetIds.length > 0,
+    stops.length > 0,
+  ];
+  const progressDone = progressSteps.filter(Boolean).length;
 
   const handleSaveTrip = async () => {
     const validationErrors = {};
@@ -233,26 +303,32 @@ export const CreateTripScreen = ({ navigation }) => {
     setIsSaving(true);
 
     try {
-      const newTrip = {
-        id: `trip-${Date.now()}`,
+      const payload = {
         title: title.trim(),
-        description: description.trim(),
-        date: date.trim() || formatDateToString(new Date()),
-        destination: destination.trim(),
+        tripDate: toApiDate(date.trim()),
         petIds: selectedPetIds,
-        placesVisited,
-        createdAt: new Date().toISOString(),
+        stops: stops.map(stop => ({
+          listingId: stop.listingId,
+          ...(stop.stopNote ? { stopNote: stop.stopNote } : {}),
+        })),
       };
+      if (description.trim()) {
+        payload.subtitle = description.trim();
+      }
+      if (destination.trim()) {
+        payload.destination = destination.trim();
+      }
 
-      const existingTrips = getItem(STORAGE_KEYS.SAVED_TRIPS, true) || [];
-      const updatedTrips = [newTrip, ...existingTrips];
-      setItem(STORAGE_KEYS.SAVED_TRIPS, updatedTrips);
+      console.log('Create trip payload:', JSON.stringify(payload, null, 2));
+      const response = await api.post(API_ENDPOINTS.TRIPS, payload);
+      console.log('Create trip response:', JSON.stringify(response, null, 2));
 
       setIsSaving(false);
       setShowSuccessModal(true);
     } catch (e) {
+      console.log('Create trip error:', e?.response?.status, JSON.stringify(e?.response?.data));
       setIsSaving(false);
-      Alert.alert('Error', 'Unable to save trip. Please try again.');
+      Alert.alert('Error', getErrorMessage(e));
     }
   };
 
@@ -264,92 +340,14 @@ export const CreateTripScreen = ({ navigation }) => {
         translucent
       />
 
-      {/* ── Home Page Signature Ambient Decorative Glow Orbs ── */}
-      <View
-        style={[
-          styles.ambientGlowTopRight,
-          isDarkMode && styles.ambientGlowDark,
-        ]}
-        pointerEvents="none"
-      />
-      <View
-        style={[
-          styles.ambientGlowTopLeft,
-          isDarkMode && styles.ambientGlowDark,
-        ]}
-        pointerEvents="none"
-      />
-      <View
-        style={[
-          styles.ambientGlowMidRight,
-          isDarkMode && styles.ambientGlowDark,
-        ]}
-        pointerEvents="none"
-      />
-      <View
-        style={[
-          styles.ambientGlowMidLeft,
-          isDarkMode && styles.ambientGlowDark,
-        ]}
-        pointerEvents="none"
-      />
-      <View
-        style={[
-          styles.ambientGlowBottomRight,
-          isDarkMode && styles.ambientGlowDark,
-        ]}
-        pointerEvents="none"
-      />
+      <AmbientBackground scrollY={scrollY} isDarkMode={isDarkMode} />
 
-      {/* ── Home Page Signature Ambient Paw Watermarks ── */}
-      <View
-        style={styles.ambientPawWatermarkTop}
-        pointerEvents="none">
-        <Ionicons
-          name="paw"
-          size={ms(130)}
-          color={isDarkMode ? 'rgba(168, 85, 247, 0.08)' : 'rgba(123, 44, 255, 0.035)'}
-        />
-      </View>
-      <View
-        style={styles.ambientPawWatermarkBottom}
-        pointerEvents="none">
-        <Ionicons
-          name="paw"
-          size={ms(160)}
-          color={isDarkMode ? 'rgba(238, 42, 123, 0.06)' : 'rgba(238, 42, 123, 0.03)'}
-        />
-      </View>
-
-      {/* ── Top Header Navigation Bar (Fixed at top with clean icon back button) ── */}
-      <View
-        style={[
-          styles.topNav,
-          { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? vs(10) : vs(6)) },
-          isDarkMode && styles.topNavDark,
-        ]}>
-        <BouncyPressable
-          testID="create-trip-back-btn"
-          accessibilityLabel="Back"
-          style={[styles.backButton, isDarkMode && styles.backButtonDark]}
-          activeScale={0.88}
-          onPress={() => navigation.goBack()}>
-          <Ionicons
-            name="arrow-back"
-            size={s(20)}
-            color={isDarkMode ? '#FFFFFF' : '#1E1B4B'}
-          />
-        </BouncyPressable>
-
-        <View style={[styles.navBadge, isDarkMode && styles.navBadgeDark]}>
-          <Ionicons name="sparkles" size={ms(11)} color="#F59E0B" style={styles.sparkleIcon} />
-          <Text style={[styles.navBadgeText, isDarkMode && styles.navBadgeTextDark]}>
-            PAWSPORT ADVENTURES 🐾
-          </Text>
-        </View>
-
-        <View style={styles.topNavSpacer} />
-      </View>
+      <ScreenHeader
+        title="Create a Trip"
+        subtitle="PAWSPORT ADVENTURES 🐾"
+        onBack={() => navigation.goBack()}
+        testID="create-trip-back-btn"
+      />
 
       <KeyboardAwareScrollView
         ref={scrollViewRef}
@@ -358,30 +356,100 @@ export const CreateTripScreen = ({ navigation }) => {
           styles.scrollContent,
           {
             paddingTop: vs(8),
-            paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? vs(32) : vs(16)) + vs(50),
+            paddingBottom:
+              Math.max(insets.bottom, Platform.OS === 'android' ? vs(32) : vs(16)) + vs(50),
           },
         ]}
         enableOnAndroid={false}
         enableAutomaticScroll={Platform.OS === 'ios'}
         extraScrollHeight={Platform.OS === 'android' ? vs(120) : vs(80)}
         keyboardOpeningTime={0}
+        scrollEventThrottle={16}
+        onScroll={e => scrollY.setValue(e.nativeEvent.contentOffset.y)}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
-        {/* ── Header Title & Subtitle ── */}
-        <View style={styles.headerBlock}>
-          <View style={styles.titleRow}>
-            <Text style={[styles.pageTitle, isDarkMode && styles.textWhite]}>
-              Create a trip
-            </Text>
-            <Text style={styles.titlePawEmoji}> 🐾</Text>
+        {/* ── Boarding-pass Hero ── */}
+        <LinearGradient
+          colors={['#1E0B4B', '#4C1D95', '#7C3AED']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.heroCard}>
+          <View style={styles.heroPawMark} pointerEvents="none">
+            <Ionicons name="paw" size={ms(120)} color="rgba(255, 255, 255, 0.07)" />
           </View>
-          <Text style={[styles.pageSubtitle, isDarkMode && styles.pageSubtitleDark]}>
-            Record an adventure and show it on your pets' Pawsports.
+
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroEyebrowPill}>
+              <Ionicons name="airplane" size={ms(10)} color="#FDE68A" />
+              <Text style={styles.heroEyebrowText}>PAWSPORT BOARDING PASS</Text>
+            </View>
+            <Text
+              style={styles.heroProgressLabel}>{`${progressDone}/${progressSteps.length}`}</Text>
+          </View>
+
+          <Text style={styles.heroTitle} numberOfLines={2}>
+            {title.trim() || 'Create a trip'}
           </Text>
-        </View>
+          <View style={styles.heroDestRow}>
+            <Ionicons name="location-sharp" size={ms(12)} color="#FDE68A" />
+            <Text style={styles.heroSubtitle} numberOfLines={1}>
+              {destination.trim() || "Show it on your pets' Pawsports"}
+            </Text>
+          </View>
+
+          {/* Perforated ticket divider */}
+          <View style={styles.ticketDividerRow}>
+            <View
+              style={[
+                styles.ticketNotch,
+                styles.ticketNotchLeft,
+                isDarkMode ? styles.ticketNotchDark : styles.ticketNotchLight,
+              ]}
+            />
+            <View style={styles.ticketDash} />
+            <View
+              style={[
+                styles.ticketNotch,
+                styles.ticketNotchRight,
+                isDarkMode ? styles.ticketNotchDark : styles.ticketNotchLight,
+              ]}
+            />
+          </View>
+
+          <View style={styles.ticketStatsRow}>
+            <View style={styles.ticketStat}>
+              <Text style={styles.ticketStatLabel}>DATE</Text>
+              <Text style={styles.ticketStatValue}>{date || '—'}</Text>
+            </View>
+            <View style={styles.ticketStat}>
+              <Text style={styles.ticketStatLabel}>PETS</Text>
+              <Text style={styles.ticketStatValue}>{selectedPetIds.length}</Text>
+            </View>
+            <View style={styles.ticketStat}>
+              <Text style={styles.ticketStatLabel}>STOPS</Text>
+              <Text style={styles.ticketStatValue}>{stops.length}</Text>
+            </View>
+          </View>
+
+          <View style={styles.heroProgressTrack}>
+            <View
+              style={[
+                styles.heroProgressFill,
+                { width: `${Math.round((progressDone / progressSteps.length) * 100)}%` },
+              ]}
+            />
+          </View>
+        </LinearGradient>
 
         {/* ── Form Fields Section (exact styling from AddPetModal) ── */}
         <View style={styles.formContainer}>
+          <SectionCard
+            icon="compass"
+            title="Trip details"
+            hint="Name it, date it, say where"
+            step="01"
+            done={title.trim().length > 0}
+            isDarkMode={isDarkMode}>
             {/* Field 1: Trip Title */}
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
@@ -476,6 +544,38 @@ export const CreateTripScreen = ({ navigation }) => {
                     <Feather name="chevron-down" size={ms(16)} color="#7C3AED" />
                   </TouchableOpacity>
                 </TouchableOpacity>
+                <View style={styles.quickDateRow}>
+                  {[
+                    { label: 'Today', offset: 0 },
+                    { label: 'Tomorrow', offset: 1 },
+                    { label: 'This weekend', offset: 'weekend' },
+                  ].map(chip => {
+                    const d = new Date();
+                    if (chip.offset === 'weekend') {
+                      d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7 || 7));
+                    } else {
+                      d.setDate(d.getDate() + chip.offset);
+                    }
+                    const value = formatDateToString(d);
+                    const active = date === value;
+                    return (
+                      <TouchableOpacity
+                        key={chip.label}
+                        testID={`quick-date-${chip.label}`}
+                        activeOpacity={0.8}
+                        onPress={() => setDate(value)}
+                        style={[
+                          styles.quickDateChip,
+                          isDarkMode && styles.suggestedChipDark,
+                          active && styles.quickDateChipActive,
+                        ]}>
+                        <Text style={[styles.quickDateText, active && styles.quickDateTextActive]}>
+                          {chip.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
 
               {/* Destination Field */}
@@ -522,7 +622,15 @@ export const CreateTripScreen = ({ navigation }) => {
                 </View>
               </View>
             </View>
+          </SectionCard>
 
+          <SectionCard
+            icon="paw"
+            title="Companions"
+            hint="Who came along"
+            step="02"
+            done={selectedPetIds.length > 0}
+            isDarkMode={isDarkMode}>
             {/* Field 4: Pets on this trip (Companion Selector matching AddPetModal) */}
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
@@ -563,7 +671,11 @@ export const CreateTripScreen = ({ navigation }) => {
                           <LinearGradient
                             colors={isSelected ? ['#FDE68A', '#F59E0B'] : ['#E2E8F0', '#CBD5E1']}
                             style={styles.petAvatarRing}>
-                            <View style={[styles.petAvatarInner, isSelected && styles.petAvatarInnerSelected]}>
+                            <View
+                              style={[
+                                styles.petAvatarInner,
+                                isSelected && styles.petAvatarInnerSelected,
+                              ]}>
                               <Ionicons
                                 name="paw"
                                 size={ms(14)}
@@ -610,14 +722,22 @@ export const CreateTripScreen = ({ navigation }) => {
               )}
               {errors.pets && <Text style={styles.errorText}>{errors.pets}</Text>}
             </View>
+          </SectionCard>
 
+          <SectionCard
+            icon="map"
+            title="Route stops"
+            hint="Search pet-friendly places you visited"
+            step="03"
+            done={stops.length > 0}
+            isDarkMode={isDarkMode}>
             {/* Field 5: Places visited (optional) */}
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
                 <Text style={[styles.inputLabel, isDarkMode && styles.textWhite]}>
                   Places visited <Text style={styles.optionalText}>(optional)</Text>
                 </Text>
-                {placesVisited.length > 0 && (
+                {stops.length > 0 && (
                   <View style={styles.filledCheckMark}>
                     <Feather name="check" size={ms(11)} color="#10B981" />
                   </View>
@@ -642,59 +762,104 @@ export const CreateTripScreen = ({ navigation }) => {
                   onChangeText={setPlaceQuery}
                   onFocus={() => handleInputFocus('place')}
                   onBlur={handleInputBlur}
-                  onSubmitEditing={() => handleAddPlace()}
-                  returnKeyType="done"
+                  returnKeyType="search"
                 />
-                {placeQuery.trim().length > 0 && (
-                  <TouchableOpacity
-                    onPress={() => handleAddPlace()}
-                    style={styles.addPlaceButton}>
-                    <Text style={styles.addPlaceButtonText}>+ Add</Text>
-                  </TouchableOpacity>
-                )}
               </View>
 
-              {/* Quick Suggestions Chips */}
-              <View style={styles.suggestedPlacesRow}>
-                {SUGGESTED_PLACES.map(suggested => (
-                  <TouchableOpacity
-                    key={suggested}
-                    onPress={() => handleAddPlace(suggested)}
-                    activeOpacity={0.7}
-                    style={[styles.suggestedChip, isDarkMode && styles.suggestedChipDark]}>
-                    <Text
+              {/* Custom loader while the first results load */}
+              {isSearching && suggestions.length === 0 && (
+                <View style={styles.searchLoaderBox}>
+                  <Loader fullScreen transparent title="Searching places..." />
+                </View>
+              )}
+
+              {/* Search suggestions from the listings API */}
+              {suggestions.length > 0 && (
+                <View style={[styles.suggestionList, isDarkMode && styles.suggestionListDark]}>
+                  {suggestions.map((listing, idx) => (
+                    <TouchableOpacity
+                      key={listing.id}
+                      testID={`place-suggestion-${listing.id}`}
+                      onPress={() => selectPlace(listing)}
+                      activeOpacity={0.7}
                       style={[
-                        styles.suggestedChipText,
-                        isDarkMode && styles.suggestedChipTextDark,
+                        styles.suggestionRow,
+                        idx > 0 && styles.suggestionRowDivider,
+                        idx > 0 && isDarkMode && styles.suggestionRowDividerDark,
                       ]}>
-                      + {suggested}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                      <View style={styles.suggestionPin}>
+                        <Ionicons name="location-sharp" size={ms(13)} color="#7C3AED" />
+                      </View>
+                      <View style={styles.suggestionTextCol}>
+                        <Text
+                          numberOfLines={1}
+                          style={[styles.suggestionName, isDarkMode && styles.textWhite]}>
+                          {listing.name}
+                        </Text>
+                        {!!(listing.city || listing.state) && (
+                          <Text
+                            numberOfLines={1}
+                            style={[styles.suggestionMeta, isDarkMode && styles.pageSubtitleDark]}>
+                            {[listing.city, listing.state].filter(Boolean).join(', ')}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.suggestionAdd}>
+                        <Feather name="plus" size={ms(13)} color="#FFFFFF" />
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              {placeQuery.trim().length >= 2 && !isSearching && suggestions.length === 0 && (
+                <Text style={[styles.emptyPetsSub, isDarkMode && styles.pageSubtitleDark]}>
+                  No places found.
+                </Text>
+              )}
 
-              {/* Added Places Tags */}
-              {placesVisited.length > 0 && (
-                <View style={styles.placesChipsContainer}>
-                  {placesVisited.map((p, idx) => (
+              {/* Selected stops timeline */}
+              {stops.length > 0 && (
+                <View style={styles.stopsList}>
+                  {stops.map((stop, idx) => (
                     <View
-                      key={`${p}-${idx}`}
-                      style={[styles.placeTag, isDarkMode && styles.placeTagDark]}>
-                      <Ionicons name="location-sharp" size={ms(12)} color="#7C3AED" style={styles.placeTagIcon} />
-                      <Text style={[styles.placeTagText, isDarkMode && styles.textWhite]}>
-                        {p}
-                      </Text>
+                      key={stop.listingId}
+                      style={[styles.stopRow, isDarkMode && styles.stopRowDark]}>
+                      <LinearGradient colors={['#8B5CF6', '#6D28D9']} style={styles.stopIndex}>
+                        <Text style={styles.stopIndexText}>{idx + 1}</Text>
+                      </LinearGradient>
+                      <View style={styles.suggestionTextCol}>
+                        <Text
+                          numberOfLines={1}
+                          style={[styles.suggestionName, isDarkMode && styles.textWhite]}>
+                          {stop.name}
+                        </Text>
+                        {!!(stop.city || stop.state) && (
+                          <Text
+                            numberOfLines={1}
+                            style={[styles.suggestionMeta, isDarkMode && styles.pageSubtitleDark]}>
+                            {[stop.city, stop.state].filter(Boolean).join(', ')}
+                          </Text>
+                        )}
+                      </View>
                       <TouchableOpacity
                         onPress={() => handleRemovePlace(idx)}
-                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                        <Ionicons name="close-circle" size={ms(14)} color="#94A3B8" />
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Ionicons name="close-circle" size={ms(18)} color="#94A3B8" />
                       </TouchableOpacity>
                     </View>
                   ))}
                 </View>
               )}
             </View>
+          </SectionCard>
 
+          <SectionCard
+            icon="create"
+            title="The story"
+            hint="A line to remember it by"
+            step="04"
+            done={description.trim().length > 0}
+            isDarkMode={isDarkMode}>
             {/* Field 6: Short Description (Textarea matching AddPetModal Bio) */}
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
@@ -727,48 +892,55 @@ export const CreateTripScreen = ({ navigation }) => {
                 />
               </View>
             </View>
+          </SectionCard>
 
-            {/* ── Submit Button with 3D Bevels & Luxury Glow ── */}
-            <View style={styles.submitSection}>
-              {isFormValid ? (
-                <BouncyPressable
-                  testID="create-trip-submit-btn"
-                  style={styles.submitBtnActive}
-                  activeScale={0.96}
-                  disabled={isSaving}
-                  onPress={handleSaveTrip}>
-                  <LinearGradient
-                    colors={['#8B5CF6', '#7C3AED', '#581C87']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.submitBtnGradient}>
-                    <View style={styles.btnContentRow}>
-                      <Text style={styles.submitBtnActiveText}>
-                        {isSaving ? 'Saving Trip...' : 'Save trip 🐾'}
-                      </Text>
-                    </View>
-                  </LinearGradient>
-                </BouncyPressable>
-              ) : (
-                <TouchableOpacity
-                  testID="create-trip-submit-btn"
-                  style={[styles.submitBtnDisabled, isDarkMode && styles.submitBtnDisabledDark]}
-                  activeOpacity={0.8}
-                  onPress={handleSaveTrip}>
+          {/* ── Submit Button with 3D Bevels & Luxury Glow ── */}
+          <View style={styles.submitSection}>
+            <Text style={[styles.submitSummary, isDarkMode && styles.pageSubtitleDark]}>
+              {`${selectedPetIds.length} pet${selectedPetIds.length === 1 ? '' : 's'}  ·  ${
+                stops.length
+              } stop${stops.length === 1 ? '' : 's'}`}
+            </Text>
+            {isFormValid ? (
+              <BouncyPressable
+                testID="create-trip-submit-btn"
+                style={styles.submitBtnActive}
+                activeScale={0.96}
+                disabled={isSaving}
+                onPress={handleSaveTrip}>
+                <LinearGradient
+                  colors={['#8B5CF6', '#7C3AED', '#581C87']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.submitBtnGradient}>
                   <View style={styles.btnContentRow}>
-                    <Text
-                      style={[
-                        styles.submitBtnDisabledText,
-                        isDarkMode && styles.submitBtnDisabledTextDark,
-                      ]}>
-                      Save trip 🐾
-                    </Text>
+                    <Ionicons name="paper-plane" size={ms(15)} color="#FFFFFF" />
+                    <Text style={styles.submitBtnActiveText}>Save trip</Text>
                   </View>
-                </TouchableOpacity>
-              )}
-            </View>
+                </LinearGradient>
+              </BouncyPressable>
+            ) : (
+              <TouchableOpacity
+                testID="create-trip-submit-btn"
+                style={[styles.submitBtnDisabled, isDarkMode && styles.submitBtnDisabledDark]}
+                activeOpacity={0.8}
+                onPress={handleSaveTrip}>
+                <View style={styles.btnContentRow}>
+                  <Text
+                    style={[
+                      styles.submitBtnDisabledText,
+                      isDarkMode && styles.submitBtnDisabledTextDark,
+                    ]}>
+                    Save trip
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
           </View>
-        </KeyboardAwareScrollView>
+        </View>
+      </KeyboardAwareScrollView>
+
+      <Loader visible={isSaving} title="Saving your trip..." />
 
       {/* ── Native Third-Party DateTimePicker Modal for iOS / Component Fallback ── */}
       {showDatePicker && (
@@ -785,11 +957,7 @@ export const CreateTripScreen = ({ navigation }) => {
               activeOpacity={1}
               onPress={() => setShowDatePicker(false)}
             />
-            <View
-              style={[
-                styles.nativePickerCard,
-                isDarkMode && styles.nativePickerCardDark,
-              ]}>
+            <View style={[styles.nativePickerCard, isDarkMode && styles.nativePickerCardDark]}>
               <View style={styles.nativePickerHeader}>
                 <TouchableOpacity
                   testID="date-modal-cancel-btn"
@@ -805,11 +973,7 @@ export const CreateTripScreen = ({ navigation }) => {
                 </TouchableOpacity>
 
                 <View style={styles.nativePickerHeaderTitleWrap}>
-                  <Text
-                    style={[
-                      styles.nativePickerHeaderTitle,
-                      isDarkMode && styles.textWhite,
-                    ]}>
+                  <Text style={[styles.nativePickerHeaderTitle, isDarkMode && styles.textWhite]}>
                     Select Date
                   </Text>
                 </View>
@@ -891,67 +1055,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F071D',
   },
 
-  /* ── Home Screen Background Ambient Decorative Glows & Watermarks ── */
-  ambientGlowTopRight: {
-    position: 'absolute',
-    top: -s(40),
-    right: -s(60),
-    width: s(280),
-    height: s(280),
-    borderRadius: s(140),
-    backgroundColor: 'rgba(233, 213, 255, 0.45)',
-  },
-  ambientGlowTopLeft: {
-    position: 'absolute',
-    top: s(70),
-    left: -s(90),
-    width: s(240),
-    height: s(240),
-    borderRadius: s(120),
-    backgroundColor: 'rgba(254, 240, 215, 0.40)',
-  },
-  ambientGlowMidRight: {
-    position: 'absolute',
-    top: s(520),
-    right: -s(80),
-    width: s(280),
-    height: s(280),
-    borderRadius: s(140),
-    backgroundColor: 'rgba(252, 231, 243, 0.45)',
-  },
-  ambientGlowMidLeft: {
-    position: 'absolute',
-    top: s(380),
-    left: -s(80),
-    width: s(290),
-    height: s(290),
-    borderRadius: s(145),
-    backgroundColor: 'rgba(254, 240, 215, 0.55)',
-  },
-  ambientGlowBottomRight: {
-    position: 'absolute',
-    bottom: s(140),
-    right: -s(70),
-    width: s(320),
-    height: s(320),
-    borderRadius: s(160),
-    backgroundColor: 'rgba(245, 230, 255, 0.45)',
-  },
-  ambientGlowDark: {
-    opacity: 0.18,
-  },
-  ambientPawWatermarkTop: {
-    position: 'absolute',
-    top: s(180),
-    right: -s(20),
-    transform: [{ rotate: '-25deg' }],
-  },
-  ambientPawWatermarkBottom: {
-    position: 'absolute',
-    bottom: s(220),
-    left: -s(30),
-    transform: [{ rotate: '30deg' }],
-  },
   flexOne: {
     flex: 1,
   },
@@ -959,70 +1062,323 @@ const styles = StyleSheet.create({
     paddingHorizontal: s(20),
   },
 
-  /* ── Top Header Navigation Bar ── */
-  topNav: {
+  /* ── Hero ── */
+  heroCard: {
+    borderRadius: s(24),
+    padding: s(18),
+    marginBottom: vs(18),
+    overflow: 'hidden',
+    shadowColor: '#4C1D95',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    elevation: 8,
+  },
+  heroPawMark: {
+    position: 'absolute',
+    right: -s(18),
+    bottom: -vs(20),
+  },
+  heroEyebrowPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: s(5),
+    paddingHorizontal: s(10),
+    paddingVertical: vs(4),
+    borderRadius: s(20),
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(253, 230, 138, 0.35)',
+  },
+  heroEyebrowText: {
+    fontSize: s(9.5),
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#FDE68A',
+    letterSpacing: 1.2,
+  },
+  heroTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: s(20),
-    paddingBottom: vs(8),
   },
-  topNavDark: {
-    borderBottomColor: '#1F1635',
-  },
-  backButton: {
-    width: s(38),
-    height: s(38),
-    borderRadius: s(19),
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.2,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#7C3AED',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 5,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
-  backButtonDark: {
-    backgroundColor: '#1E1035',
-    borderColor: '#371B58',
-  },
-  navBadge: {
+  heroDestRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    borderRadius: s(12),
-    paddingHorizontal: s(10),
-    paddingVertical: vs(5),
-    borderWidth: 1,
-    borderColor: '#FDE68A',
+    gap: s(4),
+    marginTop: vs(4),
   },
-  navBadgeDark: {
-    backgroundColor: '#2E1A05',
-    borderColor: '#78350F',
+  ticketDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: vs(14),
+    marginHorizontal: -s(18),
   },
-  sparkleIcon: {
-    marginRight: s(4),
+  ticketNotch: {
+    width: s(16),
+    height: s(16),
+    borderRadius: s(8),
   },
-  navBadgeText: {
+  ticketNotchLight: {
+    backgroundColor: '#FAF7F2',
+  },
+  ticketNotchDark: {
+    backgroundColor: '#0F071D',
+  },
+  ticketNotchLeft: {
+    marginLeft: -s(8),
+  },
+  ticketNotchRight: {
+    marginRight: -s(8),
+  },
+  ticketDash: {
+    flex: 1,
+    marginHorizontal: s(6),
+    borderTopWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255, 255, 255, 0.28)',
+  },
+  ticketStatsRow: {
+    flexDirection: 'row',
+    marginBottom: vs(14),
+  },
+  ticketStat: {
+    flex: 1,
+  },
+  ticketStatLabel: {
     fontSize: s(9),
     fontFamily: theme.typography.fontFamily.bold,
-    color: '#B45309',
-    letterSpacing: 0.6,
+    color: 'rgba(255, 255, 255, 0.55)',
+    letterSpacing: 1.4,
   },
-  navBadgeTextDark: {
-    color: '#FCD34D',
+  ticketStatValue: {
+    fontSize: s(15),
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#FFFFFF',
+    marginTop: vs(2),
   },
-  topNavSpacer: {
-    width: s(38),
+  sectionDoneBadge: {
+    width: s(22),
+    height: s(22),
+    borderRadius: s(11),
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchLoaderBox: {
+    height: vs(170),
+    marginTop: vs(4),
+  },
+  quickDateRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: s(8),
+    marginTop: vs(10),
+  },
+  quickDateChip: {
+    paddingHorizontal: s(12),
+    paddingVertical: vs(6),
+    borderRadius: s(20),
+    backgroundColor: '#F7F2FF',
+    borderWidth: 1,
+    borderColor: '#E4D9FB',
+  },
+  quickDateChipActive: {
+    backgroundColor: '#7C3AED',
+    borderColor: '#7C3AED',
+  },
+  quickDateText: {
+    fontSize: s(11),
+    fontFamily: theme.typography.fontFamily.medium,
+    color: '#6D28D9',
+  },
+  quickDateTextActive: {
+    color: '#FFFFFF',
+  },
+  heroTitle: {
+    fontSize: s(28),
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+    marginTop: vs(14),
+  },
+  heroSubtitle: {
+    fontSize: s(12.5),
+    fontFamily: theme.typography.fontFamily.regular,
+    color: 'rgba(255, 255, 255, 0.78)',
+    lineHeight: s(18),
+    marginTop: 0,
+    flex: 1,
+  },
+  heroProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(10),
+    marginTop: vs(16),
+  },
+  heroProgressTrack: {
+    width: '100%',
+    height: vs(6),
+    borderRadius: s(4),
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    overflow: 'hidden',
+  },
+  heroProgressFill: {
+    height: '100%',
+    borderRadius: s(4),
+    backgroundColor: '#FDE68A',
+  },
+  heroProgressLabel: {
+    fontSize: s(11),
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#FDE68A',
+  },
+
+  /* ── Section Cards ── */
+  sectionCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderRadius: s(22),
+    padding: s(16),
+    marginBottom: vs(16),
+    borderWidth: 1,
+    borderColor: '#F0EBFA',
+    shadowColor: '#4C1D95',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
+    elevation: 3,
+  },
+  sectionCardDark: {
+    backgroundColor: 'rgba(23, 9, 46, 0.85)',
+    borderColor: '#2D1452',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: vs(14),
+  },
+  sectionIconWrap: {
+    width: s(32),
+    height: s(32),
+    borderRadius: s(11),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: s(10),
+  },
+  sectionHeaderText: {
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: s(14.5),
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#111827',
+  },
+  sectionHint: {
+    fontSize: s(10.5),
+    fontFamily: theme.typography.fontFamily.regular,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  sectionStep: {
+    fontSize: s(18),
+    fontFamily: theme.typography.fontFamily.bold,
+    color: 'rgba(124, 58, 237, 0.18)',
+  },
+
+  /* ── Place suggestions & stops ── */
+  suggestionList: {
+    marginTop: vs(8),
+    borderRadius: s(16),
+    borderWidth: 1,
+    borderColor: '#EAE6F5',
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  suggestionListDark: {
+    backgroundColor: '#120726',
+    borderColor: '#2D1452',
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: s(12),
+    paddingVertical: vs(10),
+  },
+  suggestionRowDivider: {
+    borderTopWidth: 1,
+    borderTopColor: '#F1EEF9',
+  },
+  suggestionRowDividerDark: {
+    borderTopColor: '#2D1452',
+  },
+  suggestionPin: {
+    width: s(28),
+    height: s(28),
+    borderRadius: s(9),
+    backgroundColor: '#F3EEFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: s(10),
+  },
+  suggestionTextCol: {
+    flex: 1,
+    marginRight: s(8),
+  },
+  suggestionName: {
+    fontSize: s(12.5),
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#1E293B',
+  },
+  suggestionMeta: {
+    fontSize: s(10.5),
+    fontFamily: theme.typography.fontFamily.regular,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  suggestionAdd: {
+    width: s(24),
+    height: s(24),
+    borderRadius: s(12),
+    backgroundColor: '#7C3AED',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stopsList: {
+    marginTop: vs(10),
+    gap: vs(8),
+  },
+  stopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: s(10),
+    borderRadius: s(16),
+    backgroundColor: '#F7F2FF',
+    borderWidth: 1,
+    borderColor: '#E4D9FB',
+  },
+  stopRowDark: {
+    backgroundColor: '#1E0B3C',
+    borderColor: '#3B1B6B',
+  },
+  stopIndex: {
+    width: s(26),
+    height: s(26),
+    borderRadius: s(13),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: s(10),
+  },
+  stopIndexText: {
+    fontSize: s(11.5),
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#FFFFFF',
+  },
+  submitSummary: {
+    textAlign: 'center',
+    fontSize: s(11),
+    fontFamily: theme.typography.fontFamily.medium,
+    color: '#64748B',
+    marginBottom: vs(10),
   },
 
   /* ── Header Block ── */
@@ -1098,42 +1454,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderWidth: 1.2,
-    borderColor: '#E2E8F0',
-    borderBottomWidth: 2.5,
-    borderBottomColor: '#CBD5E1',
-    borderRadius: s(14),
+    borderWidth: 1,
+    borderColor: '#EAE6F5',
+    borderRadius: s(16),
     paddingHorizontal: s(12),
-    height: vs(48),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 5,
+    height: vs(52),
+    shadowColor: '#4C1D95',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
     elevation: 2,
   },
   inputCardWrapperDark: {
-    backgroundColor: '#17092E',
+    backgroundColor: '#120726',
     borderColor: '#2D1452',
-    borderBottomColor: '#1E0B38',
   },
   inputCardWrapperFocused: {
     borderColor: '#7C3AED',
-    borderBottomColor: '#5B21B6',
-    backgroundColor: '#FAF5FF',
+    backgroundColor: '#FFFFFF',
     shadowColor: '#7C3AED',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    elevation: 5,
   },
   inputCardWrapperError: {
     borderColor: '#EF4444',
-    borderBottomColor: '#DC2626',
   },
   inputIconBox: {
     width: s(28),
     height: s(28),
-    borderRadius: s(8),
-    backgroundColor: '#F5F3FF',
+    borderRadius: s(10),
+    backgroundColor: '#F3EEFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: s(10),
@@ -1158,15 +1509,15 @@ const styles = StyleSheet.create({
 
   /* Two Column Row */
   twoColumnRow: {
-    flexDirection: 'row',
-    gap: s(10),
-    marginBottom: vs(18),
+    flexDirection: 'column',
+    gap: vs(16),
+    marginBottom: vs(14),
   },
   dateCol: {
-    flex: 1,
+    width: '100%',
   },
   destCol: {
-    flex: 1.15,
+    width: '100%',
   },
 
   /* Pets Selector */
@@ -1214,28 +1565,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderWidth: 1.2,
-    borderColor: '#E2E8F0',
-    borderBottomWidth: 2.5,
-    borderBottomColor: '#CBD5E1',
-    borderRadius: s(14),
+    borderColor: '#EAE6F5',
+    borderRadius: s(16),
     paddingHorizontal: s(10),
-    paddingVertical: vs(8),
+    paddingVertical: vs(10),
     minWidth: s(130),
     flex: 1,
   },
   petCompanionCardDark: {
-    backgroundColor: '#17092E',
+    backgroundColor: '#120726',
     borderColor: '#2D1452',
-    borderBottomColor: '#1E0B38',
   },
   petCompanionCardSelected: {
     borderColor: '#7C3AED',
-    borderBottomColor: '#5B21B6',
-    backgroundColor: '#FAF5FF',
+    borderWidth: 1.8,
+    backgroundColor: '#F7F2FF',
     shadowColor: '#7C3AED',
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
   },
   petAvatarOrb: {
     width: s(28),
@@ -1365,22 +1714,19 @@ const styles = StyleSheet.create({
   bioCardWrapper: {
     height: vs(95),
     backgroundColor: '#FFFFFF',
-    borderWidth: 1.2,
-    borderColor: '#E2E8F0',
-    borderBottomWidth: 2.5,
-    borderBottomColor: '#CBD5E1',
-    borderRadius: s(14),
+    borderWidth: 1,
+    borderColor: '#EAE6F5',
+    borderRadius: s(16),
     padding: s(12),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 5,
+    shadowColor: '#4C1D95',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
     elevation: 2,
   },
   bioCardWrapperDark: {
-    backgroundColor: '#17092E',
+    backgroundColor: '#120726',
     borderColor: '#2D1452',
-    borderBottomColor: '#1E0B38',
   },
   bioTextInput: {
     flex: 1,
@@ -1404,8 +1750,8 @@ const styles = StyleSheet.create({
     marginBottom: vs(24),
   },
   submitBtnDisabled: {
-    height: vs(50),
-    borderRadius: s(14),
+    height: vs(54),
+    borderRadius: s(18),
     backgroundColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1425,13 +1771,14 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   btnContentRow: {
+    gap: s(8),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   submitBtnActive: {
-    height: vs(50),
-    borderRadius: s(14),
+    height: vs(54),
+    borderRadius: s(18),
     shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.45,
@@ -1440,7 +1787,7 @@ const styles = StyleSheet.create({
   },
   submitBtnGradient: {
     flex: 1,
-    borderRadius: s(14),
+    borderRadius: s(18),
     alignItems: 'center',
     justifyContent: 'center',
     borderTopWidth: 1.2,

@@ -9,7 +9,6 @@ import { theme } from '../../theme';
 const PURPLE = '#7B2CFF';
 const DEEP_PURPLE = '#3B108F';
 const GUTTER = s(15);
-const PAW_COLORS = [PURPLE, '#FF4FB8', '#FF9F1C'];
 
 // Grey placeholder with a light streak sweeping across it
 export const SkeletonBlock = ({ style, isDarkMode }) => {
@@ -63,58 +62,8 @@ export const SkeletonBlock = ({ style, isDarkMode }) => {
   );
 };
 
-// Three paw prints that hop one after another
-export const PawLoader = ({ label, isDarkMode }) => {
-  const hops = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
-
-  useEffect(() => {
-    const loops = hops.map((value, i) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(i * 180),
-          Animated.timing(value, {
-            toValue: 1,
-            duration: 360,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(value, {
-            toValue: 0,
-            duration: 360,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.delay((hops.length - 1 - i) * 180),
-        ]),
-      ),
-    );
-    loops.forEach(loop => loop.start());
-    return () => loops.forEach(loop => loop.stop());
-  }, [hops]);
-
-  return (
-    <View style={styles.pawLoader}>
-      <View style={styles.pawRow}>
-        {hops.map((value, i) => (
-          <Animated.View
-            key={PAW_COLORS[i]}
-            style={{
-              opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }),
-              transform: [
-                { translateY: value.interpolate({ inputRange: [0, 1], outputRange: [0, -s(10)] }) },
-                { rotate: i % 2 === 0 ? '-18deg' : '18deg' },
-              ],
-            }}>
-            <Ionicons name="paw" size={ms(22)} color={PAW_COLORS[i]} />
-          </Animated.View>
-        ))}
-      </View>
-      {label ? (
-        <Text style={[styles.pawLabel, isDarkMode && styles.textMutedDark]}>{label}</Text>
-      ) : null}
-    </View>
-  );
-};
+// The shared paw loader, re-exported so the community screens keep their imports
+export { LoaderCard as PawLoader } from '../../components/common/Loader';
 
 // Friendly failure state with a wobbling pup and a retry button
 export const ErrorState = ({ message = 'Could not load communities', onRetry, isDarkMode }) => {
@@ -234,14 +183,6 @@ const styles = StyleSheet.create({
 
   block: { backgroundColor: '#EDE8F8', borderRadius: s(6), overflow: 'hidden' },
   blockDark: { backgroundColor: '#2E1654' },
-
-  pawLoader: { alignItems: 'center', paddingVertical: s(14), gap: s(6) },
-  pawRow: { flexDirection: 'row', alignItems: 'flex-end', gap: s(12), height: s(36) },
-  pawLabel: {
-    fontFamily: theme.typography.fontFamily.semiBold,
-    fontSize: s(11.5),
-    color: '#9A8BA9',
-  },
 
   errorState: { alignItems: 'center', paddingVertical: s(22), paddingHorizontal: s(24), gap: s(4) },
   errorEmoji: { fontSize: s(40), marginBottom: s(4) },

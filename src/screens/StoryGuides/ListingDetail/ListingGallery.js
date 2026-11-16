@@ -1,11 +1,12 @@
 import React, { useRef, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, useWindowDimensions } from 'react-native';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { ms } from 'react-native-size-matters';
 import { images as themeImages } from '../../../theme';
 import { styles } from './styles';
+import { AppImage } from '../../../components/common/AppImage';
 
 /** Swipeable photo gallery; tapping a photo (or the counter) opens the full gallery. */
 export const ListingGallery = ({ photos, height, onOpen }) => {
@@ -37,10 +38,10 @@ export const ListingGallery = ({ photos, height, onOpen }) => {
             activeOpacity={0.95}
             disabled={!item}
             onPress={() => onOpen && onOpen(i)}>
-            <FastImage
+            <AppImage
               source={item ? { uri: item, priority: FastImage.priority.high } : themeImages.noimage}
               style={{ width, height }}
-              resizeMode={FastImage.resizeMode.cover}
+              resizeMode="cover"
             />
           </TouchableOpacity>
         )}

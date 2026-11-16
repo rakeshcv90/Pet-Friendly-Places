@@ -7,10 +7,9 @@ import {
   TextInput,
   RefreshControl,
   Platform,
-  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../components/common/FastImage';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
 import { s, vs, ms } from 'react-native-size-matters';
@@ -20,6 +19,7 @@ import { useStore } from '../../store';
 import { useInfiniteArticles, resolveImageUrl } from '../../hooks/useDiscovery';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { Loader } from '../../components/common/Loader';
+import { AppImage } from '../../components/common/AppImage';
 
 export const mapCategoryToBadge = category => {
   const norm = (category || '').toLowerCase().trim();
@@ -313,14 +313,14 @@ const GuideCard = React.memo(function GuideCard({ guide, isDarkMode, onOpen }) {
       {/* Left: Thumbnail Image */}
       <View
         style={[styles.guideThumbnailWrap, isDarkMode && styles.guideThumbnailWrapDark]}>
-        <FastImage
+        <AppImage
           source={imageSource}
           defaultSource={images.noimage}
           onError={() => setImageFailed(true)}
           alt={guide.title || 'Pet guide thumbnail'}
           accessibilityLabel={guide.title || 'Pet guide thumbnail'}
           style={styles.guideThumbnailImage}
-          resizeMode={FastImage.resizeMode.cover}
+          resizeMode="cover"
         />
       </View>
 
@@ -559,13 +559,13 @@ export const GuidesScreen = React.memo(function GuidesScreen({ navigation, onScr
         {/* ── 6. Pagination & Load More ── */}
         {hasNextPage && !hasMoreLocal && (
           <View style={styles.loadMoreWrap}>
+            <Loader visible={!!isFetchingNextPage} title="Loading next batch..." />
             <BouncyPressable
               style={[styles.loadMoreBtn, isDarkMode && styles.loadMoreBtnDark]}
               onPress={() => fetchNextPage()}
               disabled={isFetchingNextPage}>
               {isFetchingNextPage ? (
                 <View style={styles.loadMoreInner}>
-                  <ActivityIndicator size="small" color="#7C3AED" />
                   <Text style={[styles.loadMoreText, isDarkMode && styles.loadMoreTextDark]}>
                     Loading next batch...
                   </Text>

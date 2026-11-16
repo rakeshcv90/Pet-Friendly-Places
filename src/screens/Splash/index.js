@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet, StatusBar, useWindowDimensions } from 'react-native';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../components/common/FastImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { theme } from '../../theme';

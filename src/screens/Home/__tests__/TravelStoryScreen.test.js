@@ -63,6 +63,10 @@ const MOCK_API_STORIES = [
   },
 ];
 
+jest.mock('../../../hooks/useUser', () => ({
+  useUserProfile: () => ({ data: null }),
+}));
+
 jest.mock('../../../hooks/useDiscovery', () => ({
   useHomeData: () => ({
     data: {

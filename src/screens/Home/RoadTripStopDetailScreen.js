@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import Feather from 'react-native-vector-icons/Feather';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -1625,9 +1625,9 @@ export const RoadTripStopDetailScreen = ({ navigation, route }) => {
       />
 
       {/* ── Premium Custom Loader ── */}
+      {/* Only when a partial stop was passed in: otherwise the page loader above is already showing */}
       <Loader
-        visible={isLoading && !listing?.id}
-        fullScreen
+        visible={isLoading && !listing?.id && !!route?.params?.listing?.name}
         message="Loading verified highway stop..."
       />
     </View>

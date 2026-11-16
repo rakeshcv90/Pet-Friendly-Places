@@ -1,11 +1,16 @@
+import * as Keychain from 'react-native-keychain';
 import {
   setItem,
   getItem,
   removeItem,
   clearStorage,
+  initSecureStorage,
+  saveSecureTokens,
   STORAGE_KEYS,
   storage,
 } from '../storage';
+
+const SESSION = { service: 'com.petfriendly.session' };
 
 describe('storage service', () => {
   beforeEach(() => {
@@ -14,21 +19,18 @@ describe('storage service', () => {
   });
 
   it('stores and retrieves string values', () => {
-    setItem(STORAGE_KEYS.ACCESS_TOKEN, 'test_token_123');
-    expect(storage.set).toHaveBeenCalledWith(STORAGE_KEYS.ACCESS_TOKEN, 'test_token_123');
+    setItem(STORAGE_KEYS.SELECTED_LOCATION, 'Bengaluru');
+    expect(storage.set).toHaveBeenCalledWith(STORAGE_KEYS.SELECTED_LOCATION, 'Bengaluru');
 
-    const result = getItem(STORAGE_KEYS.ACCESS_TOKEN);
-    expect(result).toBe('test_token_123');
+    const result = getItem(STORAGE_KEYS.SELECTED_LOCATION);
+    expect(result).toBe('Bengaluru');
   });
 
   it('serializes objects on setItem and deserializes with isObject=true', () => {
     const user = { id: 'u1', name: 'Buddy Owner', role: 'admin' };
     setItem(STORAGE_KEYS.USER_INFO, user);
 
-    expect(storage.set).toHaveBeenCalledWith(
-      STORAGE_KEYS.USER_INFO,
-      JSON.stringify(user)
-    );
+    expect(storage.set).toHaveBeenCalledWith(STORAGE_KEYS.USER_INFO, JSON.stringify(user));
 
     const retrieved = getItem(STORAGE_KEYS.USER_INFO, true);
     expect(retrieved).toEqual(user);
@@ -49,5 +51,77 @@ describe('storage service', () => {
   it('clears storage completely on clearStorage', () => {
     clearStorage();
     expect(storage.clearAll).toHaveBeenCalled();
+  });
+
+  describe('secure session', () => {
+    beforeEach(async () => {
+      await Keychain.resetGenericPassword(SESSION);
+      jest.clearAllMocks();
+    });
+
+    it('keeps the tokens out of MMKV and in the Keychain', async () => {
+      setItem(STORAGE_KEYS.ACCESS_TOKEN, 'access-1');
+      setItem(STORAGE_KEYS.REFRESH_TOKEN, 'refresh-1');
+      await saveSecureTokens('access-1', 'refresh-1');
+
+      expect(getItem(STORAGE_KEYS.ACCESS_TOKEN)).toBe('access-1');
+      expect(storage.set).not.toHaveBeenCalledWith(STORAGE_KEYS.ACCESS_TOKEN, expect.anything());
+      expect(storage.set).not.toHaveBeenCalledWith(STORAGE_KEYS.REFRESH_TOKEN, expect.anything());
+
+      const saved = await Keychain.getGenericPassword(SESSION);
+      expect(JSON.parse(saved.password)).toEqual({
+        ACCESS_TOKEN: 'access-1',
+        REFRESH_TOKEN: 'refresh-1',
+      });
+      expect(Keychain.setGenericPassword).toHaveBeenCalledWith(
+        'session',
+        expect.any(String),
+        expect.objectContaining({ accessible: 'AccessibleAfterFirstUnlockThisDeviceOnly' }),
+      );
+    });
+
+    it('saves a rotated pair of tokens in a single write', async () => {
+      await saveSecureTokens('new-access', 'new-refresh');
+
+      expect(Keychain.setGenericPassword).toHaveBeenCalledTimes(1);
+      expect(getItem(STORAGE_KEYS.REFRESH_TOKEN)).toBe('new-refresh');
+    });
+
+    it('loads the session from the Keychain on start', async () => {
+      await Keychain.setGenericPassword(
+        'session',
+        JSON.stringify({ ACCESS_TOKEN: 'a', REFRESH_TOKEN: 'r' }),
+        SESSION,
+      );
+      removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+
+      await initSecureStorage();
+
+      expect(getItem(STORAGE_KEYS.ACCESS_TOKEN)).toBe('a');
+      expect(getItem(STORAGE_KEYS.REFRESH_TOKEN)).toBe('r');
+    });
+
+    it('moves tokens an older version left in MMKV into the Keychain', async () => {
+      storage.set(STORAGE_KEYS.ACCESS_TOKEN, 'legacy-access');
+      storage.set(STORAGE_KEYS.REFRESH_TOKEN, 'legacy-refresh');
+      await Keychain.resetGenericPassword(SESSION);
+
+      await initSecureStorage();
+
+      expect(getItem(STORAGE_KEYS.ACCESS_TOKEN)).toBe('legacy-access');
+      expect(storage.remove).toHaveBeenCalledWith(STORAGE_KEYS.ACCESS_TOKEN);
+      expect(storage.remove).toHaveBeenCalledWith(STORAGE_KEYS.REFRESH_TOKEN);
+      const saved = await Keychain.getGenericPassword(SESSION);
+      expect(JSON.parse(saved.password).REFRESH_TOKEN).toBe('legacy-refresh');
+    });
+
+    it('clears the Keychain when the last token is removed', async () => {
+      await saveSecureTokens('a', 'r');
+      removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+      removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+
+      await new Promise(resolve => setImmediate(resolve));
+      expect(await Keychain.getGenericPassword(SESSION)).toBe(false);
+    });
   });
 });

@@ -21,12 +21,17 @@ import { s, vs, ms } from 'react-native-size-matters';
 import { theme } from '../../theme';
 import { useStore } from '../../store';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
+import { useQueryClient } from '@tanstack/react-query';
+import { patchCachedProfile } from '../../hooks/useUser';
+import { ScreenHeader } from '../../components/common/AppHeader/ScreenHeader';
+import { AmbientBackground } from '../Home/components';
 
 export const MyProfileScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const isDarkMode = useStore(state => state.isDarkMode) || false;
   const storeUser = useStore(state => state.user);
   const setUser = useStore(state => state.setUser);
+  const queryClient = useQueryClient();
 
   // Initial user values
   const initialName = storeUser?.name || storeUser?.displayName || 'Rakesh Rao';
@@ -53,6 +58,8 @@ export const MyProfileScreen = ({ navigation }) => {
 
   // Toast / Feedback State
   const [toastMessage, setToastMessage] = useState(null);
+  // Drives the background glows, as on the Home screen
+  const scrollY = useRef(new Animated.Value(0)).current;
   const toastAnim = useRef(new Animated.Value(0)).current;
   const toastTimeoutRef = useRef(null);
 
@@ -98,9 +105,11 @@ export const MyProfileScreen = ({ navigation }) => {
       showToast('⚠️ Please enter a display name');
       return;
     }
+    const nameUpdate = { name: displayName.trim(), displayName: displayName.trim() };
     if (setUser && storeUser) {
-      setUser({ ...storeUser, name: displayName.trim(), displayName: displayName.trim() });
+      setUser({ ...storeUser, ...nameUpdate });
     }
+    patchCachedProfile(queryClient, nameUpdate);
     showToast('Display name updated successfully! ✨');
   };
 
@@ -114,20 +123,22 @@ export const MyProfileScreen = ({ navigation }) => {
     if (setUser && storeUser) {
       setUser({ ...storeUser, profileSlug: sanitized });
     }
+    patchCachedProfile(queryClient, { profileSlug: sanitized });
     showToast('Profile URL updated successfully! 🔗');
   };
 
   const handleSaveProfileInfo = () => {
+    const infoUpdate = {
+      bio: bio.trim(),
+      location: location.trim(),
+      instagramHandle: instagramHandle.trim(),
+      youtubeHandle: youtubeHandle.trim(),
+      website: website.trim(),
+    };
     if (setUser && storeUser) {
-      setUser({
-        ...storeUser,
-        bio: bio.trim(),
-        location: location.trim(),
-        instagramHandle: instagramHandle.trim(),
-        youtubeHandle: youtubeHandle.trim(),
-        website: website.trim(),
-      });
+      setUser({ ...storeUser, ...infoUpdate });
     }
+    patchCachedProfile(queryClient, infoUpdate);
     showToast('Profile info saved successfully! 🌟');
   };
 
@@ -151,78 +162,23 @@ export const MyProfileScreen = ({ navigation }) => {
         backgroundColor={isDarkMode ? '#0F071D' : '#FAF7F2'}
       />
 
-      {/* ── Signature Homepage Ambient Glow Orbs ── */}
-      <View
-        style={[styles.ambientGlowTopRight, isDarkMode && styles.ambientGlowDark]}
-        pointerEvents="none"
-      />
-      <View
-        style={[styles.ambientGlowTopLeft, isDarkMode && styles.ambientGlowDark]}
-        pointerEvents="none"
-      />
-      <View
-        style={[styles.ambientGlowMidRight, isDarkMode && styles.ambientGlowDark]}
-        pointerEvents="none"
-      />
-      <View
-        style={[styles.ambientGlowMidLeft, isDarkMode && styles.ambientGlowDark]}
-        pointerEvents="none"
-      />
-      <View
-        style={[styles.ambientGlowBottomRight, isDarkMode && styles.ambientGlowDark]}
-        pointerEvents="none"
-      />
+      <AmbientBackground scrollY={scrollY} isDarkMode={isDarkMode} />
 
-      {/* ── Signature Ambient Paw Watermarks ── */}
-      <View style={styles.ambientPawWatermarkTop} pointerEvents="none">
-        <Ionicons
-          name="paw"
-          size={ms(130)}
-          color={isDarkMode ? 'rgba(168, 85, 247, 0.08)' : 'rgba(123, 44, 255, 0.035)'}
-        />
-      </View>
-      <View style={styles.ambientPawWatermarkBottom} pointerEvents="none">
-        <Ionicons
-          name="paw"
-          size={ms(160)}
-          color={isDarkMode ? 'rgba(238, 42, 123, 0.06)' : 'rgba(238, 42, 123, 0.03)'}
-        />
-      </View>
-
-      {/* ── Fixed Top Navigation Bar ── */}
-      <View
-        style={[
-          styles.headerRow,
-          { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? vs(10) : vs(6)) },
-          isDarkMode && styles.headerRowDark,
-        ]}>
-        <BouncyPressable
-          testID="my-profile-back-btn"
-          accessibilityLabel="Back"
-          style={[styles.backBtn, isDarkMode && styles.backBtnDark]}
-          activeScale={0.88}
-          onPress={() => navigation.goBack()}>
-          <Ionicons
-            name="arrow-back"
-            size={s(20)}
-            color={isDarkMode ? '#FFFFFF' : '#1E1B4B'}
-          />
-        </BouncyPressable>
-
-        <View style={styles.headerTitleWrap}>
-          <Text style={[styles.headerTitle, isDarkMode && styles.textWhite]}>
-            My Profile
-          </Text>
-        </View>
-
-        <BouncyPressable
-          testID="view-public-quick-btn"
-          style={[styles.headerActionBtn, isDarkMode && styles.headerActionBtnDark]}
-          activeScale={0.9}
-          onPress={() => setPreviewModalVisible(true)}>
-          <Feather name="globe" size={ms(16)} color={isDarkMode ? '#A78BFA' : '#7C3AED'} />
-        </BouncyPressable>
-      </View>
+      <ScreenHeader
+        title="My Profile"
+        subtitle="YOUR PET PARENT PROFILE"
+        onBack={() => navigation.goBack()}
+        testID="my-profile-back-btn"
+        rightComponent={
+          <BouncyPressable
+            testID="view-public-quick-btn"
+            style={[styles.headerActionBtn, isDarkMode && styles.headerActionBtnDark]}
+            activeScale={0.9}
+            onPress={() => setPreviewModalVisible(true)}>
+            <Feather name="globe" size={ms(16)} color={isDarkMode ? '#A78BFA' : '#7C3AED'} />
+          </BouncyPressable>
+        }
+      />
 
       {/* ── Floating Notification Toast ── */}
       {toastMessage && (
@@ -230,7 +186,7 @@ export const MyProfileScreen = ({ navigation }) => {
           style={[
             styles.toastContainer,
             {
-              top: insets.top + vs(62),
+              top: Math.max(insets.top, s(12)) + s(84),
               opacity: toastAnim,
               transform: [
                 {
@@ -258,6 +214,8 @@ export const MyProfileScreen = ({ navigation }) => {
           { paddingBottom: insets.bottom + vs(36) },
         ]}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={e => scrollY.setValue(e.nativeEvent.contentOffset.y)}
         enableOnAndroid
         extraScrollHeight={vs(20)}>
         {/* Main Card Container with 3D Depth matching CreateTripScreen */}
@@ -265,9 +223,7 @@ export const MyProfileScreen = ({ navigation }) => {
           {/* Top colored accent stripe matching CreateTrip & Community card */}
           <View style={styles.cardTopAccent} />
 
-          {/* ══════════════════════════════════════
-              SECTION 1: Public Identity
-          ══════════════════════════════════════ */}
+      
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionHeading, isDarkMode && styles.textWhite]}>
               Public Identity
@@ -808,118 +764,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F071D',
   },
 
-  /* ── Homepage Signature Ambient Glow Orbs ── */
-  ambientGlowTopRight: {
-    position: 'absolute',
-    top: -s(80),
-    right: -s(80),
-    width: s(280),
-    height: s(280),
-    borderRadius: s(140),
-    backgroundColor: 'rgba(233, 213, 255, 0.45)',
-  },
-  ambientGlowTopLeft: {
-    position: 'absolute',
-    top: s(70),
-    left: -s(90),
-    width: s(240),
-    height: s(240),
-    borderRadius: s(120),
-    backgroundColor: 'rgba(254, 240, 215, 0.40)',
-  },
-  ambientGlowMidRight: {
-    position: 'absolute',
-    top: s(520),
-    right: -s(80),
-    width: s(280),
-    height: s(280),
-    borderRadius: s(140),
-    backgroundColor: 'rgba(252, 231, 243, 0.45)',
-  },
-  ambientGlowMidLeft: {
-    position: 'absolute',
-    top: s(380),
-    left: -s(80),
-    width: s(290),
-    height: s(290),
-    borderRadius: s(145),
-    backgroundColor: 'rgba(254, 240, 215, 0.55)',
-  },
-  ambientGlowBottomRight: {
-    position: 'absolute',
-    bottom: s(140),
-    right: -s(70),
-    width: s(320),
-    height: s(320),
-    borderRadius: s(160),
-    backgroundColor: 'rgba(245, 230, 255, 0.45)',
-  },
-  ambientGlowDark: {
-    opacity: 0.18,
-  },
-
-  /* ── Homepage Signature Ambient Paw Watermarks ── */
-  ambientPawWatermarkTop: {
-    position: 'absolute',
-    top: vs(120),
-    right: -s(20),
-    transform: [{ rotate: '-25deg' }],
-  },
-  ambientPawWatermarkBottom: {
-    position: 'absolute',
-    bottom: vs(160),
-    left: -s(30),
-    transform: [{ rotate: '30deg' }],
-  },
-
   /* ── Header ── */
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: s(16),
-    paddingBottom: vs(12),
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  headerRowDark: {
-    borderBottomColor: '#1E1435',
-  },
-  backBtn: {
-    width: s(38),
-    height: s(38),
-    borderRadius: s(19),
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.2,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#7C3AED',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 5,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
-  backBtnDark: {
-    backgroundColor: '#1E1035',
-    borderColor: '#371B58',
-  },
-  headerTitleWrap: {
-    flex: 1,
-    marginHorizontal: s(12),
-  },
-  headerTitle: {
-    fontSize: s(18),
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#1A0B2E',
-    letterSpacing: -0.3,
-  },
   headerActionBtn: {
     width: s(38),
     height: s(38),

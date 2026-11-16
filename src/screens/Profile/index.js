@@ -1,12 +1,13 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StatusBar, Animated } from 'react-native';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { View, Text, StatusBar, Animated, Alert } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useStore } from '../../store';
-import { useUserProfile } from '../../hooks/useUser';
+import { useUserProfile, useMyPets, useCreatePet } from '../../hooks/useUser';
+import { useMyActivity, filterActivity } from '../../hooks/useCommunity';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { s, vs, ms } from 'react-native-size-matters';
 
@@ -19,46 +20,38 @@ import {
   NavTabs,
   PawsportCard,
   ModernConfirmModal,
+  ActivityCard,
 } from './components';
-import { COMMUNITY_CHANNELS } from './communityData';
+import { PetCarousel } from '../Pets/components/PetCarousel';
+import { Loader } from '../../components/common/Loader';
+import { signOut } from '../../services/auth/signOut';
+import { enableAppLock, disableAppLock, isAppLockSupported } from '../../services/security/appLock';
 import styles from './styles';
+import { LoaderCard } from '../../components/common/Loader';
 
 const sanitizePet = (pet, index = 0) => {
   if (!pet) {
     return null;
   }
-  let name = pet.name || pet.pet_name;
-  if (
-    !name ||
-    name === 'undefined' ||
-    name === 'null' ||
-    name === 'REPLACE_ME' ||
-    (typeof name === 'string' && name.includes('REPLACE_ME')) ||
-    name.trim() === ''
-  ) {
-    name = index === 0 ? 'Simba' : `Pet ${index + 1}`;
-  }
+  // Use only values returned by the API; placeholders and blanks become ''
+  const clean = (...values) => {
+    const found = values.find(
+      v =>
+        typeof v === 'string' &&
+        v.trim() !== '' &&
+        v !== 'undefined' &&
+        v !== 'null' &&
+        !v.includes('REPLACE_ME'),
+    );
+    return found ? found.trim() : '';
+  };
 
-  let breed = pet.breed || pet.pet_breed || pet.breed_name;
-  if (
-    !breed ||
-    breed === 'undefined' ||
-    breed === 'null' ||
-    breed === 'REPLACE_ME' ||
-    breed.trim() === ''
-  ) {
-    const isCat = pet.type === 'Cat' || pet.pet_type === 'Cat';
-    breed = isCat ? 'Indie Cat' : 'Golden Retriever';
-  }
-
-  let type = pet.type || pet.pet_type || pet.species || 'Dog';
-  if (type !== 'Dog' && type !== 'Cat') {
-    type = 'Dog';
-  }
+  const name = clean(pet.petName, pet.name, pet.pet_name);
+  const breed = clean(pet.breed, pet.pet_breed, pet.breed_name);
+  const type = clean(pet.species, pet.type, pet.pet_type);
 
   const id = pet.id || pet._id || `pet-${index + 1}`;
-  const suffix = id.toString().replace(/\D/g, '').slice(-4) || `${8400 + index}`;
-  const passportNo = pet.passport_no || `PAW-${suffix}-IN`;
+  const passportNo = clean(pet.passportNo, pet.passport_no);
 
   return {
     ...pet,
@@ -72,7 +65,6 @@ const sanitizePet = (pet, index = 0) => {
 
 export const ProfileScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const logout = useStore(state => state.logout);
   const storeUser = useStore(state => state.user);
   const storePets = useStore(state => state.pets) || [];
 
@@ -90,24 +82,20 @@ export const ProfileScreen = ({ navigation }) => {
     profileData?.user ||
     (profileData?.id ? profileData : null) ||
     storeUser;
-
-  const userName =
-    user?.name || user?.displayName || user?.display_name || user?.full_name || 'Rishab';
-  const userEmail = user?.email || 'rishabsharma@cvinfotech.com';
+console.log('profileData', user?.stamps_count);
+  const userName = user?.name || user?.displayName || user?.display_name || user?.full_name;
+  const userEmail = user?.email;
   const userInitial = (userName.trim()[0] || 'R').toUpperCase();
 
   // Safely resolve & sanitize pets list from API or store
-  const apiPets = profileData?.pets || profileData?.account?.pets;
+  // /me/pets is the source of truth; the profile's own list and the store are fallbacks
+  const { data: myPets } = useMyPets();
+  const apiPets = myPets ?? profileData?.pets;
   const rawPets = apiPets && apiPets.length > 0 ? apiPets : storePets;
 
-  const [localPets, setLocalPets] = useState(null);
-  const pets = useMemo(() => {
-    const list = localPets !== null ? localPets : rawPets || [];
-    return list.map((p, i) => sanitizePet(p, i));
-  }, [localPets, rawPets]);
+  const pets = useMemo(() => (rawPets || []).map((p, i) => sanitizePet(p, i)), [rawPets]);
 
-  const [selectedPetIndex, setSelectedPetIndex] = useState(0);
-  const activePet = pets[selectedPetIndex] || pets[0] || null;
+  const [, setSelectedPetIndex] = useState(0);
 
   // Modals state
   const [addPetModalVisible, setAddPetModalVisible] = useState(false);
@@ -149,6 +137,9 @@ export const ProfileScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [communitySubFilter, setCommunitySubFilter] = useState('all');
   const scrollRef = useRef(null);
+  const myActivity = useMyActivity({
+    enabled: activeTab === 'community_posts',
+  });
 
   const handleSelectTab = useCallback(tabId => {
     setActiveTab(tabId);
@@ -158,14 +149,17 @@ export const ProfileScreen = ({ navigation }) => {
   }, []);
 
   const handleBrowseCommunity = useCallback(() => {
-    navigation.navigate('CommunityPostsScreen', { initialTab: communitySubFilter });
+    navigation.navigate('MyActivityScreen', { initialFilter: communitySubFilter });
   }, [navigation, communitySubFilter]);
 
   const handleJoinConversation = useCallback(() => {
     navigation.navigate('CommunityPostsScreen', { initialTab: communitySubFilter });
   }, [navigation, communitySubFilter]);
 
-  const displayedChannels = useMemo(() => COMMUNITY_CHANNELS.slice(0, 2), []);
+  const activityItems = useMemo(
+    () => filterActivity(myActivity.data?.items || [], communitySubFilter),
+    [myActivity.data, communitySubFilter],
+  );
 
   // Metrics
   const petsCount = pets.length;
@@ -173,27 +167,32 @@ export const ProfileScreen = ({ navigation }) => {
   const postsCount = user?.posts_count || 0;
   const topRank = user?.rank ? `#${user.rank}` : '—';
 
-  const handleAddPet = newPet => {
-    const newId = `pet-${Date.now()}`;
-    const newPassportNo = `PAW-${Math.floor(1000 + Math.random() * 9000)}-IN`;
-    const createdPet = {
-      id: newId,
-      name: newPet.name,
-      type: newPet.type,
-      breed: newPet.breed,
-      bio: newPet.bio || '',
-      passportNo: newPassportNo,
-      stamps: 0,
-      badge: 'Pack Explorer',
-    };
+  const createPet = useCreatePet();
+  const [newPetId, setNewPetId] = useState(null);
 
-    const updated = [...pets, createdPet];
-    setLocalPets(updated);
-    setSelectedPetIndex(updated.length - 1);
+  // Show the pet that was just added once it is in the reloaded list
+  useEffect(() => {
+    const index = newPetId ? pets.findIndex(pet => String(pet.id) === String(newPetId)) : -1;
+    if (index >= 0) {
+      setSelectedPetIndex(index);
+      setNewPetId(null);
+    }
+  }, [pets, newPetId]);
+
+  // Saves the pet through POST /pets. Throws on failure so the form can stay open.
+  const handleAddPet = async newPet => {
+    const created = await createPet.mutateAsync({
+      petName: newPet.name,
+      species: newPet.type,
+      breed: newPet.breed,
+      bio: newPet.bio,
+      photo: newPet.photo,
+    });
+    setNewPetId(created?.id ?? created?.pet?.id ?? null);
     setConfirmModalConfig({
       visible: true,
       title: 'Pawsport Activated! 🎉',
-      subtitle: `${newPet.name} is now registered on PetFriendly with Passport ID ${newPassportNo}!`,
+      subtitle: `${newPet.name} is now registered on PetFriendly!`,
       badge: 'PACK PASSPORT',
       type: 'success',
       confirmText: 'Awesome!',
@@ -202,6 +201,74 @@ export const ProfileScreen = ({ navigation }) => {
       onConfirm: null,
     });
   };
+
+  // Shared by the Dashboard and My Pets tabs: the pet carousel, or the create-first-pawsport card
+  const petsSection =
+    pets.length === 0 ? (
+      <PawsportCard
+        activePet={null}
+        pets={[]}
+        onAddPet={() => setAddPetModalVisible(true)}
+        isDarkMode={isDarkMode}
+      />
+    ) : (
+      <PetCarousel
+        pets={pets}
+        isDarkMode={isDarkMode}
+        onOpen={pet => navigation.navigate('PetDetailsScreen', { pet })}
+        onHealth={pet => navigation.navigate('PetHealthRecordsScreen', { pet })}
+        onPawsport={pet => navigation.navigate('PawsportScreen', { pet })}
+        onEdit={pet => navigation.navigate('PetEditScreen', { pet })}
+        onAddPet={() => setAddPetModalVisible(true)}
+      />
+    );
+
+  // App lock switch in Settings. Turning it on makes the user pass the phone's check once.
+  const appLockEnabled = useStore(state => state.appLockEnabled);
+  const setAppLockEnabled = useStore(state => state.setAppLockEnabled);
+  const handleToggleAppLock = useCallback(
+    async value => {
+      if (!value) {
+        await disableAppLock();
+        setAppLockEnabled(false);
+        return;
+      }
+      if (!(await isAppLockSupported())) {
+        Alert.alert(
+          'Set up a phone lock first',
+          'Add a fingerprint, face unlock or screen PIN in your phone settings, then turn on App Lock.',
+        );
+        return;
+      }
+      if (await enableAppLock()) {
+        setAppLockEnabled(true);
+      }
+    },
+    [setAppLockEnabled],
+  );
+
+  // Tells the server (this device, or every device), then clears the device and returns to sign in
+  const [signingOut, setSigningOut] = useState(false);
+  const runSignOut = useCallback(async allDevices => {
+    setSigningOut(true);
+    await signOut({ allDevices });
+    setSigningOut(false);
+  }, []);
+
+  const handleLogoutAll = useCallback(() => {
+    setConfirmModalConfig({
+      visible: true,
+      title: 'Sign out everywhere?',
+      subtitle:
+        'This signs you out of PetFriendly on every phone and tablet where you are logged in, including this one.',
+      badge: 'SECURITY & SESSION',
+      type: 'logout',
+      confirmText: 'Sign Out Everywhere',
+      cancelText: 'Cancel',
+      singleButton: false,
+      onConfirm: () => runSignOut(true),
+    });
+  }, [runSignOut]);
 
   const handleLogout = useCallback(() => {
     setConfirmModalConfig({
@@ -214,9 +281,9 @@ export const ProfileScreen = ({ navigation }) => {
       confirmText: 'Yes, Sign Out',
       cancelText: 'Stay Logged In',
       singleButton: false,
-      onConfirm: () => logout(),
+      onConfirm: () => runSignOut(false),
     });
-  }, [logout]);
+  }, [runSignOut]);
 
   const handleOpenFollowing = useCallback(() => {
     setConfirmModalConfig({
@@ -234,23 +301,12 @@ export const ProfileScreen = ({ navigation }) => {
   }, [handleSelectTab]);
 
   const handleOpenSavedPlaces = useCallback(() => {
-    navigation?.navigate?.('Saved');
+    navigation?.navigate?.('SavedPlacesScreen');
   }, [navigation]);
 
   const handleOpenSubmissions = useCallback(() => {
-    setConfirmModalConfig({
-      visible: true,
-      title: 'My Submissions 📍',
-      subtitle:
-        'Track pet-friendly cafes, hotels, and dog parks you have submitted. Our team verifies all community submissions to ensure safe pet environments.',
-      badge: 'VERIFIED PLACES',
-      type: 'info',
-      confirmText: 'Got It',
-      cancelText: 'Close',
-      singleButton: true,
-      onConfirm: null,
-    });
-  }, []);
+    navigation?.navigate?.('MySubmissionsScreen');
+  }, [navigation]);
 
   const handleOpenMyProfile = useCallback(() => {
     navigation.navigate('MyProfileScreen');
@@ -292,25 +348,6 @@ export const ProfileScreen = ({ navigation }) => {
         sectionTitle: 'ACTIVITY',
         items: [
           {
-            id: 'community_posts',
-            title: 'Community Posts',
-            icon: 'chatbubble-ellipses-outline',
-            color: '#7C3AED',
-            bgColor: isDarkMode ? '#2D1652' : '#F5F3FF',
-            badge: postsCount > 0 ? `${postsCount}` : null,
-            active: activeTab === 'community_posts',
-            onPress: () => handleSelectTab('community_posts'),
-          },
-          {
-            id: 'reviews',
-            title: 'Reviews',
-            icon: 'star-outline',
-            color: '#F59E0B',
-            bgColor: isDarkMode ? '#451A03' : '#FEF3C7',
-            active: activeTab === 'reviews',
-            onPress: () => handleSelectTab('reviews'),
-          },
-          {
             id: 'create_trip',
             title: 'Create a trip',
             icon: 'map-outline',
@@ -326,7 +363,7 @@ export const ProfileScreen = ({ navigation }) => {
             bgColor: isDarkMode ? '#2A0845' : '#FAF5FF',
             badge: topRank !== '—' ? topRank : 'Explore',
             active: activeTab === 'leaderboard',
-            onPress: () => handleSelectTab('leaderboard'),
+            onPress: () => navigation.navigate('LeaderboardScreen'),
           },
           {
             id: 'following',
@@ -415,6 +452,15 @@ export const ProfileScreen = ({ navigation }) => {
             isDestructive: true,
             onPress: handleLogout,
           },
+          {
+            id: 'logout_all',
+            title: 'Log out of all devices',
+            icon: 'phone-portrait-outline',
+            color: '#EF4444',
+            bgColor: isDarkMode ? '#450A0A' : '#FEF2F2',
+            isDestructive: true,
+            onPress: handleLogoutAll,
+          },
         ],
       },
     ],
@@ -426,6 +472,7 @@ export const ProfileScreen = ({ navigation }) => {
       postsCount,
       handleSelectTab,
       handleLogout,
+      handleLogoutAll,
       handleOpenFollowing,
       handleOpenSavedPlaces,
       handleOpenSubmissions,
@@ -445,12 +492,7 @@ export const ProfileScreen = ({ navigation }) => {
         icon: 'chatbubble-ellipses-outline',
         count: postsCount,
       },
-      {
-        id: 'leaderboard',
-        label: 'Rankings',
-        icon: 'trophy-outline',
-        count: topRank !== '—' ? topRank : null,
-      },
+   
       { id: 'reviews', label: 'Reviews', icon: 'star-outline' },
     ],
     [pets.length, postsCount, topRank],
@@ -604,15 +646,7 @@ export const ProfileScreen = ({ navigation }) => {
               />
             </View>
 
-            {/* Luxury Digital VIP Pawsport Card */}
-            <PawsportCard
-              activePet={activePet}
-              pets={pets}
-              selectedPetIndex={selectedPetIndex}
-              onSelectPetIndex={setSelectedPetIndex}
-              onAddPet={() => setAddPetModalVisible(true)}
-              isDarkMode={isDarkMode}
-            />
+       
           </View>
         )}
 
@@ -631,18 +665,10 @@ export const ProfileScreen = ({ navigation }) => {
               </Text>
             </View>
 
-            <PawsportCard
-              activePet={activePet}
-              pets={pets}
-              selectedPetIndex={selectedPetIndex}
-              onSelectPetIndex={setSelectedPetIndex}
-              onAddPet={() => setAddPetModalVisible(true)}
-              isDarkMode={isDarkMode}
-            />
+            {petsSection}
           </View>
         )}
 
-        {/* ── TAB CONTENT: COMMUNITY POSTS (Web-Matched Design) ── */}
         {activeTab === 'community_posts' && (
           <View style={styles.tabContentContainer}>
             {/* Header: "Community Posts" + "Browse →" */}
@@ -700,9 +726,14 @@ export const ProfileScreen = ({ navigation }) => {
               })}
             </View>
 
-            {/* Channel Cards (Top 2 channels matching screenshot) or Empty State */}
-            {communitySubFilter === 'replies' ? (
-              /* Empty State Card matching Web App */
+            {/* My activity: the signed-in user's own posts and replies for the selected filter */}
+            {myActivity.isLoading ? (
+              <LoaderCard
+                style={styles.activityLoader}
+                label="Loading your activity…"
+                isDarkMode={isDarkMode}
+              />
+            ) : activityItems.length === 0 ? (
               <View
                 style={[styles.communityEmptyCard, isDarkMode && styles.communityEmptyCardDark]}>
                 <Ionicons
@@ -717,141 +748,42 @@ export const ProfileScreen = ({ navigation }) => {
                       styles.communityEmptyMessage,
                       isDarkMode && styles.communityEmptyMessageDark,
                     ]}>
-                    No replies yet.{' '}
+                    {myActivity.isError
+                      ? 'Could not load your activity. '
+                      : `No ${
+                          communitySubFilter === 'all' ? 'activity' : communitySubFilter
+                        } yet. `}
                   </Text>
-                  <BouncyPressable activeScale={0.94} onPress={handleJoinConversation}>
+                  <BouncyPressable
+                    activeScale={0.94}
+                    onPress={
+                      myActivity.isError ? () => myActivity.refetch() : handleJoinConversation
+                    }>
                     <Text
                       style={[
                         styles.communityJoinLink,
                         isDarkMode && styles.communityJoinLinkDark,
                       ]}>
-                      Join the conversation
+                      {myActivity.isError ? 'Retry' : 'Join the conversation'}
                     </Text>
                   </BouncyPressable>
                 </View>
               </View>
             ) : (
               <>
-                {displayedChannels.map(channel => {
-                  const isHealth = channel.id === 'health-vet-advice';
-                  return (
-                    <BouncyPressable
-                      key={channel.id}
-                      testID={`community-channel-${channel.id}`}
-                      style={[
-                        styles.communityChannelCard,
-                        isHealth ? styles.channelBorderHealth : styles.channelBorderTravel,
-                        isDarkMode && styles.communityChannelCardDark,
-                      ]}
-                      activeScale={0.97}
-                      onPress={() =>
-                        navigation.navigate('CommunityPostsScreen', {
-                          initialTab: communitySubFilter,
-                        })
-                      }>
-                      {/* Top Accent Strip matching Screenshot */}
-                      <View
-                        style={[
-                          styles.communityChannelTopAccent,
-                          isHealth ? styles.channelAccentHealth : styles.channelAccentTravel,
-                        ]}
-                      />
-
-                    {/* Emoji + Title */}
-                    <View style={styles.communityChannelHeaderRow}>
-                      <Text style={styles.communityChannelEmoji}>{channel.emoji}</Text>
-                      <Text
-                        style={[
-                          styles.communityChannelTitle,
-                          isDarkMode && styles.textWhite,
-                        ]}>
-                        {channel.title}
-                      </Text>
-                    </View>
-
-                    {/* Description */}
-                    <Text
-                      style={[
-                        styles.communityChannelDesc,
-                        isDarkMode && styles.textMutedDark,
-                      ]}
-                      numberOfLines={2}>
-                      {channel.description}
-                    </Text>
-
-                    {/* Badges: Members & Posts */}
-                    <View style={styles.communityChannelPillsRow}>
-                      <View
-                        style={[
-                          styles.channelMembersPill,
-                          isDarkMode && styles.channelMembersPillDark,
-                        ]}>
-                        <Text
-                          style={[
-                            styles.channelMembersText,
-                            isDarkMode && styles.channelMembersTextDark,
-                          ]}>
-                          👥 {channel.membersCount} members
-                        </Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.channelPostsPill,
-                          isDarkMode && styles.channelPostsPillDark,
-                        ]}>
-                        <Text
-                          style={[
-                            styles.channelPostsText,
-                            isDarkMode && styles.channelPostsTextDark,
-                          ]}>
-                          📝 {channel.postsCount} posts
-                        </Text>
-                      </View>
-                    </View>
-                  </BouncyPressable>
-                );
-              })}
+         
+                <ActivityCard
+                  item={activityItems[0]}
+                  isDarkMode={isDarkMode}
+                  onPress={() =>
+                    navigation.navigate('CommunityPostDetailScreen', {
+                      slug: activityItems[0].postSlug || activityItems[0].slug,
+                    })
+                  }
+                />
+            
               </>
             )}
-          </View>
-        )}
-
-        {/* ── TAB CONTENT: LEADERBOARD ── */}
-        {activeTab === 'leaderboard' && (
-          <View style={styles.tabContentContainer}>
-            <View style={styles.dashboardSectionHeader}>
-              <View style={styles.dashboardTitleRow}>
-                <Text style={[styles.dashboardTitle, isDarkMode && styles.dashboardTitleDark]}>
-                  Leaderboard
-                </Text>
-                <Text style={styles.waveEmoji}> 🏆</Text>
-              </View>
-              <Text style={[styles.dashboardSubtitle, isDarkMode && styles.dashboardSubtitleDark]}>
-                Top pet explorers and active pack leaders this week
-              </Text>
-            </View>
-
-            <View style={[styles.tabContentCard, isDarkMode && styles.tabContentCardDark]}>
-              <View style={styles.leaderboardPodiumRow}>
-                <View style={[styles.podiumItem, styles.podiumSilver]}>
-                  <Text style={styles.podiumMedal}>🥈</Text>
-                  <Text style={[styles.podiumName, isDarkMode && styles.textWhite]}>Milo</Text>
-                  <Text style={styles.podiumScore}>2,410 pts</Text>
-                </View>
-                <View style={[styles.podiumItem, styles.podiumGold]}>
-                  <Text style={styles.podiumMedal}>🥇</Text>
-                  <Text style={[styles.podiumName, isDarkMode && styles.textWhite]}>
-                    Simba & Rishab
-                  </Text>
-                  <Text style={styles.podiumScore}>3,150 pts</Text>
-                </View>
-                <View style={[styles.podiumItem, styles.podiumBronze]}>
-                  <Text style={styles.podiumMedal}>🥉</Text>
-                  <Text style={[styles.podiumName, isDarkMode && styles.textWhite]}>Rocky</Text>
-                  <Text style={styles.podiumScore}>1,980 pts</Text>
-                </View>
-              </View>
-            </View>
           </View>
         )}
 
@@ -982,6 +914,9 @@ export const ProfileScreen = ({ navigation }) => {
         toggleDarkMode={toggleDarkMode}
         accentColor={accentColor}
         setAccentColor={setAccentColor}
+        appLockEnabled={appLockEnabled}
+        onToggleAppLock={handleToggleAppLock}
+        onOpenPermissions={() => useStore.getState().setPermissionsSheetOpen(true)}
         pushNotifications={pushNotifications}
         setPushNotifications={setPushNotifications}
         travelAlerts={travelAlerts}
@@ -1009,6 +944,7 @@ export const ProfileScreen = ({ navigation }) => {
       />
 
       {/* ── 10. Modern 3D Confirm / Alert Modal Component ── */}
+      <Loader visible={signingOut} title="Signing out…" />
       <ModernConfirmModal
         visible={confirmModalConfig.visible}
         onClose={() => setConfirmModalConfig(prev => ({ ...prev, visible: false }))}

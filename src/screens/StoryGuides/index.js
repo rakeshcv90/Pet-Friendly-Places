@@ -9,7 +9,6 @@ import {
   Pressable,
   Dimensions,
   Easing,
-  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -20,6 +19,7 @@ import { useStore } from '../../store';
 import { AppHeader } from '../../components/common/AppHeader';
 import { TravelStoryScreen } from '../Home/TravelStoryScreen';
 import { GuidesScreen } from './GuidesScreen';
+import { LoaderCard } from '../../components/common/Loader';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DEFAULT_TRACK_WIDTH = Math.max(0, Math.round(SCREEN_WIDTH - s(30)));
@@ -91,7 +91,7 @@ const Pane = ({ isActive, isMounted, children }) => (
       children
     ) : (
       <View style={styles.panePlaceholder}>
-        <ActivityIndicator color="#7C3AED" />
+        <LoaderCard label="Loading…" />
       </View>
     )}
   </View>

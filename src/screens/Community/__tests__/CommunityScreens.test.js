@@ -294,10 +294,11 @@ describe('CommunityDetailScreen membership', () => {
   it('ignores taps while a membership request is in flight', () => {
     const toggle = jest.fn();
     mockMembership.mockReturnValue(membership({ isPending: true, toggle }));
-    const { queryByText } = renderScreen();
+    const { getByText } = renderScreen();
 
-    // The label is replaced by a spinner and the button is disabled
-    expect(queryByText('Join Community')).toBeNull();
+    // The paw loader card shows and the button is disabled
+    expect(getByText('Updating membership…')).toBeTruthy();
+    fireEvent.press(getByText('Join Community'));
     expect(toggle).not.toHaveBeenCalled();
   });
 
@@ -420,7 +421,7 @@ describe('PostDetailScreen', () => {
       expect(getByText('24/10000')).toBeTruthy();
       fireEvent.press(getByLabelText('Post Reply'));
 
-      await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith('Parcel office first.'));
+      await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ body: 'Parcel office first.', parentReplyId: null }));
       await waitFor(() =>
         expect(getByText('✅ Reply submitted and pending review, thank you for sharing! 🐾')).toBeTruthy(),
       );

@@ -11,7 +11,6 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Feather from 'react-native-vector-icons/Feather';
@@ -26,6 +25,7 @@ import { useStore } from '../../store';
 import { useCommunities, useCreatePost, uploadPostPhoto } from '../../hooks/useCommunity';
 import { Bob, Shine, Enter } from './Motion';
 import { openCommunityGuidelines } from './utils';
+import { Loader } from '../../components/common/Loader';
 
 const PURPLE = '#7B2CFF';
 const PINK = '#FF4FB8';
@@ -675,6 +675,7 @@ export const NewPostScreen = ({ navigation, route }) => {
                 style={[styles.cancelBtn, isDarkMode && styles.cancelBtnDark]}>
                 <Text style={[styles.cancelText, isDarkMode && styles.textLight]}>Cancel</Text>
               </BouncyPressable>
+              <Loader visible={submitting} title="Submitting your post…" />
               <BouncyPressable
                 activeScale={0.96}
                 disabled={!formValid || submitting}
@@ -685,11 +686,7 @@ export const NewPostScreen = ({ navigation, route }) => {
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.submitBtn}>
-                  {submitting ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Ionicons name="paper-plane" size={ms(14)} color="#FFFFFF" />
-                  )}
+                  <Ionicons name="paper-plane" size={ms(14)} color="#FFFFFF" />
                   <Text style={styles.submitText}>
                     {submitting ? 'Submitting…' : 'Submit post'}
                   </Text>

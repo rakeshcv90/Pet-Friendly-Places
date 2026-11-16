@@ -16,18 +16,15 @@ describe('Button component', () => {
     expect(handlePress).toHaveBeenCalledTimes(1);
   });
 
-  it('shows ActivityIndicator and does not call onPress when isLoading is true', () => {
+  it('does not call onPress when isLoading is true', () => {
     const handlePress = jest.fn();
-    const { queryByText, UNSAFE_getByType } = render(
+    const { getByText } = render(
       <Button title="Loading Button" onPress={handlePress} isLoading={true} />
     );
 
-    // Title should not be displayed when loading
-    expect(queryByText('Loading Button')).toBeNull();
-
-    // ActivityIndicator should be rendered
-    const activityIndicator = UNSAFE_getByType('ActivityIndicator');
-    expect(activityIndicator).toBeTruthy();
+    // The label stays; the screen shows the paw loader card while it works
+    fireEvent.press(getByText('Loading Button'));
+    expect(handlePress).not.toHaveBeenCalled();
   });
 
   it('renders outline variant correctly', () => {

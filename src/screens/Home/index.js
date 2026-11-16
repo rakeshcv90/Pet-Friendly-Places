@@ -1,18 +1,18 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useState, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   Animated,
+  Easing,
   ScrollView,
   StatusBar,
   Pressable,
   RefreshControl,
-  ActivityIndicator,
   StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
@@ -30,6 +30,7 @@ import {
   useHomeAnimations,
   styles,
 } from './components';
+import { LoaderCard } from '../../components/common/Loader';
 
 export const HomeScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -143,7 +144,8 @@ export const HomeScreen = ({ navigation }) => {
       badge: `${route.total_distance_km ? `${route.total_distance_km} KM` : 'ROAD TRIP'} • ${
         route.est_drive_hours ? `${route.est_drive_hours}H DRIVE` : 'SCENIC'
       }`,
-      title: route.title,
+      // The API sends no `title` for routes, so build it from the cities like the Routes screen does
+      title: route.title || `${route.origin_city || ''} → ${route.destination_city || ''}`,
       details: `${route.stop_count || 0} pet stops • ${route.origin_city || ''} to ${
         route.destination_city || ''
       }`,
@@ -158,9 +160,14 @@ export const HomeScreen = ({ navigation }) => {
     [homeData?.top_categories],
   );
 
-  const handleCategoryPress = useCallback(categoryId => {
-    setSelectedCategory(prev => (prev === categoryId ? null : categoryId));
-  }, []);
+  const handleCategoryPress = useCallback(
+    cat => {
+      setSelectedCategory(cat.id);
+      navigation.navigate('SearchScreen', { apiCategory: cat.id, category: cat.name });
+   
+    },
+    [navigation],
+  );
 
   const handleRefresh = useCallback(() => {
     refetchHome();
@@ -219,13 +226,86 @@ export const HomeScreen = ({ navigation }) => {
     roadTripScale,
     roadTripRotateX,
     roadTripOpacity,
-    calloutScale,
-    calloutRotateX,
-    calloutOpacity,
-    calloutSheenX,
-    calloutBadgeRotate,
-    calloutBtnScale,
   } = useHomeAnimations(scrollY);
+
+  // Quick actions: header fade-in, staggered card slide-in and a looping CTA nudge
+  const quickHeaderAnim = useRef(new Animated.Value(0)).current;
+  const quickCardAnims = useRef([new Animated.Value(0), new Animated.Value(0)]).current;
+  const quickNudge = useRef(new Animated.Value(0)).current;
+  const quickShake = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(quickHeaderAnim, {
+        toValue: 1,
+        duration: 450,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.stagger(
+        140,
+        quickCardAnims.map(v =>
+          Animated.spring(v, { toValue: 1, friction: 7, tension: 70, useNativeDriver: true }),
+        ),
+      ),
+    ]).start();
+    const nudgeLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(quickNudge, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(quickNudge, {
+          toValue: 0,
+          duration: 700,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    nudgeLoop.start();
+    // Quick wiggle every few seconds to catch the eye
+    const shakeStep = toValue =>
+      Animated.timing(quickShake, { toValue, duration: 70, useNativeDriver: true });
+    const shakeLoop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(2600),
+        shakeStep(1),
+        shakeStep(-1),
+        shakeStep(1),
+        shakeStep(-1),
+        shakeStep(0),
+      ]),
+    );
+    shakeLoop.start();
+    return () => {
+      nudgeLoop.stop();
+      shakeLoop.stop();
+    };
+  }, [quickHeaderAnim, quickCardAnims, quickNudge, quickShake]);
+
+  // dir: -1 = left card (tilts left, enters from left), 1 = right card
+  const quickTileStyle = (anim, dir) => ({
+    opacity: anim,
+    transform: [
+      { translateX: anim.interpolate({ inputRange: [0, 1], outputRange: [dir * s(60), 0] }) },
+      {
+        rotate: anim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [`${dir * 12}deg`, `${dir * 2}deg`],
+        }),
+      },
+      { translateX: quickShake.interpolate({ inputRange: [-1, 1], outputRange: [-s(3), s(3)] }) },
+      { rotate: quickShake.interpolate({ inputRange: [-1, 1], outputRange: ['-1.5deg', '1.5deg'] }) },
+    ],
+  });
+  const quickNudgeStyle = {
+    transform: [
+      { translateX: quickNudge.interpolate({ inputRange: [0, 1], outputRange: [0, s(3)] }) },
+    ],
+  };
 
   return (
     <View
@@ -354,7 +434,7 @@ export const HomeScreen = ({ navigation }) => {
             ]}>
             <FastImage
               source={theme.images.home}
-              style={StyleSheet.absoluteFillObject}
+              style={{ width: '100%', height: '100%' }}
               resizeMode={FastImage.resizeMode.cover}
             />
           </Animated.View>
@@ -424,15 +504,7 @@ export const HomeScreen = ({ navigation }) => {
         {/* Loading Indicator when initial home data is in-flight */}
         {isHomeLoading && !homeData && (
           <View style={{ paddingVertical: s(40), alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator size="large" color="#7B2CFF" />
-            <Text
-              style={{
-                marginTop: s(12),
-                color: isDarkMode ? '#A78BFA' : '#71717A',
-                fontSize: ms(13),
-              }}>
-              Finding pet-friendly places...
-            </Text>
+            <LoaderCard label="Finding pet-friendly places..." isDarkMode={isDarkMode} />
           </View>
         )}
 
@@ -457,6 +529,7 @@ export const HomeScreen = ({ navigation }) => {
             </Text>
 
             <View style={styles.categoriesGrid}>
+         
               {categoriesList.map((cat, index) => (
                 <Animated.View
                   key={cat.id}
@@ -467,7 +540,7 @@ export const HomeScreen = ({ navigation }) => {
                   <AnimatedCategoryItem
                     cat={cat}
                     isSelected={selectedCategory === cat.id}
-                    onPress={() => handleCategoryPress(cat.id)}
+                    onPress={() => handleCategoryPress(cat)}
                   />
                 </Animated.View>
               ))}
@@ -672,7 +745,12 @@ export const HomeScreen = ({ navigation }) => {
                 <BouncyPressable
                   style={[styles.circleArrowBtn, isDarkMode && styles.circleArrowBtnDark]}
                   activeScale={0.85}
-                  onPress={() => {}}>
+                  onPress={() =>
+                    navigation.navigate('SearchScreen', {
+                      tailsVerified: true,
+                      category: 'Tails Verified',
+                    })
+                  }>
                   <Feather
                     name="arrow-right"
                     size={ms(18)}
@@ -1105,12 +1183,33 @@ export const HomeScreen = ({ navigation }) => {
                     key={trip.id}
                     style={[styles.roadTripCard, isDarkMode && styles.roadTripCardDark]}
                     activeScale={0.95}
-                    onPress={() => navigation.navigate('RoadTripRoutesScreen')}>
-                    <FastImage
-                      source={{ uri: trip.image }}
-                      style={StyleSheet.absoluteFillObject}
-                      resizeMode={FastImage.resizeMode.cover}
-                    />
+                    onPress={() =>
+                      navigation.navigate('RoadTripDetailScreen', {
+                        slug: trip.slug,
+                       
+                      })
+                    }>
+                    {trip.image ? (
+                      <FastImage
+                        source={{ uri: trip.image }}
+                        style={StyleSheet.absoluteFillObject}
+                        resizeMode={FastImage.resizeMode.cover}
+                      />
+                    ) : (
+                      // Routes currently come back without a cover image
+                      <LinearGradient
+                        colors={['#3B108F', '#7B2CFF', '#EE2A7B']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={StyleSheet.absoluteFillObject}>
+                        <Ionicons
+                          name="car-sport"
+                          size={ms(90)}
+                          color="rgba(255, 255, 255, 0.12)"
+                          style={styles.roadTripPlaceholderIcon}
+                        />
+                      </LinearGradient>
+                    )}
                     <LinearGradient
                       colors={['rgba(15, 6, 32, 0.3)', 'rgba(15, 6, 32, 0.88)']}
                       start={{ x: 0, y: 0 }}
@@ -1150,80 +1249,120 @@ export const HomeScreen = ({ navigation }) => {
           </>
         ) : null}
 
-        {/* ── 10. Know a pet-friendly place? Callout Banner ── */}
+        {/* ── 10. Quick Actions: Add place + Transport with Dogs ── */}
         <Animated.View
           style={{
-            opacity: calloutOpacity,
+            opacity: quickHeaderAnim,
             transform: [
-              { perspective: 1000 },
-              { scale: calloutScale },
-              { rotateX: calloutRotateX },
+              {
+                translateY: quickHeaderAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [s(12), 0],
+                }),
+              },
             ],
           }}>
-          <BouncyPressable style={styles.fullWidth} activeScale={0.98} onPress={() => {}}>
-            <LinearGradient
-              colors={['#4C1378', '#6D28D9', '#8B5CF6']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.communityCalloutCard}>
-              {/* Dynamic Glass Holographic Sheen */}
-              <Animated.View
-                pointerEvents="none"
-                style={[
-                  styles.glassSheenOverlay,
-                  {
-                    transform: [{ translateX: calloutSheenX }, { rotate: '25deg' }],
-                  },
-                ]}>
-                <LinearGradient
-                  colors={[
-                    'rgba(255, 255, 255, 0)',
-                    'rgba(255, 255, 255, 0.22)',
-                    'rgba(255, 255, 255, 0)',
-                  ]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={StyleSheet.absoluteFillObject}
-                />
-              </Animated.View>
-
-              {/* Decorative concentric rings in background */}
-              <View style={styles.calloutDecoCircleOuter} />
-              <View style={styles.calloutDecoCircleInner} />
-
-              <Animated.View style={{ transform: [{ rotate: calloutBadgeRotate }] }}>
-                <View style={styles.calloutIconBadge}>
-                  <Ionicons name="storefront" size={ms(20)} color="#1E1035" />
-                </View>
-              </Animated.View>
-
-              <Text style={styles.calloutOverline}>HELP THE PACK GROW</Text>
-              <Text style={styles.calloutTitle}>Know a pet-friendly place?</Text>
-              <Text style={styles.calloutDesc}>
-                Add it for review and help other pet parents explore with confidence.
+          <View style={styles.sectionHeaderRow}>
+            <View>
+              <Text style={[styles.sectionOverline, isDarkMode && styles.sectionOverlineDark]}>
+                MORE FOR PET PARENTS
               </Text>
-
-              <Animated.View
-                style={[styles.alignSelfStart, { transform: [{ scale: calloutBtnScale }] }]}>
-                <BouncyPressable style={styles.calloutBtn} activeScale={0.92} onPress={() => {}}>
-                  <Text style={styles.calloutBtnText}>Add place</Text>
-                  <Feather
-                    name="arrow-right"
-                    size={ms(13)}
-                    color="#220D47"
-                    style={styles.btnArrowMargin}
-                  />
-                </BouncyPressable>
-              </Animated.View>
-            </LinearGradient>
-          </BouncyPressable>
+              <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
+                Quick actions
+              </Text>
+            </View>
+          </View>
         </Animated.View>
+
+        <View style={styles.quickTilesRow}>
+          {[
+            {
+              key: 'add-place',
+              colors: ['#2E0A5C', '#5B21B6', '#8B5CF6'],
+              border: '#3B0F73',
+              accent: '#FBBF24',
+              accentText: '#1E1035',
+              icon: 'storefront',
+              overline: 'HELP THE PACK GROW',
+              title: 'Add a place',
+              desc: 'Add it for review',
+              ctaIcon: 'plus',
+              onPress: () => navigation.navigate('AddPlaceScreen'),
+            },
+            {
+              key: 'transport',
+              colors: ['#053F3A', '#0F766E', '#2DD4BF'],
+              border: '#064E48',
+              accent: '#99F6E4',
+              accentText: '#134E4A',
+              icon: 'car',
+              overline: 'TRAVEL EASY',
+              title: 'Transport With Dogs',
+              desc: 'Taxis, trains & more',
+              ctaIcon: 'arrow-right',
+              onPress: () => navigation.navigate('TransportScreen'),
+            },
+          ].map((tile, i) => (
+            <Animated.View
+              key={tile.key}
+              style={[styles.quickTileWrap, quickTileStyle(quickCardAnims[i], i === 0 ? -1 : 1)]}>
+              <BouncyPressable style={styles.fullWidth} activeScale={0.97} onPress={tile.onPress}>
+                <LinearGradient
+                  colors={tile.colors}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.quickTile, { borderBottomColor: tile.border }]}>
+                  {/* Large faint watermark icon */}
+                  <Ionicons
+                    name={tile.icon}
+                    size={ms(96)}
+                    color="rgba(255,255,255,0.09)"
+                    style={styles.quickTileWatermark}
+                  />
+                  {/* Soft top glass highlight */}
+                  <LinearGradient
+                    pointerEvents="none"
+                    colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0)']}
+                    style={styles.quickTileGloss}
+                  />
+                  <View style={styles.quickTileTop}>
+                    <View style={[styles.quickActionBadge, { backgroundColor: tile.accent }]}>
+                      <Ionicons name={tile.icon} size={ms(18)} color={tile.accentText} />
+                    </View>
+                    <Animated.View style={[styles.quickTilePill, quickNudgeStyle]}>
+                      <Feather
+                        name={tile.ctaIcon}
+                        size={ms(16)}
+                        color={tile.accentText}
+                      />
+                    </Animated.View>
+                  </View>
+                  <View>
+                    <Text style={styles.quickTileOverline} numberOfLines={1}>
+                      {tile.overline}
+                    </Text>
+                    <Text style={styles.quickTileTitle}>{tile.title}</Text>
+                    <Text style={styles.quickActionDesc} numberOfLines={1}>
+                      {tile.desc}
+                    </Text>
+                  </View>
+                </LinearGradient>
+              </BouncyPressable>
+            </Animated.View>
+          ))}
+        </View>
       </Animated.ScrollView>
     </View>
   );
 };
 
 export { ReuniteScreen } from './ReuniteScreen';
+export { ReuniteListScreen } from './ReuniteListScreen';
+export { ReuniteDetailScreen } from './ReuniteDetailScreen';
+export { PetAlertsScreen } from './PetAlertsScreen';
+export { AddPlaceScreen } from './AddPlaceScreen';
+export { TransportScreen } from './TransportScreen';
+export { TransportModeScreen } from './TransportModeScreen';
 export { TravelStoryScreen } from './TravelStoryScreen';
 export { RoadTripRoutesScreen } from './RoadTripRoutesScreen';
 export { RoadTripDetailScreen } from './RoadTripDetailScreen';

@@ -23,6 +23,8 @@ import { theme } from '../../theme';
 import { useStore } from '../../store';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { Loader } from '../../components/common/Loader';
+import { ScreenHeader } from '../../components/common/AppHeader/ScreenHeader';
+import { AmbientBackground } from '../Home/components';
 import { ModernConfirmModal } from './components/ModernConfirmModal';
 
 // Exact 8 reason options matching website screenshot
@@ -81,6 +83,8 @@ export const ContactUsScreen = ({ navigation }) => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // Animations
+  // Drives the background glows, as on the Home screen
+  const scrollY = useRef(new Animated.Value(0)).current;
   const chevronAnim = useRef(new Animated.Value(0)).current;
   const dropdownAnim = useRef(new Animated.Value(0)).current;
 
@@ -176,30 +180,17 @@ export const ContactUsScreen = ({ navigation }) => {
     <View style={[styles.rootContainer, isDarkMode && styles.rootContainerDark]}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={isDarkMode ? '#0F071D' : '#FFFFFF'}
+        backgroundColor={isDarkMode ? '#0F071D' : '#FAF7F2'}
       />
 
-      {/* ── Top Header Navigation Bar ── */}
-      <View style={[styles.headerBar, isDarkMode && styles.headerBarDark, { paddingTop: insets.top + vs(4) }]}>
-        <BouncyPressable
-          testID="contact-us-back-btn"
-          accessibilityLabel="Back"
-          style={[styles.backBtn, isDarkMode && styles.backBtnDark]}
-          activeScale={0.88}
-          onPress={() => navigation.goBack()}>
-          <Ionicons
-            name="chevron-back"
-            size={ms(20)}
-            color={isDarkMode ? '#FFFFFF' : '#1E1B4B'}
-          />
-        </BouncyPressable>
+      <AmbientBackground scrollY={scrollY} isDarkMode={isDarkMode} />
 
-        <Text style={[styles.headerBarTitle, isDarkMode && styles.textWhite]}>
-          Contact Us
-        </Text>
-
-        <View style={styles.headerRightSpacer} />
-      </View>
+      <ScreenHeader
+        title="Contact Us"
+        subtitle="WE'RE HERE TO HELP"
+        onBack={() => navigation.goBack()}
+        testID="contact-us-back-btn"
+      />
 
       {/* Premium Loader Modal */}
       <Loader
@@ -220,6 +211,8 @@ export const ContactUsScreen = ({ navigation }) => {
         enableResetScrollToCoords={false}
         extraScrollHeight={Platform.OS === 'ios' ? 20 : 0}
         keyboardOpeningTime={0}
+        scrollEventThrottle={16}
+        onScroll={e => scrollY.setValue(e.nativeEvent.contentOffset.y)}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
 
@@ -750,65 +743,13 @@ export const ContactUsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   rootContainer: {
     flex: 1,
-    backgroundColor: '#FAF8F5',
+    backgroundColor: '#FAF7F2',
   },
   rootContainerDark: {
     backgroundColor: '#0F071D',
   },
 
   /* ── Header Bar ── */
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: s(16),
-    paddingBottom: vs(8),
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#ECE8E1',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#200744',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  headerBarDark: {
-    backgroundColor: '#16082F',
-    borderBottomColor: '#28114D',
-  },
-  backBtn: {
-    width: s(34),
-    height: s(34),
-    borderRadius: s(17),
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderBottomWidth: 2,
-    borderBottomColor: '#D1D5DB',
-  },
-  backBtnDark: {
-    backgroundColor: '#261347',
-    borderColor: '#3D1C73',
-    borderBottomColor: '#210C42',
-  },
-  headerBarTitle: {
-    fontSize: s(15.5),
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#16082F',
-    letterSpacing: -0.2,
-  },
-  headerRightSpacer: {
-    width: s(34),
-  },
-
   keyboardView: {
     flex: 1,
   },

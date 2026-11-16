@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { View, Text, Modal, FlatList, StatusBar, useWindowDimensions } from 'react-native';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../../components/common/FastImage';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ms } from 'react-native-size-matters';

@@ -1,18 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Modal,
-  Pressable,
-  ActivityIndicator,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, TextInput, Modal, Pressable, StyleSheet } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { s } from 'react-native-size-matters';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { theme } from '../../theme';
-import { useCreateReply, useReportContent } from '../../hooks/useCommunity';
+import { useReportContent } from '../../hooks/useCommunity';
+import { Loader } from '../../components/common/Loader';
 
 const PURPLE = '#7B2CFF';
 const PINK = '#FF4FB8';
@@ -30,18 +23,17 @@ const { fontFamily } = theme.typography;
 export const ReplyActionBar = ({ onAccept, accepting, onReply, onReport }) => (
   <View style={styles.bar}>
     {onAccept ? (
-      <BouncyPressable
+      <>
+        <Loader visible={!!accepting} title="Accepting answer…" />
+        <BouncyPressable
         activeScale={0.94}
         disabled={accepting}
         onPress={onAccept}
         accessibilityLabel="Accept answer"
         style={styles.acceptBtn}>
-        {accepting ? (
-          <ActivityIndicator size="small" color={TEAL} />
-        ) : (
-          <Text style={styles.acceptText}>✓ Accept</Text>
-        )}
+        <Text style={styles.acceptText}>✓ Accept</Text>
       </BouncyPressable>
+      </>
     ) : null}
     {onReply ? (
       <Pressable
@@ -64,8 +56,7 @@ export const ReplyActionBar = ({ onAccept, accepting, onReply, onReport }) => (
 );
 
 // Reply box shown under a reply, replying to that reply
-export const InlineReplyForm = ({ slug, parentReplyId, onCancel, onSubmitted, isDarkMode }) => {
-  const createReply = useCreateReply(slug);
+export const InlineReplyForm = ({ parentReplyId, onCancel, onSubmit, submitting, isDarkMode }) => {
   const [body, setBody] = useState('');
   const [error, setError] = useState(null);
   const [sent, setSent] = useState(false);
@@ -80,7 +71,7 @@ export const InlineReplyForm = ({ slug, parentReplyId, onCancel, onSubmitted, is
   }, [sent, onCancel]);
 
   const trimmed = body.trim();
-  const canSubmit = trimmed.length >= INLINE_MIN && !createReply.isPending;
+  const canSubmit = trimmed.length >= INLINE_MIN && !submitting;
 
   const submit = async () => {
     if (!canSubmit) {
@@ -88,12 +79,11 @@ export const InlineReplyForm = ({ slug, parentReplyId, onCancel, onSubmitted, is
     }
     setError(null);
     try {
-      const data = await createReply.mutateAsync({ body: trimmed, parentReplyId });
+      const data = await onSubmit({ body: trimmed, parentReplyId });
       if (!data || data.error || typeof data.id !== 'number') {
         setError(data?.error ?? 'The reply could not be confirmed. Please try again.');
         return;
       }
-      onSubmitted?.({ id: data.id, status: data.status, body: trimmed, parentReplyId });
       setSent(true);
     } catch (e) {
       setError(e?.response?.data?.error ?? 'The reply could not be confirmed. Please try again.');
@@ -150,7 +140,7 @@ export const InlineReplyForm = ({ slug, parentReplyId, onCancel, onSubmitted, is
             end={{ x: 1, y: 1 }}
             style={styles.postBtn}>
             <Text style={[styles.postText, !canSubmit && styles.postTextDisabled]}>
-              {createReply.isPending ? 'Posting…' : 'Post reply'}
+              {submitting ? 'Posting…' : 'Post reply'}
             </Text>
           </LinearGradient>
         </BouncyPressable>

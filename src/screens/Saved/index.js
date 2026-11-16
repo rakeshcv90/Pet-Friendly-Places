@@ -39,7 +39,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const GUTTER = s(15);
 const GRID_GAP = s(10);
 // Two cards per row, so the whole list fits the page width with no sideways scrolling
-const GRID_CARD_WIDTH = (SCREEN_WIDTH - GUTTER * 2 - GRID_GAP) / 2;
+const GRID_CARD_WIDTH = Math.floor((SCREEN_WIDTH - GUTTER * 2 - GRID_GAP) / 2) - 1;
 
 const PURPLE = '#7B2CFF';
 const DEEP_PURPLE = '#3B108F';
@@ -684,7 +684,7 @@ export const SavedScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [infoVisible, setInfoVisible] = useState(false);
   const { data: apiCommunities, isLoading, isError, refetch } = useCommunities();
-;
+  console.log('SavedScreen: apiCommunities', apiCommunities);
   const communities = apiCommunities || [];
   const topics = communities.filter(c => c.type === 'TOPIC').map(toCommunityCard);
   const cities = communities.filter(c => c.type === 'CITY').map(toCommunityCard);

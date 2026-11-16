@@ -5,7 +5,6 @@ import {
   FlatList,
   ScrollView,
   StyleSheet,
-  ActivityIndicator,
   RefreshControl,
   StatusBar,
 } from 'react-native';
@@ -35,6 +34,7 @@ import { Bob, Shine, Enter } from './Motion';
 import { DraggableFab } from './DraggableFab';
 import { NightSky } from './NightSky';
 import { ModernConfirmModal } from '../Profile/components/ModernConfirmModal';
+import { Loader } from '../../components/common/Loader';
 
 const PURPLE = '#7B2CFF';
 const DEEP_PURPLE = '#3B108F';
@@ -54,6 +54,15 @@ const GUIDELINES = [
   'Stay on topic',
   'Report anything that feels off',
 ];
+
+// Opaque blend of a #RRGGBB colour over a base (default white). Alpha-hex gradient stops are
+// interpolated differently by iOS and Android, so fixed opaque stops keep both looking the same.
+const tint = (hex, amount, base = [255, 255, 255]) => {
+  const c = [1, 3, 5].map((i, k) =>
+    Math.round(base[k] + (parseInt(hex.slice(i, i + 2), 16) - base[k]) * amount),
+  );
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+};
 
 const PostCard = ({ post, index, isDarkMode, onPress }) => {
   const typeStyle = TYPE_STYLES[post.type] || TYPE_STYLES.DISCUSSION;
@@ -75,8 +84,8 @@ const PostCard = ({ post, index, isDarkMode, onPress }) => {
           pointerEvents="none"
           colors={
             isDarkMode
-              ? ['rgba(255,255,255,0)', `${typeStyle.color}26`]
-              : ['#FFFFFF', `${typeStyle.color}14`]
+              ? [tint(typeStyle.color, 0, [30, 14, 56]), tint(typeStyle.color, 0.15, [30, 14, 56])]
+              : ['#FFFFFF', tint(typeStyle.color, 0.08)]
           }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -84,7 +93,7 @@ const PostCard = ({ post, index, isDarkMode, onPress }) => {
         />
         <LinearGradient
           pointerEvents="none"
-          colors={[typeStyle.color, `${typeStyle.color}66`]}
+          colors={[typeStyle.color, tint(typeStyle.color, 0.4)]}
           style={styles.postAccent}
         />
         <View style={styles.postTopRow}>
@@ -287,18 +296,15 @@ export const CommunityDetailScreen = ({ navigation, route }) => {
         </Text>
 
         <View style={styles.heroButtons}>
+          <Loader visible={isPending} title="Updating membership…" />
           <BouncyPressable
             activeScale={0.95}
             disabled={isPending}
             onPress={handleMembership}
             style={[styles.joinBtn, isMember && styles.joinBtnMember]}>
-            {isPending ? (
-              <ActivityIndicator size="small" color={isMember ? '#FFFFFF' : DEEP_PURPLE} />
-            ) : (
-              <Text style={[styles.joinBtnText, isMember && styles.joinBtnTextMember]}>
-                {isMember ? 'Leave Community' : 'Join Community'}
-              </Text>
-            )}
+            <Text style={[styles.joinBtnText, isMember && styles.joinBtnTextMember]}>
+              {isMember ? 'Leave Community' : 'Join Community'}
+            </Text>
           </BouncyPressable>
           <BouncyPressable
             activeScale={0.95}
@@ -386,7 +392,7 @@ export const CommunityDetailScreen = ({ navigation, route }) => {
 
   const renderFooter = () => (
     <View>
-      {isFetchingNextPage ? <ActivityIndicator style={styles.footerLoader} color={PURPLE} /> : null}
+      <Loader visible={!!isFetchingNextPage} title="Loading more posts…" />
 
       <View style={[styles.ctaCard, isDarkMode && styles.ctaCardDark]}>
         <Text style={styles.ctaEmoji}>{community.icon}</Text>

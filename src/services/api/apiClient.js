@@ -1,7 +1,7 @@
  
 import axios from 'axios';
 import { QueryClient } from '@tanstack/react-query';
-import { getItem, setItem, removeItem, STORAGE_KEYS } from '../storage/storage';
+import { getItem, removeItem, saveSecureTokens, STORAGE_KEYS } from '../storage/storage';
 import { API_BASE_URL, API_ENDPOINTS } from './apiList';
 import { useStore } from '../../store';
 
@@ -36,6 +36,7 @@ const handleForceLogout = () => {
     removeItem(STORAGE_KEYS.REFRESH_TOKEN);
     removeItem(STORAGE_KEYS.USER_INFO);
     useStore.getState().logout();
+    queryClient.clear();
   } catch (e) {
     // if (__DEV__) {
     //   console.warn('[apiClient] Error during forced logout:', e);
@@ -106,9 +107,12 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config;
 
     // Check if error is 401 and request has not already been retried
-    const isAuthEndpoint =
-      originalRequest?.url?.includes(API_ENDPOINTS.AUTH.LOGIN) ||
-      originalRequest?.url?.includes(API_ENDPOINTS.AUTH.REFRESH_TOKEN);
+    const isAuthEndpoint = [
+      API_ENDPOINTS.AUTH.LOGIN,
+      API_ENDPOINTS.AUTH.REFRESH_TOKEN,
+      API_ENDPOINTS.AUTH.LOGOUT,
+      API_ENDPOINTS.AUTH.LOGOUT_ALL,
+    ].some(path => originalRequest?.url?.includes(path));
 
     if (error.response?.status === 401 && !originalRequest?._retry && !isAuthEndpoint) {
       const refreshToken = getItem(STORAGE_KEYS.REFRESH_TOKEN);
@@ -142,6 +146,8 @@ apiClient.interceptors.response.use(
             headers: {
               'Content-Type': 'application/json',
               Accept: 'application/json',
+              // Required by the refresh endpoint; a raw axios call skips the client defaults
+              'X-Requested-With': 'fetch',
             },
           },
         );
@@ -155,11 +161,9 @@ apiClient.interceptors.response.use(
           refreshResponse.data?.refresh_token || refreshResponse.data?.refreshToken;
 
         if (newAccessToken) {
-          // Persist the fresh tokens in MMKV
-          setItem(STORAGE_KEYS.ACCESS_TOKEN, newAccessToken);
-          if (newRefreshToken) {
-            setItem(STORAGE_KEYS.REFRESH_TOKEN, newRefreshToken);
-          }
+          // Refresh tokens are single-use: save both new tokens together, in the Keychain, before
+          // anything else uses them
+          await saveSecureTokens(newAccessToken, newRefreshToken);
 
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
 
@@ -171,9 +175,16 @@ apiClient.interceptors.response.use(
           throw new Error('No access token returned from refresh');
         }
       } catch (refreshError) {
-        // Refresh failed (e.g. refresh token expired or revoked) -> logout
         processQueue(refreshError, null);
-        handleForceLogout();
+        // End the session only when the server rejected the refresh token (expired, reused or
+        // revoked). A network drop, timeout or server error must not sign the user out.
+        const status = refreshError?.response?.status;
+        const rejected =
+          [400, 401, 403].includes(status) ||
+          refreshError?.message === 'No access token returned from refresh';
+        if (rejected) {
+          handleForceLogout();
+        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

@@ -1,20 +1,19 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, ScrollView, Dimensions } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
 import { theme } from '../../../theme';
 import { s, vs, ms } from 'react-native-size-matters';
 import { BouncyPressable } from '../../../components/common/BouncyPressable';
+import { Enter, Shine } from '../../Community/Motion';
 
-export const PawsportCard = ({
-  activePet,
-  pets = [],
-  selectedPetIndex = 0,
-  onSelectPetIndex,
-  onAddPet,
-  isDarkMode = false,
-}) => {
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// One page of the carousel: leaves a sliver of the next card visible as a swipe cue
+const PAGE_WIDTH = SCREEN_WIDTH - s(44);
+
+// One pet's pawsport card (or the "create your first pawsport" card when there is no pet)
+const PawsportCardView = ({ activePet, onAddPet, onPressPet, isDarkMode = false, outerStyle }) => {
   // Floating bob animation for 3D emblem
   const floatAnim = useRef(new Animated.Value(0)).current;
 
@@ -37,23 +36,37 @@ export const PawsportCard = ({
     return () => floatLoop.stop();
   }, [floatAnim]);
 
+  // Soft ring pulsing out from the pet emblem
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const pulseLoop = Animated.loop(
+      Animated.timing(pulse, { toValue: 1, duration: 2200, useNativeDriver: true }),
+    );
+    pulseLoop.start();
+    return () => pulseLoop.stop();
+  }, [pulse]);
+
   const floatingPawStyle = {
     transform: [{ translateY: floatAnim }],
   };
+  const pulseStyle = {
+    opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] }),
+    transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.55] }) }],
+  };
 
   return (
-    <View style={styles.pawsportSectionOuter}>
+    <Enter style={[styles.pawsportSectionOuter, outerStyle]}>
       <LinearGradient
-        colors={isDarkMode ? ['#150A2A', '#260D55', '#380B5C'] : ['#1E103A', '#2E1065', '#3B0764']}
+        colors={isDarkMode ? ['#2A0B6B', '#4C1D95', '#6D28D9'] : ['#3B108F', '#5B21B6', '#7B2CFF']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.pawsportCardGradient}>
         {/* Hologram Light Reflection Strip */}
         <LinearGradient
-          colors={['rgba(255, 255, 255, 0.22)', 'rgba(255, 255, 255, 0.04)', 'transparent']}
+          colors={['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0)']}
           start={{ x: 0, y: 0 }}
-          end={{ x: 0.9, y: 0.9 }}
-          style={styles.pawsportSheen}
+          end={{ x: 0.7, y: 0.6 }}
+          style={styles.pwSheen}
         />
 
         {/* Background Paw Security Watermark */}
@@ -70,92 +83,90 @@ export const PawsportCard = ({
             <Ionicons
               name="shield-checkmark"
               size={ms(15)}
-              color="#FCD34D"
+              color="#FBCFE8"
               style={styles.pawsportShieldIcon}
             />
             <Text style={styles.pawsportGoldTag}>OFFICIAL PET PAWSPORT</Text>
           </View>
 
-          <View style={styles.pawsportVerifiedBadge}>
-            <Ionicons
-              name="checkmark-circle"
-              size={ms(11)}
-              color="#10B981"
-              style={styles.badgeCheckIcon}
-            />
-            <Text style={styles.pawsportVerifiedText}>VERIFIED</Text>
-          </View>
+          {activePet ? (
+            <BouncyPressable style={styles.pwAddPill} activeScale={0.94} onPress={onAddPet}>
+              <Feather name="plus" size={ms(12)} color="#5B21B6" />
+              <Text style={styles.pwAddPillText}>Add pet</Text>
+            </BouncyPressable>
+          ) : (
+            <View style={styles.pawsportVerifiedBadge}>
+              <Ionicons
+                name="checkmark-circle"
+                size={ms(11)}
+                color="#10B981"
+                style={styles.badgeCheckIcon}
+              />
+              <Text style={styles.pawsportVerifiedText}>VERIFIED</Text>
+            </View>
+          )}
         </View>
 
         {/* Active Pet Card Body */}
         {activePet ? (
           <View style={styles.pawsportBody}>
-            <View style={styles.pawsportMainRow}>
+            <BouncyPressable
+              testID="pawsport-open-details"
+              accessibilityLabel="View pet details"
+              style={styles.pwMain}
+              activeScale={0.98}
+              onPress={() => onPressPet?.(activePet)}>
               {/* Floating 3D Pet Emblem */}
-              <Animated.View style={[styles.pawsportEmblemCircle, floatingPawStyle]}>
+              <Animated.View style={[styles.pwEmblem, floatingPawStyle]}>
+                <Animated.View style={[styles.pwPulse, pulseStyle]} pointerEvents="none" />
                 <LinearGradient
-                  colors={['#EDE9FE', '#C4B5FD', '#A78BFA']}
-                  style={styles.pawsportEmblemInner}>
-                  <Text style={styles.petEmblemEmoji}>
-                    {activePet.type === 'Cat' ? '🐱' : '🐶'}
-                  </Text>
+                  colors={['#FFFFFF', '#F5D0FE', '#C4B5FD']}
+                  style={styles.pwEmblemRing}>
+                  <View style={styles.pwEmblemInner}>
+                    <Text style={styles.petEmblemEmoji}>
+                      {/cat/i.test(activePet.type) ? '🐱' : '🐶'}
+                    </Text>
+                  </View>
                 </LinearGradient>
+                <View style={styles.pwEmblemBadge}>
+                  <Ionicons name="checkmark" size={ms(9)} color="#FFFFFF" />
+                </View>
               </Animated.View>
 
-              {/* Pet Core Passport Details */}
-              <View style={styles.pawsportDetailsCol}>
-                <Text style={styles.pawsportPetNameText}>{`${activePet.name}'s Pawsport`}</Text>
-                <Text
-                  style={
-                    styles.pawsportPetBreedText
-                  }>{`${activePet.breed} · Ready for adventures`}</Text>
+              <View style={styles.pwText}>
+                <Text style={styles.pwName} numberOfLines={1}>
+                  {activePet.name || 'Your pet'}
+                </Text>
+                <Text style={styles.pwBreed} numberOfLines={1}>
+                  {[activePet.breed, activePet.type].filter(Boolean).join(' · ') ||
+                    'Ready for adventures'}
+                </Text>
+              </View>
 
-                <View style={styles.pawsportMetaRow}>
-                  <View style={styles.pawsportIdPill}>
-                    <Text style={styles.pawsportIdLabel}>ID: </Text>
-                    <Text style={styles.pawsportIdValue}>{activePet.passportNo}</Text>
-                  </View>
-                  <View style={styles.pawsportStatusPill}>
-                    <Text style={styles.pawsportStatusText}>Active Pack 🐾</Text>
-                  </View>
-                </View>
+              <View style={styles.pwChevron}>
+                <Feather name="chevron-right" size={ms(16)} color="#FFFFFF" />
+              </View>
+            </BouncyPressable>
+
+            {/* Passport facts */}
+            <View style={styles.pwStats}>
+              <View style={styles.pwStat}>
+                <Text style={styles.pwStatLabel}>PASSPORT ID</Text>
+                <Text style={styles.pwStatValue} numberOfLines={1}>
+                  {activePet.passportNo || 'Pending'}
+                </Text>
+              </View>
+              <View style={styles.pwStatDivider} />
+              <View style={styles.pwStatSmall}>
+                <Text style={styles.pwStatLabel}>STAMPS</Text>
+                <Text style={styles.pwStatValue}>{activePet.stamps ?? 0}</Text>
+              </View>
+              <View style={styles.pwStatDivider} />
+              <View style={styles.pwStatSmall}>
+                <Text style={styles.pwStatLabel}>STATUS</Text>
+                <Text style={[styles.pwStatValue, styles.pwStatActive]}>Active</Text>
               </View>
             </View>
-
-            {/* Pet Switcher Chips (when user has multiple pets) */}
-            {pets.length > 1 && (
-              <View style={styles.petsChipsScroll}>
-                {pets.map((p, idx) => {
-                  const isSelected = idx === selectedPetIndex;
-                  return (
-                    <TouchableOpacity
-                      key={p.id || idx}
-                      onPress={() => onSelectPetIndex?.(idx)}
-                      style={[styles.petTabChip, isSelected && styles.petTabChipSelected]}>
-                      <Text style={styles.petTabChipEmoji}>
-                        {p.type === 'Cat' ? '🐱' : '🐶'}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.petTabChipName,
-                          isSelected && styles.petTabChipNameSelected,
-                        ]}>
-                        {p.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-
-            {/* Add Another Pet Button */}
-            <BouncyPressable
-              style={styles.addAnotherPetBtnLuxury}
-              activeScale={0.94}
-              onPress={onAddPet}>
-              <Feather name="plus" size={ms(14)} color="#FFFFFF" style={styles.btnPlusIcon} />
-              <Text style={styles.addAnotherPetBtnLuxuryText}>Add another pet</Text>
-            </BouncyPressable>
           </View>
         ) : (
           /* Empty State: Create First Pawsport */
@@ -173,10 +184,7 @@ export const PawsportCard = ({
               Unlock verified pet-friendly places, exclusive stays, and road trip perks!
             </Text>
 
-            <BouncyPressable
-              style={styles.addFirstPetBtn3D}
-              activeScale={0.93}
-              onPress={onAddPet}>
+            <BouncyPressable style={styles.addFirstPetBtn3D} activeScale={0.93} onPress={onAddPet}>
               <LinearGradient
                 colors={['#8B5CF6', '#7C3AED', '#6D28D9']}
                 start={{ x: 0, y: 0 }}
@@ -188,7 +196,89 @@ export const PawsportCard = ({
             </BouncyPressable>
           </View>
         )}
+        <Shine travel={SCREEN_WIDTH} />
       </LinearGradient>
+    </Enter>
+  );
+};
+
+// All pets, swiped sideways one card at a time. A single pet (or none) shows one plain card.
+export const PawsportCard = ({
+  activePet,
+  pets = [],
+  selectedPetIndex = 0,
+  onSelectPetIndex,
+  onAddPet,
+  onPressPet,
+  isDarkMode = false,
+}) => {
+  const scrollRef = useRef(null);
+  const shownIndex = useRef(selectedPetIndex);
+
+  // Move to a pet chosen elsewhere (for example the one just added)
+  useEffect(() => {
+    if (pets.length > 1 && shownIndex.current !== selectedPetIndex) {
+      shownIndex.current = selectedPetIndex;
+      scrollRef.current?.scrollTo({ x: selectedPetIndex * PAGE_WIDTH, animated: true });
+    }
+  }, [selectedPetIndex, pets.length]);
+
+  if (pets.length <= 1) {
+    return (
+      <PawsportCardView
+        activePet={activePet}
+        onAddPet={onAddPet}
+        onPressPet={onPressPet}
+        isDarkMode={isDarkMode}
+      />
+    );
+  }
+
+  const handleScrollEnd = event => {
+    const index = Math.round(event.nativeEvent.contentOffset.x / PAGE_WIDTH);
+    const clamped = Math.max(0, Math.min(pets.length - 1, index));
+    shownIndex.current = clamped;
+    if (clamped !== selectedPetIndex) {
+      onSelectPetIndex?.(clamped);
+    }
+  };
+
+  return (
+    <View>
+      <ScrollView
+        ref={scrollRef}
+        testID="pawsport-carousel"
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={PAGE_WIDTH}
+        decelerationRate="fast"
+        contentOffset={{ x: selectedPetIndex * PAGE_WIDTH, y: 0 }}
+        onMomentumScrollEnd={handleScrollEnd}>
+        {pets.map((pet, index) => (
+          <View key={pet.id || index} style={styles.page}>
+            <PawsportCardView
+              activePet={pet}
+              onAddPet={onAddPet}
+              onPressPet={onPressPet}
+              isDarkMode={isDarkMode}
+              outerStyle={styles.pageCard}
+            />
+          </View>
+        ))}
+      </ScrollView>
+
+      <View style={styles.dots}>
+        {pets.map((pet, index) => (
+          <View
+            key={pet.id || index}
+            style={[
+              styles.dot,
+              isDarkMode && styles.dotDark,
+              index === selectedPetIndex && styles.dotActive,
+            ]}
+          />
+        ))}
+      </View>
     </View>
   );
 };
@@ -196,25 +286,176 @@ export const PawsportCard = ({
 export default PawsportCard;
 
 const styles = StyleSheet.create({
+  pwEmblemBadge: {
+    position: 'absolute',
+    right: -s(1),
+    bottom: -s(1),
+    width: s(17),
+    height: s(17),
+    borderRadius: s(9),
+    backgroundColor: '#10B981',
+    borderWidth: 2,
+    borderColor: '#5B21B6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pwAddPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: s(10),
+    paddingVertical: vs(4),
+    borderRadius: s(12),
+    backgroundColor: '#FFFFFF',
+  },
+  pwAddPillText: {
+    marginLeft: s(3),
+    fontSize: ms(11),
+    color: '#5B21B6',
+    fontFamily: theme.typography.fontFamily.extraBold,
+  },
+  pwPulse: {
+    position: 'absolute',
+    width: s(50),
+    height: s(50),
+    borderRadius: s(25),
+    backgroundColor: '#F5D0FE',
+  },
+  pwSheen: { ...StyleSheet.absoluteFillObject },
+  pwMain: { flexDirection: 'row', alignItems: 'center' },
+  pwEmblem: {
+    shadowColor: '#EE2A7B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  pwEmblemRing: {
+    width: s(50),
+    height: s(50),
+    borderRadius: s(25),
+    padding: s(2.5),
+  },
+  pwEmblemInner: {
+    flex: 1,
+    borderRadius: s(23),
+    backgroundColor: '#EDE9FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pwText: { flex: 1, marginLeft: s(12) },
+  pwEyebrow: {
+    fontSize: ms(9.5),
+    letterSpacing: 1.6,
+    color: 'rgba(252,211,77,0.9)',
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  pwName: {
+    fontSize: ms(19),
+    letterSpacing: -0.5,
+    color: '#FFFFFF',
+    fontFamily: theme.typography.fontFamily.extraBold,
+  },
+  pwBreed: {
+    marginTop: vs(1),
+    fontSize: ms(12.5),
+    color: 'rgba(255,255,255,0.72)',
+    fontFamily: theme.typography.fontFamily.medium,
+  },
+  pwChevron: {
+    width: s(26),
+    height: s(26),
+    borderRadius: s(13),
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pwStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: vs(10),
+    paddingVertical: vs(6),
+    paddingHorizontal: s(10),
+    borderRadius: s(12),
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  pwStat: { flex: 1.5 },
+  pwStatSmall: { flex: 1, alignItems: 'center' },
+  pwStatLabel: {
+    fontSize: ms(8.5),
+    letterSpacing: 1.3,
+    color: 'rgba(255,255,255,0.55)',
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  pwStatValue: {
+    marginTop: vs(1),
+    fontSize: ms(12),
+    color: '#FFFFFF',
+    fontFamily: theme.typography.fontFamily.extraBold,
+  },
+  pwStatActive: { color: '#6EE7B7' },
+  pwStatDivider: {
+    width: 1,
+    height: vs(20),
+    marginHorizontal: s(8),
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  pwAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: vs(12),
+    paddingVertical: vs(9),
+    borderRadius: s(14),
+    borderWidth: 1.2,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(252,211,77,0.5)',
+  },
+  pwAddText: {
+    marginLeft: s(6),
+    fontSize: ms(12.5),
+    color: '#FCD34D',
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  page: { width: PAGE_WIDTH, paddingLeft: s(16) },
+  pageCard: { marginHorizontal: 0, marginBottom: vs(10) },
+  dots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: vs(14),
+  },
+  dot: {
+    width: s(6),
+    height: s(6),
+    borderRadius: s(3),
+    marginHorizontal: s(3),
+    backgroundColor: '#DDD6FE',
+  },
+  dotDark: { backgroundColor: '#3B1F66' },
+  dotActive: { width: s(20), backgroundColor: '#7C3AED' },
   pawsportSectionOuter: {
     marginHorizontal: s(16),
     marginTop: vs(4),
-    marginBottom: vs(18),
-    borderRadius: s(24),
-    shadowColor: '#2E1065',
+    marginBottom: vs(12),
+    borderRadius: s(22),
+    shadowColor: '#7B2CFF',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.35,
     shadowRadius: 20,
     elevation: 8,
   },
   pawsportCardGradient: {
-    borderRadius: s(24),
+    borderRadius: s(22),
     borderWidth: 1.5,
-    borderColor: '#7C3AED',
-    borderTopColor: '#A78BFA',
-    borderBottomWidth: 3.5,
-    borderBottomColor: '#1E0747',
-    padding: s(18),
+    borderColor: 'rgba(255,255,255,0.28)',
+    borderTopColor: 'rgba(255,255,255,0.5)',
+    borderBottomWidth: 4,
+    borderBottomColor: '#2A0B6B',
+    padding: s(14),
     position: 'relative',
     overflow: 'hidden',
   },
@@ -235,10 +476,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: vs(12),
+    paddingBottom: vs(8),
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.12)',
-    marginBottom: vs(12),
+    marginBottom: vs(10),
   },
   pawsportTitleWrap: {
     flexDirection: 'row',
@@ -250,7 +491,7 @@ const styles = StyleSheet.create({
   pawsportGoldTag: {
     fontSize: s(10),
     fontFamily: theme.typography.fontFamily.bold,
-    color: '#FDE68A',
+    color: 'rgba(255,255,255,0.9)',
     letterSpacing: 1.1,
   },
   pawsportVerifiedBadge: {

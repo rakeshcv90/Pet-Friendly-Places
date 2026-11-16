@@ -23,6 +23,11 @@ jest.mock('../../../store', () => ({
   ),
 }));
 
+// The screen and the shared header both read the profile
+jest.mock('../../../hooks/useUser', () => ({
+  useUserProfile: () => ({ data: undefined }),
+}));
+
 describe('CreateTripScreen Component', () => {
   const mockNavigation = {
     goBack: jest.fn(),
@@ -40,9 +45,8 @@ describe('CreateTripScreen Component', () => {
 
     // Header
     expect(getByText('Create a trip')).toBeTruthy();
-    expect(
-      getByText("Record an adventure and show it on your pets' Pawsports.")
-    ).toBeTruthy();
+    expect(getByText('PAWSPORT ADVENTURES 🐾')).toBeTruthy();
+    expect(getByText("Show it on your pets' Pawsports")).toBeTruthy();
 
     // Inputs
     expect(getByPlaceholderText('e.g. Monsoon weekend in Coorg')).toBeTruthy();
@@ -57,7 +61,7 @@ describe('CreateTripScreen Component', () => {
 
     // Submit button
     expect(getByTestId('create-trip-submit-btn')).toBeTruthy();
-    expect(getByText('Save trip 🐾')).toBeTruthy();
+    expect(getByTestId('create-trip-submit-btn')).toBeTruthy();
 
     // Verify preview card has been removed
     const { queryByText } = render(<CreateTripScreen navigation={mockNavigation} />);

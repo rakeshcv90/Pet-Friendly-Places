@@ -36,6 +36,9 @@ export const SettingsBottomSheet = ({
   publicProfile,
   setPublicProfile,
   onChangePassword,
+  appLockEnabled = false,
+  onToggleAppLock,
+  onOpenPermissions,
 }) => {
   const insets = useSafeAreaInsets();
 
@@ -573,6 +576,84 @@ export const SettingsBottomSheet = ({
                 </Text>
               </View>
 
+              <View
+                style={[
+                  styles.settingRowCard,
+                  isDarkMode && styles.settingRowCardDark,
+                  styles.settingRowCardSpacingBottom,
+                ]}>
+                <View style={styles.settingRowLeft}>
+                  <View
+                    style={[
+                      styles.settingIconBox,
+                      isDarkMode ? styles.settingIconBoxSlateDark : styles.settingIconBoxSlate,
+                    ]}>
+                    <Ionicons
+                      name="finger-print-outline"
+                      size={ms(18)}
+                      color={isDarkMode ? '#C084FC' : '#7C3AED'}
+                    />
+                  </View>
+                  <View style={styles.settingRowTextWrap}>
+                    <Text style={[styles.settingRowTitle, isDarkMode && styles.textWhite]}>
+                      App Lock
+                    </Text>
+                    <Text style={[styles.settingRowSub, isDarkMode && styles.textMutedDark]}>
+                      Fingerprint, face or phone lock
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  testID="app-lock-switch"
+                  value={appLockEnabled}
+                  onValueChange={onToggleAppLock}
+                  trackColor={{ false: '#CBD5E1', true: accentColor }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+
+              <TouchableOpacity
+                testID="open-permissions"
+                style={[
+                  styles.settingRowCard,
+                  isDarkMode && styles.settingRowCardDark,
+                  styles.settingRowCardSpacingBottom,
+                ]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  closeSettingsModal();
+                  setTimeout(() => {
+                    onOpenPermissions?.();
+                  }, 200);
+                }}>
+                <View style={styles.settingRowLeft}>
+                  <View
+                    style={[
+                      styles.settingIconBox,
+                      isDarkMode ? styles.settingIconBoxSlateDark : styles.settingIconBoxSlate,
+                    ]}>
+                    <Ionicons
+                      name="location-outline"
+                      size={ms(18)}
+                      color={isDarkMode ? '#C084FC' : '#7C3AED'}
+                    />
+                  </View>
+                  <View style={styles.settingRowTextWrap}>
+                    <Text style={[styles.settingRowTitle, isDarkMode && styles.textWhite]}>
+                      App Permissions
+                    </Text>
+                    <Text style={[styles.settingRowSub, isDarkMode && styles.textMutedDark]}>
+                      Location and notifications
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={ms(16)}
+                  color={isDarkMode ? '#64748B' : '#94A3B8'}
+                />
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={[styles.settingRowCard, isDarkMode && styles.settingRowCardDark]}
                 activeOpacity={0.7}
@@ -896,6 +977,9 @@ const styles = StyleSheet.create({
   },
   settingRowCardSpacing: {
     marginTop: vs(8),
+  },
+  settingRowCardSpacingBottom: {
+    marginBottom: vs(8),
   },
   settingRowLeft: {
     flexDirection: 'row',

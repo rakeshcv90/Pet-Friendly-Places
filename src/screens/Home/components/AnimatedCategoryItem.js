@@ -6,6 +6,7 @@ import { theme } from '../../../theme';
 import { useStore } from '../../../store';
 
 export const AnimatedCategoryItem = React.memo(({ cat, isSelected, onPress }) => {
+
   const isDarkMode = useStore(state => state.isDarkMode);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;

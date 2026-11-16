@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../components/common/FastImage';
 
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';

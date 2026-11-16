@@ -11,11 +11,10 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   TouchableOpacity,
-  ActivityIndicator,
   Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import Feather from 'react-native-vector-icons/Feather';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -24,19 +23,68 @@ import { theme } from '../../theme';
 import { useStore } from '../../store';
 import { useDiscoveryCities, resolveImageUrl } from '../../hooks/useDiscovery';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
+import { LoaderCard } from '../../components/common/Loader';
 
 const PALETTES = [
-  { bg: '#EDE9FE', border: '#DDD6FE', shadowBorder: '#C4B5FD', iconColor: '#7C3AED', icon: 'trail-sign-outline' }, // Purple
-  { bg: '#CCFBF1', border: '#99F6E4', shadowBorder: '#5EEAD4', iconColor: '#0D9488', icon: 'leaf-outline' }, // Teal
-  { bg: '#FEF3C7', border: '#FDE68A', shadowBorder: '#FCD34D', iconColor: '#D97706', icon: 'business-outline' }, // Amber
-  { bg: '#FCE7F3', border: '#FBCFE8', shadowBorder: '#F472B6', iconColor: '#DB2777', icon: 'heart-outline' }, // Pink
+  {
+    bg: '#EDE9FE',
+    border: '#DDD6FE',
+    shadowBorder: '#C4B5FD',
+    iconColor: '#7C3AED',
+    icon: 'trail-sign-outline',
+  }, // Purple
+  {
+    bg: '#CCFBF1',
+    border: '#99F6E4',
+    shadowBorder: '#5EEAD4',
+    iconColor: '#0D9488',
+    icon: 'leaf-outline',
+  }, // Teal
+  {
+    bg: '#FEF3C7',
+    border: '#FDE68A',
+    shadowBorder: '#FCD34D',
+    iconColor: '#D97706',
+    icon: 'business-outline',
+  }, // Amber
+  {
+    bg: '#FCE7F3',
+    border: '#FBCFE8',
+    shadowBorder: '#F472B6',
+    iconColor: '#DB2777',
+    icon: 'heart-outline',
+  }, // Pink
 ];
 
 const DARK_PALETTES = [
-  { bg: 'rgba(124, 58, 237, 0.22)', border: '#3B1D6E', shadowBorder: '#230E4A', iconColor: '#C4B5FD', icon: 'trail-sign-outline' }, // Purple
-  { bg: 'rgba(13, 148, 136, 0.22)', border: '#134E4A', shadowBorder: '#0A2D2A', iconColor: '#5EEAD4', icon: 'leaf-outline' }, // Teal
-  { bg: 'rgba(217, 119, 6, 0.22)', border: '#78350F', shadowBorder: '#451A03', iconColor: '#FCD34D', icon: 'business-outline' }, // Amber
-  { bg: 'rgba(219, 39, 119, 0.22)', border: '#831843', shadowBorder: '#4C0D24', iconColor: '#F472B6', icon: 'heart-outline' }, // Pink
+  {
+    bg: 'rgba(124, 58, 237, 0.22)',
+    border: '#3B1D6E',
+    shadowBorder: '#230E4A',
+    iconColor: '#C4B5FD',
+    icon: 'trail-sign-outline',
+  }, // Purple
+  {
+    bg: 'rgba(13, 148, 136, 0.22)',
+    border: '#134E4A',
+    shadowBorder: '#0A2D2A',
+    iconColor: '#5EEAD4',
+    icon: 'leaf-outline',
+  }, // Teal
+  {
+    bg: 'rgba(217, 119, 6, 0.22)',
+    border: '#78350F',
+    shadowBorder: '#451A03',
+    iconColor: '#FCD34D',
+    icon: 'business-outline',
+  }, // Amber
+  {
+    bg: 'rgba(219, 39, 119, 0.22)',
+    border: '#831843',
+    shadowBorder: '#4C0D24',
+    iconColor: '#F472B6',
+    icon: 'heart-outline',
+  }, // Pink
 ];
 
 const CityCardItem = React.memo(
@@ -65,8 +113,7 @@ const CityCardItem = React.memo(
         ? item.total_count
         : verifiedCount || 1;
     const displayVerified = verifiedCount > 0 ? verifiedCount : totalCount;
-    const hasCover =
-      !!item.cover_image_url && !failedImages[item.cover_image_url];
+    const hasCover = !!item.cover_image_url && !failedImages[item.cover_image_url];
 
     const translateY = enterAnim.interpolate({
       inputRange: [0, 1],
@@ -92,7 +139,7 @@ const CityCardItem = React.memo(
           activeScale={0.96}
           springTension={180}
           springFriction={7}
-          onPress={() => onSelectCity(item.city)}>
+          onPress={() => onSelectCity(item)}>
           <View style={styles.cityCardLeft}>
             {hasCover ? (
               <View style={[styles.cityImageBox, isDarkMode && styles.cityImageBoxDark]}>
@@ -151,11 +198,7 @@ const CityCardItem = React.memo(
 
           <View style={styles.cityCardRight}>
             <View style={[styles.verifiedBadge, isDarkMode && styles.verifiedBadgeDark]}>
-              <Text
-                style={[
-                  styles.verifiedBadgeText,
-                  isDarkMode && styles.verifiedBadgeTextDark,
-                ]}>
+              <Text style={[styles.verifiedBadgeText, isDarkMode && styles.verifiedBadgeTextDark]}>
                 {`${displayVerified} Verified ${displayVerified === 1 ? 'Place' : 'Places'}`}
               </Text>
             </View>
@@ -206,6 +249,7 @@ export const CityList = ({ navigation, route }) => {
 
   // Fetch live discovery cities from API (/cities/known)
   const { data: apiCities, isLoading } = useDiscoveryCities();
+  
 
   const citiesData = useMemo(() => {
     if (Array.isArray(apiCities) && apiCities.length > 0) {
@@ -222,26 +266,15 @@ export const CityList = ({ navigation, route }) => {
               : typeof c.listing_count === 'number'
               ? c.listing_count
               : 0;
-          const totalCount =
-            typeof c.total_count === 'number'
-              ? c.total_count
-              : verifiedCount;
-          const listingCount =
-            verifiedCount > 0 ? verifiedCount : totalCount || 1;
+          const totalCount = typeof c.total_count === 'number' ? c.total_count : verifiedCount;
+          const listingCount = verifiedCount > 0 ? verifiedCount : totalCount || 1;
 
           const rawCover =
-            c.cover_image_url ||
-            c.cover_image ||
-            c.coverImage ||
-            c.image_url ||
-            c.image;
+            c.cover_image_url || c.cover_image || c.coverImage || c.image_url || c.image;
           let coverImageUrl = rawCover ? resolveImageUrl(rawCover) : null;
 
           // If Rishikesh has the expired 404 Unsplash ID from backend, replace with verified working photo
-          if (
-            coverImageUrl &&
-            coverImageUrl.includes('photo-1600100397608-4f0cefd4f05b')
-          ) {
+          if (coverImageUrl && coverImageUrl.includes('photo-1600100397608-4f0cefd4f05b')) {
             coverImageUrl =
               'https://images.unsplash.com/photo-1720819029162-8500607ae232?w=800&auto=format&fit=crop&q=80';
           }
@@ -293,6 +326,14 @@ export const CityList = ({ navigation, route }) => {
     } else {
       navigation?.navigate?.('MainTabs', { screen: 'Explore' });
     }
+  };
+
+  const handleOpenCity = item => {
+    navigation?.navigate?.('CityDetail', {
+      city: item.city,
+      state: item.state,
+      onSelectCity: route?.params?.onSelectCity,
+    });
   };
 
   const handleBack = () => {
@@ -470,7 +511,7 @@ export const CityList = ({ navigation, route }) => {
         isDarkMode={isDarkMode}
         failedImages={failedImages}
         setFailedImages={setFailedImages}
-        onSelectCity={handleSelectCity}
+        onSelectCity={handleOpenCity}
       />
     );
   };
@@ -479,20 +520,13 @@ export const CityList = ({ navigation, route }) => {
     if (isLoading && citiesData.length === 0) {
       return (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#7C3AED" />
-          <Text style={[styles.loadingText, isDarkMode && styles.loadingTextDark]}>
-            Loading pet-friendly cities...
-          </Text>
+          <LoaderCard label="Loading pet-friendly cities..." isDarkMode={isDarkMode} />
         </View>
       );
     }
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons
-          name="search-outline"
-          size={ms(38)}
-          color={isDarkMode ? '#475569' : '#CBD5E1'}
-        />
+        <Ionicons name="search-outline" size={ms(38)} color={isDarkMode ? '#475569' : '#CBD5E1'} />
         <Text style={[styles.emptyTitle, isDarkMode && styles.emptyTitleDark]}>
           No cities found
         </Text>
@@ -563,19 +597,15 @@ export const CityList = ({ navigation, route }) => {
           windowSize={5}
           keyboardShouldPersistTaps="handled"
           style={styles.flatListFlex}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: true },
-          )}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+            useNativeDriver: true,
+          })}
           scrollEventThrottle={16}
         />
 
         {/* ── Sticky Search Bar (Sticks near header when scrolled) ── */}
         <Animated.View
-          style={[
-            styles.stickySearchWrapper,
-            { transform: [{ translateY }] },
-          ]}
+          style={[styles.stickySearchWrapper, { transform: [{ translateY }] }]}
           pointerEvents="box-none">
           <Animated.View
             style={[
@@ -614,10 +644,7 @@ export const CityList = ({ navigation, route }) => {
 
       {/* ── Fixed Bottom Callout: Can't find your city? (Always visible) ── */}
       <View
-        style={[
-          styles.bottomCalloutWrapper,
-          { paddingBottom: Math.max(insets.bottom, vs(10)) },
-        ]}>
+        style={[styles.bottomCalloutWrapper, { paddingBottom: Math.max(insets.bottom, vs(10)) }]}>
         <View style={styles.requestCalloutCard}>
           <LinearGradient
             colors={['#3B0764', '#581C87', '#6D28D9']}

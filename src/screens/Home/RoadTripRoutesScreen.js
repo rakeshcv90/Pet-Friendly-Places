@@ -23,6 +23,7 @@ import { useStore } from '../../store';
 import { useRoadTrips, resolveImageUrl } from '../../hooks/useDiscovery';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { Loader } from '../../components/common/Loader';
+import { ScreenHeader } from '../../components/common/AppHeader/ScreenHeader';
 
 const HighwayRoadStrip = React.memo(({ origin, destination, index = 0 }) => {
   const [lineWidth, setLineWidth] = useState(0);
@@ -434,38 +435,25 @@ export const RoadTripRoutesScreen = ({ navigation, route }) => {
       </View>
 
       {/* ── 1. Top Navigation Bar ── */}
-      <View
-        style={[
-          styles.headerRow,
-          { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? vs(10) : vs(6)) },
-          isDarkMode && styles.headerRowDark,
-        ]}>
-        <BouncyPressable
-          testID="road-trips-back-btn"
-          accessibilityLabel="Back"
-          style={[styles.backBtn, isDarkMode && styles.backBtnDark]}
-          activeScale={0.88}
-          onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={s(20)} color={isDarkMode ? '#FFFFFF' : '#1E1B4B'} />
-        </BouncyPressable>
-
-        <View style={styles.headerTitleWrap}>
-          <Text style={styles.headerOverline}>EXPLORE TOGETHER</Text>
-          <Text style={[styles.headerTitle, isDarkMode && styles.textWhite]}>Road trip routes</Text>
-        </View>
-
-        <BouncyPressable
-          testID="search-toggle-btn"
-          style={[styles.headerActionBtn, isDarkMode && styles.headerActionBtnDark]}
-          activeScale={0.9}
-          onPress={() => setIsSearchOpen(prev => !prev)}>
-          <Ionicons
-            name={isSearchOpen ? 'close' : 'search'}
-            size={ms(18)}
-            color={isDarkMode ? '#C084FC' : '#7C3AED'}
-          />
-        </BouncyPressable>
-      </View>
+      <ScreenHeader
+        title="Road trip routes"
+        subtitle="EXPLORE TOGETHER"
+        onBack={() => navigation.goBack()}
+        testID="road-trips-back-btn"
+        rightComponent={
+          <BouncyPressable
+            testID="search-toggle-btn"
+            style={[styles.headerActionBtn, isDarkMode && styles.headerActionBtnDark]}
+            activeScale={0.9}
+            onPress={() => setIsSearchOpen(prev => !prev)}>
+            <Ionicons
+              name={isSearchOpen ? 'close' : 'search'}
+              size={ms(18)}
+              color={isDarkMode ? '#C084FC' : '#7C3AED'}
+            />
+          </BouncyPressable>
+        }
+      />
 
       {/* ── Optional Search Bar Drawer ── */}
       {isSearchOpen && (

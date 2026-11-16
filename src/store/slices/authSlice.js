@@ -20,6 +20,9 @@ export const createAuthSlice = (set, get) => ({
     removeItem(STORAGE_KEYS.REFRESH_TOKEN);
     removeItem(STORAGE_KEYS.USER_INFO);
     removeItem(STORAGE_KEYS.SELECTED_LOCATION);
+    // The lock belongs to the signed-in user, so it goes with the session
+    get()?.clearAppLock?.();
+    get()?.resetPrompts?.();
     set({ user: null, token: null, isAuthenticated: false, currentLocation: null });
   },
 

@@ -47,6 +47,49 @@ jest.mock('react-native-mmkv', () => {
   };
 });
 
+// React Native Keychain (in-memory mock)
+jest.mock('react-native-keychain', () => {
+  const saved = {};
+  return {
+    ACCESSIBLE: {
+      AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 'AccessibleAfterFirstUnlockThisDeviceOnly',
+      WHEN_PASSCODE_SET_THIS_DEVICE_ONLY: 'AccessibleWhenPasscodeSetThisDeviceOnly',
+    },
+    ACCESS_CONTROL: { BIOMETRY_ANY_OR_DEVICE_PASSCODE: 'BiometryAnyOrDevicePasscode' },
+    isPasscodeAuthAvailable: jest.fn(async () => true),
+    getSupportedBiometryType: jest.fn(async () => null),
+    setGenericPassword: jest.fn(async (username, password, options = {}) => {
+      saved[options.service || 'default'] = { username, password };
+      return { service: options.service || 'default' };
+    }),
+    getGenericPassword: jest.fn(async (options = {}) => saved[options.service || 'default'] || false),
+    resetGenericPassword: jest.fn(async (options = {}) => {
+      delete saved[options.service || 'default'];
+      return true;
+    }),
+  };
+});
+
+// React Native Permissions (everything granted unless a test changes it)
+jest.mock('react-native-permissions', () => ({
+  PERMISSIONS: {
+    ANDROID: { ACCESS_FINE_LOCATION: 'android.permission.ACCESS_FINE_LOCATION' },
+    IOS: { LOCATION_WHEN_IN_USE: 'ios.permission.LOCATION_WHEN_IN_USE' },
+  },
+  RESULTS: {
+    UNAVAILABLE: 'unavailable',
+    BLOCKED: 'blocked',
+    DENIED: 'denied',
+    GRANTED: 'granted',
+    LIMITED: 'limited',
+  },
+  check: jest.fn(async () => 'denied'),
+  request: jest.fn(async () => 'granted'),
+  checkNotifications: jest.fn(async () => ({ status: 'denied' })),
+  requestNotifications: jest.fn(async () => ({ status: 'granted' })),
+  openSettings: jest.fn(async () => undefined),
+}));
+
 // Linear Gradient
 jest.mock('react-native-linear-gradient', () => {
   const React = require('react');
@@ -65,31 +108,6 @@ jest.mock('react-native-vector-icons/Feather', () => mockIcon);
 jest.mock('react-native-vector-icons/FontAwesome', () => mockIcon);
 jest.mock('react-native-vector-icons/FontAwesome5', () => mockIcon);
 jest.mock('react-native-vector-icons/AntDesign', () => mockIcon);
-
-// Fast Image
-jest.mock('react-native-fast-image', () => {
-  const React = require('react');
-  const { Image } = require('react-native');
-  const FastImage = props => React.createElement(Image, props);
-  FastImage.resizeMode = {
-    contain: 'contain',
-    cover: 'cover',
-    stretch: 'stretch',
-    center: 'center',
-  };
-  FastImage.priority = {
-    low: 'low',
-    normal: 'normal',
-    high: 'high',
-  };
-  FastImage.cacheControl = {
-    immutable: 'immutable',
-    web: 'web',
-    cacheOnly: 'cacheOnly',
-  };
-  FastImage.preload = jest.fn();
-  return FastImage;
-});
 
 // React Native Video
 jest.mock('react-native-video', () => {

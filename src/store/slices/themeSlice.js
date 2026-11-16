@@ -12,7 +12,8 @@ const getInitialMode = () => {
   } catch (e) {
     // fallback
   }
-  return 'dark';
+  // Nothing chosen yet: follow the phone's light / dark setting
+  return 'system';
 };
 
 export const createThemeSlice = (set, get) => {

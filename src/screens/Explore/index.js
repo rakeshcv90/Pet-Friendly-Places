@@ -9,7 +9,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { s, vs, ms } from 'react-native-size-matters';
@@ -45,7 +45,7 @@ const EXPLORE_CATEGORIES = [
     iconColor: '#7C3AED',
     iconColorDark: '#C084FC',
     iconBg: '#EDE9FE',
-    subcategories: ['Hotels', 'Resorts', 'Homestays', 'Camps'],
+    subcategories: ['Hotels', 'Resorts', 'Homestays', 'Farmstays'],
   },
   {
     id: 'wild',
@@ -370,7 +370,6 @@ export const ExploreScreen = ({ navigation }) => {
     }
     navigation?.navigate?.('SearchScreen', {
       category: category.title,
-      subcategory: category.subcategories[0],
     });
   };
 
@@ -524,24 +523,6 @@ export const ExploreScreen = ({ navigation }) => {
     [scrollY],
   );
 
-  const categoryScale = useMemo(
-    () =>
-      scrollY.interpolate({
-        inputRange: [0, 250, 600],
-        outputRange: [0.985, 1, 0.99],
-        extrapolate: 'clamp',
-      }),
-    [scrollY],
-  );
-  const categoryRotateX = useMemo(
-    () =>
-      scrollY.interpolate({
-        inputRange: [0, 250, 600],
-        outputRange: ['-2.5deg', '0deg', '2.5deg'],
-        extrapolate: 'clamp',
-      }),
-    [scrollY],
-  );
   const categorySheenX = useMemo(
     () =>
       scrollY.interpolate({
@@ -760,7 +741,7 @@ export const ExploreScreen = ({ navigation }) => {
         </View>
 
         {/* ── Nearby Areas Card with 3D Tilt & Tactile Bevel ── */}
-        <Animated.View
+        {/* <Animated.View
           style={[
             styles.nearbyCard,
             isDarkMode && styles.nearbyCardDark,
@@ -827,7 +808,7 @@ export const ExploreScreen = ({ navigation }) => {
               </View>
             ))}
           </View>
-        </Animated.View>
+        </Animated.View> */}
 
         {/* ── Categories Section with 3D Perspective & Holographic Sheen ── */}
         <View style={styles.categoriesSection}>
@@ -839,13 +820,6 @@ export const ExploreScreen = ({ navigation }) => {
             style={[
               styles.categoriesCard,
               isDarkMode && styles.categoriesCardDark,
-              {
-                transform: [
-                  { perspective: 1000 },
-                  { scale: categoryScale },
-                  { rotateX: categoryRotateX },
-                ],
-              },
             ]}>
             {/* Holographic light sheen sweeping across card */}
             <Animated.View
@@ -889,7 +863,8 @@ export const ExploreScreen = ({ navigation }) => {
                         ? styles[`iconBox_${category.id}_dark`]
                         : styles[`iconBox_${category.id}`],
                     ]}
-                    onPress={() => handleSelectCategory(category)}>
+                    onPress={() => handleSelectCategory(category)}
+                    >
                     <Ionicons
                       name={category.icon}
                       size={ms(20)}
@@ -898,16 +873,16 @@ export const ExploreScreen = ({ navigation }) => {
                   </BouncyPressable>
 
                   {/* Category Info */}
-                  <Pressable
-                    style={styles.categoryInfo}
-                    onPress={() => handleSelectCategory(category)}>
-                    <Text style={[styles.categoryTitle, isDarkMode && styles.categoryTitleDark]}>
-                      {category.title}
-                    </Text>
-                    <Text
-                      style={[styles.categorySubtitle, isDarkMode && styles.categorySubtitleDark]}>
-                      {category.subtitle}
-                    </Text>
+                  <View style={styles.categoryInfo}>
+                    <Pressable onPress={() => handleSelectCategory(category)}>
+                      <Text style={[styles.categoryTitle, isDarkMode && styles.categoryTitleDark]}>
+                        {category.title}
+                      </Text>
+                      <Text
+                        style={[styles.categorySubtitle, isDarkMode && styles.categorySubtitleDark]}>
+                        {category.subtitle}
+                      </Text>
+                    </Pressable>
 
                     {/* Subcategories Pills */}
                     <View style={styles.subcategoriesWrap}>
@@ -918,12 +893,14 @@ export const ExploreScreen = ({ navigation }) => {
                           <BouncyPressable
                             key={sub}
                             activeScale={0.91}
+                            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                             style={[
                               styles.subcategoryPill,
                               isDarkMode && styles.subcategoryPillDark,
                               isSubSelected && styles.subcategoryPillActive,
                             ]}
-                            onPress={() => handleSelectSubcategory(category, sub)}>
+                            onPress={() => handleSelectSubcategory(category, sub)}
+                            >
                             <Text
                               style={[
                                 styles.subcategoryPillText,
@@ -936,7 +913,7 @@ export const ExploreScreen = ({ navigation }) => {
                         );
                       })}
                     </View>
-                  </Pressable>
+                  </View>
                 </View>
               );
             })}
@@ -1967,3 +1944,4 @@ export default ExploreScreen;
 export { SearchScreen } from './SearchScreen';
 export { FilterScreen } from './FilterScreen';
 export { CityList, CityList as CityListScreen } from './CityList';
+export { CityDetail, CityDetail as CityDetailScreen } from './CityDetail';

@@ -1,9 +1,15 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MainTabNavigator } from './MainTabNavigator';
-import { SearchScreen, FilterScreen, CityList } from '../screens/Explore';
+import { SearchScreen, FilterScreen, CityList, CityDetail } from '../screens/Explore';
 import {
   ReuniteScreen,
+  ReuniteListScreen,
+  ReuniteDetailScreen,
+  PetAlertsScreen,
+  AddPlaceScreen,
+  TransportScreen,
+  TransportModeScreen,
   TravelStoryScreen,
   RoadTripRoutesScreen,
   RoadTripDetailScreen,
@@ -15,20 +21,19 @@ import { TailsGuideScreen } from '../screens/Profile/TailsGuideScreen';
 import { PfpAssistantScreen } from '../screens/Profile/PfpAssistantScreen';
 import { CreateTripScreen } from '../screens/Profile/CreateTripScreen';
 import { CommunityPostsScreen } from '../screens/Profile/CommunityPostsScreen';
+import { PetDetailsScreen } from '../screens/Pets/PetDetails';
+import { PetHealthRecordsScreen } from '../screens/Pets/PetHealthRecordsScreen';
+import { PawsportScreen } from '../screens/Pets/PawsportScreen';
+import { PetEditScreen } from '../screens/Pets/PetEditScreen';
+import { SavedPlacesScreen } from '../screens/Profile/SavedPlacesScreen';
+import { MyActivityScreen } from '../screens/Profile/MyActivityScreen';
+import { MySubmissionsScreen } from '../screens/Profile/MySubmissionsScreen';
 import { MyProfileScreen } from '../screens/Profile/MyProfileScreen';
-import {
-  StoryGuidesScreen,
-  GuideDetailScreen,
-  ListingDetailScreen,
-} from '../screens/StoryGuides';
+import { StoryGuidesScreen, GuideDetailScreen, ListingDetailScreen } from '../screens/StoryGuides';
 import { SavedScreen } from '../screens/Saved';
 import { InAppBrowserScreen } from '../screens/Web/InAppBrowserScreen';
 import { LeaderboardScreen } from '../screens/Leaderboard/LeaderboardScreen';
-import {
-  CommunityDetailScreen,
-  PostDetailScreen,
-  NewPostScreen,
-} from '../screens/Community';
+import { CommunityDetailScreen, PostDetailScreen, NewPostScreen } from '../screens/Community';
 
 const Stack = createNativeStackNavigator();
 
@@ -65,6 +70,69 @@ export const AppNavigator = () => {
       <Stack.Screen
         name="ReuniteScreen"
         component={ReuniteScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="ReuniteListScreen"
+        component={ReuniteListScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="ReuniteDetailScreen"
+        component={ReuniteDetailScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="PetAlertsScreen"
+        component={PetAlertsScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="MySubmissionsScreen"
+        component={MySubmissionsScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="AddPlaceScreen"
+        component={AddPlaceScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="TransportScreen"
+        component={TransportScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="TransportModeScreen"
+        component={TransportModeScreen}
         options={{
           animation: 'ios_from_right',
           gestureEnabled: true,
@@ -110,6 +178,15 @@ export const AppNavigator = () => {
       <Stack.Screen
         name="CityList"
         component={CityList}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="CityDetail"
+        component={CityDetail}
         options={{
           animation: 'ios_from_right',
           gestureEnabled: true,
@@ -173,6 +250,60 @@ export const AppNavigator = () => {
       <Stack.Screen
         name="CommunityPostsScreen"
         component={CommunityPostsScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="PetHealthRecordsScreen"
+        component={PetHealthRecordsScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="PawsportScreen"
+        component={PawsportScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="PetEditScreen"
+        component={PetEditScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="PetDetailsScreen"
+        component={PetDetailsScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="SavedPlacesScreen"
+        component={SavedPlacesScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="MyActivityScreen"
+        component={MyActivityScreen}
         options={{
           animation: 'ios_from_right',
           gestureEnabled: true,

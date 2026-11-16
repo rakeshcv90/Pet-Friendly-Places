@@ -3,10 +3,8 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   ScrollView,
   TextInput,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   StatusBar,
@@ -16,15 +14,18 @@ import LinearGradient from 'react-native-linear-gradient';
 import Feather from 'react-native-vector-icons/Feather';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { s, ms } from 'react-native-size-matters';
-import { theme, colors } from '../../../theme';
-import { BouncyPressable } from '../../../components/common/BouncyPressable';
-import { useStore } from '../../../store';
+import { theme, colors } from '../../theme';
+import { BouncyPressable } from '../../components/common/BouncyPressable';
+import { ScreenHeader } from '../../components/common/AppHeader/ScreenHeader';
+import { ModernConfirmModal } from '../Profile/components/ModernConfirmModal';
+import { getErrorMessage } from '../../services/api/apiClient';
+import { useCreateReuniteAlert } from '../../hooks/useReunite';
+import { useStore } from '../../store';
 
 const DISTANCE_OPTIONS = [
   { value: '5 km', label: '5 km', desc: 'Walking neighborhood' },
   { value: '10 km', label: '10 km', desc: 'Recommended local radius' },
   { value: '25 km', label: '25 km', desc: 'Extended city-wide coverage' },
-  { value: '50 km', label: '50 km', desc: 'Wider metropolitan area' },
 ];
 
 const POST_TYPES = [
@@ -63,7 +64,9 @@ const SPECIES_OPTIONS = [
   { id: 'bird', label: 'Bird', emoji: '🦜' },
 ];
 
-export const PetAlertsModal = ({ visible, onClose, initialCity = '' }) => {
+export const PetAlertsScreen = ({ navigation, route }) => {
+  const initialCity = route?.params?.initialCity || '';
+  const onClose = () => navigation.goBack();
   const insets = useSafeAreaInsets();
   const isDarkMode = useStore(state => state.isDarkMode);
 
@@ -78,7 +81,10 @@ export const PetAlertsModal = ({ visible, onClose, initialCity = '' }) => {
   const [selectedPostTypes, setSelectedPostTypes] = useState(['lost', 'found']);
   const [selectedSpecies, setSelectedSpecies] = useState(['dog', 'cat']);
   const [reachEmail, setReachEmail] = useState(true);
-  const [reachPush, setReachPush] = useState(false);
+  // Push needs a subscription from a push service the app does not have yet
+  const reachPush = false;
+  const createAlert = useCreateReuniteAlert();
+  const isCreating = createAlert.isPending;
   const [consentAgreed, setConsentAgreed] = useState(false);
 
   // Focus state for interactive styling
@@ -87,11 +93,17 @@ export const PetAlertsModal = ({ visible, onClose, initialCity = '' }) => {
   // Active saved alerts (up to 3 alerts)
   const [savedAlerts, setSavedAlerts] = useState([]);
 
+  // The app's message popup, used in place of the system alert
+  const [dialog, setDialog] = useState(null);
+  const showDialog = config => setDialog({ ...config, open: true });
+  const notify = (type, title, message, badge) =>
+    showDialog({ type, title, message, badge, confirmText: 'Got it', singleButton: true });
+
   // Toggle helper for arrays
   const toggleItem = (currentList, setList, itemId) => {
     if (currentList.includes(itemId)) {
       if (currentList.length === 1) {
-        Alert.alert('Required', 'Please keep at least one option selected.');
+        notify('warning', 'Required', 'Please keep at least one option selected.', 'SELECTION');
         return;
       }
       setList(currentList.filter(id => id !== itemId));
@@ -100,118 +112,112 @@ export const PetAlertsModal = ({ visible, onClose, initialCity = '' }) => {
     }
   };
 
-  const handleCreateAlert = () => {
+  const handleCreateAlert = async () => {
+    if (isCreating) {
+      return;
+    }
     const trimmedLocality = locality.trim();
     const trimmedCity = city.trim();
+    const trimmedState = stateName.trim();
 
-    if (!trimmedLocality && !trimmedCity) {
-      Alert.alert(
-        'Location Required',
-        'Please enter a locality or city so we know where to watch for pets.',
-      );
+    if (!trimmedLocality || !trimmedCity || !trimmedState) {
+      notify('warning', 'Location Required', 'Please enter a locality, city and state so we can locate where to watch for pets.', 'LOCATION');
       return;
     }
 
     if (selectedPostTypes.length === 0) {
-      Alert.alert('Post Type Required', 'Please select at least one post type.');
+      notify('warning', 'Post Type Required', 'Please select at least one post type.', 'POST TYPES');
       return;
     }
 
     if (selectedSpecies.length === 0) {
-      Alert.alert('Species Required', 'Please select at least one species.');
+      notify('warning', 'Species Required', 'Please select at least one species.', 'SPECIES');
       return;
     }
 
-    if (!reachEmail && !reachPush) {
-      Alert.alert(
-        'Notification Channel',
-        'Please select at least one notification method (Email or Push).',
-      );
+    if (!reachEmail) {
+      notify('warning', 'Notification Channel', 'Please turn on email alerts.', 'NOTIFICATIONS');
       return;
     }
 
     if (!consentAgreed) {
-      Alert.alert(
-        'Consent Required',
-        'Please tick the consent checkbox below to activate Reunite alerts.',
-      );
+      notify('warning', 'Consent Required', 'Please tick the consent checkbox below to activate Reunite alerts.', 'CONSENT');
       return;
     }
 
     if (savedAlerts.length >= 3) {
-      Alert.alert(
-        'Alert Limit Reached',
-        'You have used all 3 free alerts. Delete an active alert below to create a new one.',
-      );
+      notify('warning', 'Alert Limit Reached', 'You have used all 3 free alerts. Delete an active alert below to create a new one.', 'ALERT LIMIT');
       return;
     }
 
-    const newAlert = {
-      id: Date.now().toString(),
-      locality: trimmedLocality || trimmedCity,
-      city: trimmedCity || trimmedLocality,
-      state: stateName.trim(),
-      distance,
-      postTypes: [...selectedPostTypes],
-      species: [...selectedSpecies],
-      email: reachEmail,
-      push: reachPush,
-      date: new Date().toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      }),
-    };
+    try {
+      const created = await createAlert.mutateAsync({
+        case_types: selectedPostTypes.map(type => type.toUpperCase()),
+        species: selectedSpecies,
+        locality: trimmedLocality,
+        city: trimmedCity,
+        state: trimmedState,
+        radius_km: parseInt(distance, 10),
+        channel_email: reachEmail,
+        channel_push: reachPush,
+        consent: true,
+      });
 
-    setSavedAlerts(prev => [newAlert, ...prev]);
+      setSavedAlerts(prev => [
+        {
+          id: String(created?.id ?? created?.alert?.id ?? Date.now()),
+          locality: trimmedLocality,
+          city: trimmedCity,
+          state: trimmedState,
+          distance,
+          postTypes: [...selectedPostTypes],
+          species: [...selectedSpecies],
+          email: reachEmail,
+          push: reachPush,
+          date: new Date().toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+          }),
+        },
+        ...prev,
+      ]);
 
-    // Reset locality & consent for next alert
-    setLocality('');
-    setConsentAgreed(false);
+      // Reset locality & consent for next alert
+      setLocality('');
+      setConsentAgreed(false);
 
-    Alert.alert(
-      'Alert Created 🎉',
-      `We'll notify you whenever matching pets appear near ${
-        trimmedLocality ? `${trimmedLocality}, ` : ''
-      }${trimmedCity || 'your area'}.`,
-    );
+      notify('success', 'Alert Created', `We'll email you whenever matching pets appear near ${trimmedLocality}, ${trimmedCity}.`, 'ALERT ACTIVE');
+    } catch (err) {
+      notify('error', 'Could not create alert', getErrorMessage(err), 'ALERT NOT SAVED');
+    }
   };
 
   const handleDeleteAlert = alertId => {
-    Alert.alert('Remove Alert', 'Are you sure you want to stop receiving alerts for this area?', [
-      { text: 'Keep Alert', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: () => {
-          setSavedAlerts(prev => prev.filter(a => a.id !== alertId));
-        },
-      },
-    ]);
+    showDialog({
+      type: 'danger',
+      badge: 'ACTIVE ALERT',
+      title: 'Remove alert',
+      message: 'Are you sure you want to stop receiving alerts for this area?',
+      confirmText: 'Remove',
+      cancelText: 'Keep alert',
+      onConfirm: () => setSavedAlerts(prev => prev.filter(a => a.id !== alertId)),
+    });
   };
 
   const usedCount = savedAlerts.length;
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      statusBarTranslucent={true}
-      onRequestClose={onClose}>
+    <>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={isDarkMode ? '#0F071D' : 'transparent'}
-        translucent
+        backgroundColor={isDarkMode ? '#0F071D' : colors.background}
       />
 
       <View
         style={[
           styles.rootContainer,
           isDarkMode && styles.rootContainerDark,
-          {
-            paddingTop: insets.top || ms(12),
-            paddingBottom: insets.bottom || 0,
-          },
+          { paddingBottom: insets.bottom || 0 },
         ]}>
         {/* ── Background Ambient Luminous Glow Orbs (Signature 3D Theme) ── */}
         <View style={[styles.ambientTopRightGlow, isDarkMode && styles.ambientGlowDark]} pointerEvents="none" />
@@ -224,27 +230,20 @@ export const PetAlertsModal = ({ visible, onClose, initialCity = '' }) => {
           />
         </View>
 
-        {/* ── Top Luxury Sticky App Bar ── */}
-        <View style={[styles.headerBar, isDarkMode && styles.headerBarDark]}>
-          <BouncyPressable
-            style={[styles.closeBtn, isDarkMode && styles.closeBtnDark]}
-            activeScale={0.88}
-            onPress={onClose}>
-            <Feather name="x" size={ms(18)} color={isDarkMode ? '#FFFFFF' : colors.reunite.titleDark} />
-          </BouncyPressable>
-
-          <View style={styles.headerTitleBox}>
-            <Text style={[styles.headerMainTitle, isDarkMode && styles.headerMainTitleDark]}>Pet alerts</Text>
-            <Text style={[styles.headerSubBadge, isDarkMode && styles.headerSubBadgeDark]}>Neighborhood Radar</Text>
-          </View>
-
-          <View style={[styles.headerStatusPill, isDarkMode && styles.headerStatusPillDark]}>
-            <View style={styles.pulsingDot} />
-            <Text style={[styles.headerStatusText, isDarkMode && styles.headerStatusTextDark]}>
-              {usedCount}/3 Active
-            </Text>
-          </View>
-        </View>
+        <ScreenHeader
+          title="Pet alerts"
+          subtitle="NEIGHBOURHOOD RADAR"
+          onBack={onClose}
+          testID="pet-alerts-back-btn"
+          rightComponent={
+            <View style={[styles.headerStatusPill, isDarkMode && styles.headerStatusPillDark]}>
+              <View style={styles.pulsingDot} />
+              <Text style={[styles.headerStatusText, isDarkMode && styles.headerStatusTextDark]}>
+                {usedCount}/3 Active
+              </Text>
+            </View>
+          }
+        />
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -471,7 +470,9 @@ export const PetAlertsModal = ({ visible, onClose, initialCity = '' }) => {
 
               {/* Field: State */}
               <View style={styles.inputGroup}>
-                <Text style={[styles.fieldLabel, isDarkMode && styles.fieldLabelDark]}>State</Text>
+                <Text style={[styles.fieldLabel, isDarkMode && styles.fieldLabelDark]}>
+                  State <Text style={styles.fieldRequired}>*</Text>
+                </Text>
                 <View
                   style={[
                     styles.inputWrapper,
@@ -744,21 +745,18 @@ export const PetAlertsModal = ({ visible, onClose, initialCity = '' }) => {
                 </BouncyPressable>
 
                 {/* Push Notifications Card */}
-                <BouncyPressable
+                <View
                   style={[
                     styles.reachCard,
                     isDarkMode && styles.reachCardDark,
-                    reachPush && (isDarkMode ? styles.reachCardActiveDark : styles.reachCardActive),
-                  ]}
-                  activeScale={0.96}
-                  onPress={() => setReachPush(!reachPush)}>
+                    styles.reachCardDisabled,
+                  ]}>
                   <View
                     style={[
                       styles.checkboxSquircle,
                       isDarkMode && styles.checkboxSquircleDark,
                       reachPush && styles.checkboxSquircleChecked,
                     ]}>
-                    {reachPush && <Feather name="check" size={ms(12)} color={colors.surface} />}
                   </View>
                   <View style={styles.reachInfoCol}>
                     <View style={styles.reachTitleRow}>
@@ -769,13 +767,13 @@ export const PetAlertsModal = ({ visible, onClose, initialCity = '' }) => {
                         style={styles.reachIcon}
                       />
                       <Text style={[styles.reachTitle, isDarkMode && styles.reachTitleDark]}>Push notifications</Text>
-                      <Text style={[styles.optionalTag, isDarkMode && styles.optionalTagDark]}>(optional)</Text>
+                      <Text style={[styles.optionalTag, isDarkMode && styles.optionalTagDark]}>(coming soon)</Text>
                     </View>
                     <Text style={[styles.reachSub, isDarkMode && styles.reachSubDark]}>
                       Urgent lock-screen popups when a pet is spotted nearby.
                     </Text>
                   </View>
-                </BouncyPressable>
+                </View>
 
                 {/* Helper notice banner */}
                 <View style={[styles.permissionNoticeBox, isDarkMode && styles.permissionNoticeBoxDark]}>
@@ -785,8 +783,8 @@ export const PetAlertsModal = ({ visible, onClose, initialCity = '' }) => {
                     color={isDarkMode ? '#A78BFA' : colors.reunite.textMuted}
                   />
                   <Text style={[styles.helperNotice, isDarkMode && styles.helperNoticeDark]}>
-                    Permission is requested only if you tick push notifications. Turning this off
-                    will not affect chat notifications.
+                    Alerts are sent by email for now. Push notifications will be added in an update
+                    and will not affect chat notifications.
                   </Text>
                 </View>
               </View>
@@ -817,6 +815,7 @@ export const PetAlertsModal = ({ visible, onClose, initialCity = '' }) => {
               <BouncyPressable
                 style={styles.createAlertBtn}
                 activeScale={0.94}
+                disabled={isCreating}
                 onPress={handleCreateAlert}>
                 <LinearGradient
                   colors={['#4C1D95', '#2E008B']}
@@ -829,7 +828,9 @@ export const PetAlertsModal = ({ visible, onClose, initialCity = '' }) => {
                     color={colors.surface}
                     style={styles.createBtnIcon}
                   />
-                  <Text style={styles.createAlertBtnText}>Create alert</Text>
+                  <Text style={styles.createAlertBtnText}>
+                    {isCreating ? 'Creating...' : 'Create alert'}
+                  </Text>
                   <Feather
                     name="arrow-right"
                     size={ms(16)}
@@ -842,7 +843,20 @@ export const PetAlertsModal = ({ visible, onClose, initialCity = '' }) => {
           </ScrollView>
         </KeyboardAvoidingView>
       </View>
-    </Modal>
+      <ModernConfirmModal
+        visible={!!dialog?.open}
+        onClose={() => setDialog(current => current && { ...current, open: false })}
+        onConfirm={dialog?.onConfirm}
+        title={dialog?.title}
+        subtitle={dialog?.message}
+        badge={dialog?.badge}
+        type={dialog?.type}
+        confirmText={dialog?.confirmText}
+        cancelText={dialog?.cancelText}
+        singleButton={!!dialog?.singleButton}
+        isDarkMode={isDarkMode}
+      />
+    </>
   );
 };
 
@@ -1528,6 +1542,9 @@ const styles = StyleSheet.create({
   },
 
   /* ── Notification Channels ── */
+  reachCardDisabled: {
+    opacity: 0.55,
+  },
   reachCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1859,3 +1876,5 @@ const styles = StyleSheet.create({
     color: '#E2E8F0',
   },
 });
+
+export default PetAlertsScreen;

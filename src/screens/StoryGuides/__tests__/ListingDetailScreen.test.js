@@ -141,8 +141,7 @@ describe('listing model', () => {
     expect(l.trust.text).toBe(
       'Pet policy confirmed by the Pet Friendly Places team via primary source website.',
     );
-    // sections the app does not show are not in the model
-    expect(l.nearby).toBeUndefined();
+    expect(l.nearby).toEqual([]);
     expect(buildListing(null)).toBeNull();
   });
 
@@ -198,6 +197,30 @@ describe('ListingDetailScreen', () => {
     expect(queryByText('Help and support')).toBeNull();
     expect(queryByTestId('listing-support-community')).toBeNull();
     expect(queryByTestId('listing-write-review')).toBeNull();
+  });
+
+  it('shows nearby places from the API and opens one', () => {
+    mockHook({
+      ...RAW,
+      nearby: [
+        {
+          slug: 'novotel-goa-candolim',
+          name: 'Novotel Goa Candolim',
+          category: 'Stays',
+          city: 'Candolim',
+          state: 'Goa',
+          verification_tier: 'TEAM_VERIFIED',
+          main_image_url: '/api/storage/objects/uploads/n1',
+        },
+      ],
+    });
+    const { getByText } = renderScreen();
+
+    expect(getByText('Pet-friendly places in New Delhi')).toBeTruthy();
+    expect(getByText('Novotel Goa Candolim')).toBeTruthy();
+    expect(getByText('Candolim, Goa')).toBeTruthy();
+    fireEvent.press(getByText('Novotel Goa Candolim'));
+    expect(nav.push).toHaveBeenCalledWith('ListingDetailScreen', { slug: 'novotel-goa-candolim' });
   });
 
   it('expands the full pet policy, fee history and review details', () => {

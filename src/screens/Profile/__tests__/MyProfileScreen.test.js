@@ -27,6 +27,17 @@ jest.mock('../../../store', () => ({
   ),
 }));
 
+const mockPatchCachedProfile = jest.fn();
+jest.mock('../../../hooks/useUser', () => ({
+  useUserProfile: () => ({ data: { account: { name: 'Rakesh Rao' } } }),
+  patchCachedProfile: (...args) => mockPatchCachedProfile(...args),
+}));
+
+jest.mock('@tanstack/react-query', () => ({
+  ...jest.requireActual('@tanstack/react-query'),
+  useQueryClient: () => ({ setQueryData: jest.fn() }),
+}));
+
 jest.mock('react-native-linear-gradient', () => 'LinearGradient');
 jest.mock('react-native-vector-icons/Feather', () => 'Feather');
 jest.mock('react-native-vector-icons/Ionicons', () => 'Ionicons');
@@ -45,9 +56,7 @@ describe('MyProfileScreen', () => {
   });
 
   it('renders My Profile screen with header, sections, and form fields', () => {
-    const { getByText, getByTestId } = render(
-      <MyProfileScreen navigation={mockNavigation} />,
-    );
+    const { getByText, getByTestId } = render(<MyProfileScreen navigation={mockNavigation} />);
 
     expect(getByText('My Profile')).toBeTruthy();
     expect(getByText('Public Identity')).toBeTruthy();
@@ -66,18 +75,14 @@ describe('MyProfileScreen', () => {
   });
 
   it('navigates back when top back button is pressed', () => {
-    const { getByTestId } = render(
-      <MyProfileScreen navigation={mockNavigation} />,
-    );
+    const { getByTestId } = render(<MyProfileScreen navigation={mockNavigation} />);
 
     fireEvent.press(getByTestId('my-profile-back-btn'));
     expect(mockNavigation.goBack).toHaveBeenCalledTimes(1);
   });
 
   it('saves updated display name', () => {
-    const { getByTestId, getByText } = render(
-      <MyProfileScreen navigation={mockNavigation} />,
-    );
+    const { getByTestId, getByText } = render(<MyProfileScreen navigation={mockNavigation} />);
 
     fireEvent.changeText(getByTestId('input-display-name'), 'Rakesh R.');
     fireEvent.press(getByTestId('save-name-btn'));
@@ -88,13 +93,16 @@ describe('MyProfileScreen', () => {
         displayName: 'Rakesh R.',
       }),
     );
+    // The cached profile is patched too, so useUserProfile() readers show the new name
+    expect(mockPatchCachedProfile).toHaveBeenCalledWith(expect.anything(), {
+      name: 'Rakesh R.',
+      displayName: 'Rakesh R.',
+    });
     expect(getByText('Display name updated successfully! ✨')).toBeTruthy();
   });
 
   it('saves updated profile URL slug', () => {
-    const { getByTestId, getByText } = render(
-      <MyProfileScreen navigation={mockNavigation} />,
-    );
+    const { getByTestId, getByText } = render(<MyProfileScreen navigation={mockNavigation} />);
 
     fireEvent.changeText(getByTestId('input-profile-slug'), 'rakesh-trips');
     fireEvent.press(getByTestId('save-profile-url-btn'));
@@ -108,9 +116,7 @@ describe('MyProfileScreen', () => {
   });
 
   it('saves bio, location, and social links', () => {
-    const { getByTestId, getByText } = render(
-      <MyProfileScreen navigation={mockNavigation} />,
-    );
+    const { getByTestId, getByText } = render(<MyProfileScreen navigation={mockNavigation} />);
 
     fireEvent.changeText(getByTestId('input-bio'), 'Loving the trails!');
     fireEvent.changeText(getByTestId('input-location'), 'Bangalore');

@@ -79,6 +79,36 @@ export const useFeaturedThread = communities => {
   return { community, post, body: detailQuery.data?.post?.body, replies };
 };
 
+// Signed-in user's own posts and replies (Profile > Community). One request returns both, newest
+// first, each tagged with `kind` ('post' | 'reply'); the All / Posts / Replies filters are applied
+// on the device, so switching between them needs no extra request.
+export const useMyActivity = ({ enabled = true, ...options } = {}) => {
+  const isAuthenticated = useStore(state => state.isAuthenticated);
+  return useQuery({
+    queryKey: ['community', 'my-activity'],
+    enabled: isAuthenticated && enabled,
+    queryFn: async () => {
+      const data = await api.get(API_ENDPOINTS.COMMUNITY.MY_ACTIVITY);
+      const items = Array.isArray(data?.activity) ? data.activity : [];
+      return {
+        items,
+        postCount: data?.postCount ?? items.filter(i => i.kind === 'post').length,
+        replyCount: data?.replyCount ?? items.filter(i => i.kind === 'reply').length,
+      };
+    },
+    staleTime: 1000 * 60,
+    ...options,
+  });
+};
+
+// Applies the All / Posts / Replies filter to the list from useMyActivity
+export const filterActivity = (items, filter) =>
+  filter === 'posts'
+    ? items.filter(i => i.kind === 'post')
+    : filter === 'replies'
+    ? items.filter(i => i.kind === 'reply')
+    : items;
+
 const readMemberships = () => getItem(STORAGE_KEYS.COMMUNITY_MEMBERSHIPS, true) || {};
 
 // Join / leave a community. The API only exposes a toggle (POST /community/memberships) and no way
@@ -118,14 +148,14 @@ export const useCreatePost = () => {
     onSuccess: (data, payload) => {
       queryClient.invalidateQueries({ queryKey: ['community', 'posts', payload.communitySlug] });
       queryClient.invalidateQueries({ queryKey: ['community', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['community', 'my-activity'] });
     },
   });
 };
 
-// Posts a reply to a thread, or to another reply when `parentReplyId` is given. Takes the reply
-// text, or { body, parentReplyId }. Replies are moderated, so they do not appear straight away.
 export const useCreateReply = postSlug => {
   const queryClient = useQueryClient();
+  console.log('useCreateReply', postSlug);
   return useMutation({
     mutationFn: async input => {
       const payload = typeof input === 'string' ? { body: input } : input;
@@ -152,6 +182,7 @@ export const useCreateReply = postSlug => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['community', 'post', postSlug] });
+      queryClient.invalidateQueries({ queryKey: ['community', 'my-activity'] });
     },
   });
 };

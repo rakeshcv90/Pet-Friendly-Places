@@ -18,49 +18,32 @@ import { s, vs, ms } from 'react-native-size-matters';
 import { theme } from '../../theme';
 import { useStore } from '../../store';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
+import { useListingCount } from '../../hooks/useDiscovery';
+import {
+  API_CATEGORIES,
+  STATE_OPTIONS,
+  BADGE_OPTIONS,
+  PET_BADGES,
+  AMENITY_VALUES,
+  DEFAULT_FILTERS,
+  categoryLabel,
+  filtersToParams,
+} from './listingFilters';
 
 // ── Dropdown Options ──
-const CATEGORY_OPTIONS = [
-  'Pet Friendly Stays',
-  'Eat Out Together',
-  'Paws in the Wild',
-  'Vet & Pet Care',
-  'Road Trip Routes',
-  'Transport with Dogs',
-  'Pet-Friendly Caravans',
-  'Pet Friendly Offices',
-  'Pet Welfare & Rescue',
-  'Cities',
-];
-
-const STATE_OPTIONS = [
-  'All states',
-  'Delhi NCR',
-  'Haryana',
-  'Uttar Pradesh',
-  'Karnataka',
-  'Maharashtra',
-  'Uttarakhand',
-  'Himachal Pradesh',
-];
-
-const BADGE_OPTIONS = [
-  'Any badge',
-  'Tails Verified',
-  'Team Verified',
-  'Owner Verified',
-];
+const ALL_CATEGORIES = 'All categories';
+const CATEGORY_OPTIONS = [ALL_CATEGORIES, ...API_CATEGORIES.map(c => c.label)];
 
 const PET_SIZES_DATA = [
-  { id: 'Small', label: 'Small', flex: 1 },
-  { id: 'Medium', label: 'Medium', flex: 1.05 },
-  { id: 'Large', label: 'Large', flex: 1 },
-  { id: 'Any size', label: 'Any size', flex: 1.25 },
+  { id: 'small', label: 'Small', flex: 1 },
+  { id: 'medium', label: 'Medium', flex: 1.05 },
+  { id: 'large', label: 'Large', flex: 1 },
+  { id: 'any', label: 'Any size', flex: 1.25 },
 ];
 
 const RATINGS_DATA = [
   { id: '4.5', hasStar: true, label: '4.5+', flex: 1 },
-  { id: '4.0', hasStar: true, label: '4.0+', flex: 1 },
+  { id: '4', hasStar: true, label: '4.0+', flex: 1 },
   { id: '3.5', hasStar: true, label: '3.5+', flex: 1 },
   { id: 'any', hasStar: false, label: 'Any rating', flex: 1.35 },
 ];
@@ -152,42 +135,34 @@ export const FilterScreen = ({ navigation, route }) => {
     [scrollY],
   );
 
-  // Route initial filters
-  const initialCategory = route?.params?.category || 'Pet Friendly Stays';
+  // Initial values come from the screen that opened this one (SearchScreen passes what is applied)
+  const initialCategory = route?.params?.category || null;
+  const initialFilters = route?.params?.filters || DEFAULT_FILTERS;
+  const amenityKeys = Object.keys(AMENITY_VALUES);
 
   // State
-  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
-  const [selectedState, setSelectedState] = useState('All states');
-  const [cityQuery, setCityQuery] = useState('');
-  const [selectedBadge, setSelectedBadge] = useState('Any badge');
-
-  // Checkbox: Pets allowed in pool
-  const [petsInPool, setPetsInPool] = useState(false);
-
-  // Pet Size
-  const [selectedSize, setSelectedSize] = useState('Any size');
-
-  // Pet Amenities (7 checkboxes)
-  const [amenities, setAmenities] = useState({
-    noPetFee: false,
-    petMenu: false,
-    openLawn: true,
-    largeDogs: false,
-    waterAccess: false,
-    parking: false,
-    indoorAccess: false,
-  });
-
-  // Minimum Rating
-  const [selectedRating, setSelectedRating] = useState('any');
-
-  // Verified listings only
-  const [verifiedOnly, setVerifiedOnly] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState(
+    initialCategory ? categoryLabel(initialCategory) : ALL_CATEGORIES,
+  );
+  const [selectedState, setSelectedState] = useState(initialFilters.state || 'All states');
+  const [cityQuery, setCityQuery] = useState(initialFilters.city || '');
+  const [selectedBadge, setSelectedBadge] = useState(
+    Object.keys(PET_BADGES).find(k => PET_BADGES[k] === initialFilters.petBadge) || 'Any badge',
+  );
+  const [petsInPool, setPetsInPool] = useState(!!initialFilters.petsInPool);
+  const [selectedSize, setSelectedSize] = useState(initialFilters.petSize || 'any');
+  const [amenities, setAmenities] = useState(
+    amenityKeys.reduce(
+      (acc, key) => ({ ...acc, [key]: initialFilters.amenities.includes(AMENITY_VALUES[key]) }),
+      {},
+    ),
+  );
+  const [selectedRating, setSelectedRating] = useState(initialFilters.minRating || 'any');
+  const [verifiedOnly, setVerifiedOnly] = useState(!!initialFilters.verifiedOnly);
 
   // Modal selector states
   const [activePicker, setActivePicker] = useState(null); // 'category' | 'state' | 'badge' | null
 
-  // Toggle amenity helper
   const toggleAmenity = key => {
     setAmenities(prev => ({
       ...prev,
@@ -195,60 +170,49 @@ export const FilterScreen = ({ navigation, route }) => {
     }));
   };
 
-  // Clear all filters
+  const categoryId = useMemo(
+    () => API_CATEGORIES.find(c => c.label === selectedCategory)?.id || null,
+    [selectedCategory],
+  );
+
+  // The form as the filter model the listings API understands
+  const currentFilters = useMemo(
+    () => ({
+      state: selectedState === 'All states' ? null : selectedState,
+      city: cityQuery,
+      petBadge: PET_BADGES[selectedBadge],
+      petSize: selectedSize === 'any' ? null : selectedSize,
+      minRating: selectedRating === 'any' ? null : selectedRating,
+      verifiedOnly,
+      petsInPool,
+      amenities: amenityKeys.filter(key => amenities[key]).map(key => AMENITY_VALUES[key]),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedState, cityQuery, selectedBadge, selectedSize, selectedRating, verifiedOnly, petsInPool, amenities],
+  );
+
+  // Clear all filters (the category stays)
   const handleClearAll = () => {
-    setSelectedCategory('Pet Friendly Stays');
     setSelectedState('All states');
     setCityQuery('');
     setSelectedBadge('Any badge');
     setPetsInPool(false);
-    setSelectedSize('Any size');
-    setAmenities({
-      noPetFee: false,
-      petMenu: false,
-      openLawn: false,
-      largeDogs: false,
-      waterAccess: false,
-      parking: false,
-      indoorAccess: false,
-    });
+    setSelectedSize('any');
+    setAmenities(amenityKeys.reduce((acc, key) => ({ ...acc, [key]: false }), {}));
     setSelectedRating('any');
     setVerifiedOnly(false);
   };
 
-  // Dynamic matching count calculation
-  const matchCount = useMemo(() => {
-    let count = 24;
-    if (selectedState !== 'All states') count -= 5;
-    if (cityQuery.trim()) count -= 4;
-    if (petsInPool) count -= 6;
-    if (selectedSize !== 'Any size') count -= 3;
-    if (selectedRating !== 'any') count -= 4;
-    if (amenities.noPetFee) count -= 2;
-    if (amenities.waterAccess) count -= 2;
-    return Math.max(count, 4);
-  }, [selectedState, cityQuery, petsInPool, selectedSize, selectedRating, amenities]);
+  // Live count of matching places from the API
+  const { data: matchTotal } = useListingCount({
+    category: categoryId,
+    filters: filtersToParams(currentFilters),
+  });
 
   // Apply and navigate back
   const handleApply = () => {
-    const tags = [];
-    if (verifiedOnly) tags.push('Verified');
-    if (selectedSize === 'Any size') tags.push('All breeds');
-    else tags.push(`${selectedSize} dogs`);
-    if (amenities.openLawn) tags.push('Open lawn');
-    if (amenities.noPetFee) tags.push('No pet fee');
-    if (petsInPool) tags.push('Pool access');
-    if (amenities.indoorAccess) tags.push('Indoor access');
-
     if (route?.params?.onApplyFilters) {
-      route.params.onApplyFilters({
-        category: selectedCategory,
-        state: selectedState,
-        city: cityQuery,
-        badge: selectedBadge,
-        tags,
-        selectedRating,
-      });
+      route.params.onApplyFilters({ category: categoryId, filters: currentFilters });
     }
 
     navigation?.goBack?.();
@@ -465,16 +429,7 @@ export const FilterScreen = ({ navigation, route }) => {
             <View style={styles.amenitiesGrid}>
               {/* Column 1 */}
               <View style={styles.amenitiesCol}>
-                {renderCheckbox(
-                  amenities.noPetFee,
-                  () => toggleAmenity('noPetFee'),
-                  'No pet fee',
-                )}
-                {renderCheckbox(
-                  amenities.petMenu,
-                  () => toggleAmenity('petMenu'),
-                  'Pet menu',
-                )}
+                {renderCheckbox(amenities.noPetFee, () => toggleAmenity('noPetFee'), 'No pet fee')}
                 {renderCheckbox(
                   amenities.openLawn,
                   () => toggleAmenity('openLawn'),
@@ -489,20 +444,11 @@ export const FilterScreen = ({ navigation, route }) => {
 
               {/* Column 2 */}
               <View style={styles.amenitiesCol}>
+                {renderCheckbox(amenities.parking, () => toggleAmenity('parking'), 'Parking')}
                 {renderCheckbox(
-                  amenities.waterAccess,
-                  () => toggleAmenity('waterAccess'),
-                  'Water access',
-                )}
-                {renderCheckbox(
-                  amenities.parking,
-                  () => toggleAmenity('parking'),
-                  'Parking',
-                )}
-                {renderCheckbox(
-                  amenities.indoorAccess,
-                  () => toggleAmenity('indoorAccess'),
-                  'Indoor access',
+                  amenities.poolAccess,
+                  () => toggleAmenity('poolAccess'),
+                  'Pool access',
                 )}
               </View>
             </View>
@@ -588,7 +534,7 @@ export const FilterScreen = ({ navigation, route }) => {
           },
         ]}>
         <View style={styles.bottomInfo}>
-          <Text style={[styles.bottomPlacesCount, isDarkMode && styles.bottomPlacesCountDark]}>{`${matchCount} places`}</Text>
+          <Text style={[styles.bottomPlacesCount, isDarkMode && styles.bottomPlacesCountDark]}>{`${matchTotal ?? '...'} places`}</Text>
           <Text style={[styles.bottomSubtext, isDarkMode && styles.bottomSubtextDark]}>match these filters</Text>
         </View>
 

@@ -749,6 +749,28 @@ export const styles = StyleSheet.create({
       },
     }),
   },
+
+  addPetCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginTop: vs(2),
+    marginBottom: vs(18),
+    paddingHorizontal: s(22),
+    paddingVertical: vs(12),
+    borderRadius: s(24),
+    backgroundColor: '#3B108F',
+    borderBottomWidth: 3,
+    borderBottomColor: '#240A5E',
+  },
+  addPetCtaText: {
+    marginLeft: s(8),
+    fontSize: s(13.5),
+    color: '#FFFFFF',
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  activityLoader: { marginHorizontal: s(16), marginBottom: vs(14) },
 });
 
 export default styles;

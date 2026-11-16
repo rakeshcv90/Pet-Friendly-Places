@@ -4,6 +4,8 @@ import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/
 import { AuthNavigator } from './AuthNavigator';
 import { AppNavigator } from './AppNavigator';
 import { MainSplash } from '../screens/Splash/MainSplash';
+import { AppLockGate } from '../components/security/AppLockGate';
+import { PermissionsGate } from '../components/permissions/PermissionsGate';
 import { navigationRef } from './navigationRef';
 import { useStore } from '../store';
 import { getItem, STORAGE_KEYS } from '../services/storage/storage';
@@ -55,6 +57,10 @@ export const RootNavigator = () => {
       <NavigationContainer ref={navigationRef} theme={navTheme}>
         {isAuthenticated ? <AppNavigator /> : <AuthNavigator />}
       </NavigationContainer>
+
+      {/* The lock screen covers the app (and the offer to turn it on) until the user is verified */}
+      <AppLockGate ready={!showSplash} isDarkMode={isDarkMode} />
+      <PermissionsGate ready={!showSplash} isDarkMode={isDarkMode} />
 
       {/* Splash overlay renders on top so HomeScreen/Auth pre-renders underneath, eliminating any white flash */}
       {showSplash && (

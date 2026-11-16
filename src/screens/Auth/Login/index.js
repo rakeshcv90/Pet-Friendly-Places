@@ -8,7 +8,7 @@ import {
   StatusBar,
   Dimensions,
 } from 'react-native';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../../components/common/FastImage';
 import { s } from 'react-native-size-matters';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeatherIcon from 'react-native-vector-icons/Feather';
@@ -239,7 +239,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAF8F2',
   },
   backgroundImage: {
-    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  
   },
   keyboardView: {
     flex: 1,

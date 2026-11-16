@@ -1,6 +1,18 @@
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render as rtlRender, fireEvent } from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReuniteScreen } from '../ReuniteScreen';
+
+// The post wizard inside the screen submits through react-query
+const render = ui =>
+  rtlRender(<QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>);
+
+let mockCases = [];
+
+jest.mock('../../../hooks/useReunite', () => ({
+  ...jest.requireActual('../../../hooks/useReunite'),
+  useReuniteCases: () => ({ data: mockCases, isLoading: false }),
+}));
 
 const mockNavigation = {
   goBack: jest.fn(),
@@ -14,6 +26,7 @@ const mockRoute = {
 describe('ReuniteScreen Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCases = [];
   });
 
   it('renders the header title and hero banner text', () => {
@@ -74,13 +87,18 @@ describe('ReuniteScreen Component', () => {
     expect(getByText('Get local pet alerts')).toBeTruthy();
   });
 
-  it('displays default location if no global location is configured', () => {
-    const { getAllByText } = render(
+  it('shows a two post preview with a View all button that opens the full list', () => {
+    mockCases = ['a', 'b', 'c'].map(id => ({ id, type: 'lost', species: 'dog', name: `Pet ${id}` }));
+    const { getByText, queryByText } = render(
       <ReuniteScreen navigation={mockNavigation} route={mockRoute} />
     );
 
-    const locationElements = getAllByText(/Delhi NCR/);
-    expect(locationElements.length).toBeGreaterThan(0);
+    expect(getByText('Pet a')).toBeTruthy();
+    expect(getByText('Pet b')).toBeTruthy();
+    expect(queryByText('Pet c')).toBeNull();
+
+    fireEvent.press(getByText('View all'));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('ReuniteListScreen', { initialTab: 'all' });
   });
 
   it('renders all clear empty state when no community posts exist', () => {

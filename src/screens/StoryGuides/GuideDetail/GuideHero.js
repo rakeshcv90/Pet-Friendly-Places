@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, Animated, StyleSheet } from 'react-native';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { ms } from 'react-native-size-matters';
 import { images } from '../../../theme';
 import { styles } from './styles/hero';
+import { AppImage } from '../../../components/common/AppImage';
 
 /** Parallax hero image with the category pill. */
 export const GuideHero = ({ guide, isDarkMode, heroScale, heroTranslateY }) => {
@@ -26,12 +27,12 @@ export const GuideHero = ({ guide, isDarkMode, heroScale, heroTranslateY }) => {
           StyleSheet.absoluteFillObject,
           { transform: [{ translateY: heroTranslateY }, { scale: heroScale }] },
         ]}>
-        <FastImage
+        <AppImage
           source={heroSource}
           defaultSource={images.noimage}
           onError={() => setImageError(true)}
           style={styles.heroImage}
-          resizeMode={FastImage.resizeMode.cover}
+          resizeMode="cover"
         />
       </Animated.View>
       <LinearGradient

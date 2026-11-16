@@ -2,6 +2,10 @@ import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { ContactUsScreen } from '../ContactUsScreen';
 
+jest.mock('../../../hooks/useUser', () => ({
+  useUserProfile: () => ({ data: { account: { name: 'Test User' } } }),
+}));
+
 describe('ContactUsScreen Component', () => {
   const mockNavigation = {
     goBack: jest.fn(),

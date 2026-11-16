@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../components/common/FastImage';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { s, ms } from 'react-native-size-matters';
@@ -18,7 +18,7 @@ import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { theme } from '../../theme';
 import { useStore } from '../../store';
 import { getItem, setItem, STORAGE_KEYS } from '../../services/storage/storage';
-import { useCommunityPost, useAcceptReply } from '../../hooks/useCommunity';
+import { useCommunityPost, useAcceptReply, useCreateReply } from '../../hooks/useCommunity';
 import { resolveImageUrl } from '../../hooks/useDiscovery';
 import {
   TYPE_STYLES,
@@ -132,6 +132,7 @@ export const PostDetailScreen = ({ navigation, route }) => {
   const isAuthenticated = useStore(state => state.isAuthenticated);
   const { data, isLoading, isError, refetch, isRefetching } = useCommunityPost(slug);
   const acceptReply = useAcceptReply(slug);
+  const createReply = useCreateReply(slug);
   const [replyingTo, setReplyingTo] = useState(null);
   const [reportTarget, setReportTarget] = useState(null);
   const [acceptingId, setAcceptingId] = useState(null);
@@ -198,11 +199,16 @@ export const PostDetailScreen = ({ navigation, route }) => {
     return out;
   }, [thread, pendingReplies, data?.replies, user]);
 
-  const handleSubmitted = reply => {
-    if (/^approved$/i.test(reply.status || '')) {
-      return;
+  // Called by the reply forms on submit: makes the API call, then records the reply as pending
+  const handleSubmitted = async ({ body, parentReplyId }) => {
+    const data = await createReply.mutateAsync({ body, parentReplyId });
+    if (data && !data.error && typeof data.id === 'number' && !/^approved$/i.test(data.status || '')) {
+      setPendingReplies(prev => [
+        ...prev,
+        { id: data.id, status: data.status, body, parentReplyId, createdAt: new Date().toISOString() },
+      ]);
     }
-    setPendingReplies(prev => [...prev, { ...reply, createdAt: new Date().toISOString() }]);
+    return data;
   };
   const typeStyle = TYPE_STYLES[post?.type] || TYPE_STYLES.DISCUSSION;
 
@@ -413,11 +419,11 @@ export const PostDetailScreen = ({ navigation, route }) => {
                 </View>
                 {replyingTo === reply.id ? (
                   <InlineReplyForm
-                    slug={slug}
                     parentReplyId={reply.id}
                     isDarkMode={isDarkMode}
                     onCancel={() => setReplyingTo(null)}
-                    onSubmitted={handleSubmitted}
+                    onSubmit={handleSubmitted}
+                    submitting={createReply.isPending}
                   />
                 ) : null}
               </View>
@@ -426,10 +432,10 @@ export const PostDetailScreen = ({ navigation, route }) => {
         )}
 
         <ReplyComposer
-          slug={slug}
           hasReplies={displayThread.length > 0}
           isDarkMode={isDarkMode}
-          onSubmitted={handleSubmitted}
+          onSubmit={handleSubmitted}
+          submitting={createReply.isPending}
         />
       </View>
     );

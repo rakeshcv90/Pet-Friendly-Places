@@ -233,6 +233,18 @@ export const buildListing = raw => {
     cons: parseList(raw.cons),
     knowBeforeYouGo: parseList(raw.know_before_you_go),
     tags: parseList(raw.tags),
+    nearby: (Array.isArray(raw.nearby) ? raw.nearby : [])
+      .filter(n => n && n.slug)
+      .map(n => ({
+        slug: n.slug,
+        name: n.name,
+        category: n.category ? (n.category === 'Stays' ? 'Stay' : n.category) : '',
+        location: locationOf(n),
+        imageUri: n.main_image_url ? resolveImageUrl(n.main_image_url) : '',
+        verifiedLabel: n.tails_verified
+          ? 'Tails Verified'
+          : VERIFY_LABELS[n.verification_tier] || '',
+      })),
     trust: {
       label: verifiedLabel,
       text: methodLabel

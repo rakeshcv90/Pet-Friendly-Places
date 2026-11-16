@@ -1,13 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Image,
-  Pressable,
-  ActivityIndicator,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, TextInput, Image, Pressable, StyleSheet } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -15,7 +7,8 @@ import { s } from 'react-native-size-matters';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { theme } from '../../theme';
 import { useStore } from '../../store';
-import { useCreateReply, uploadReplyPhoto } from '../../hooks/useCommunity';
+import { uploadReplyPhoto } from '../../hooks/useCommunity';
+import { Loader } from '../../components/common/Loader';
 
 const PURPLE = '#7B2CFF';
 const PINK = '#FF4FB8';
@@ -47,9 +40,8 @@ const photoProblem = asset => {
 };
 
 // "Post a reply" card at the end of a thread. Replies are moderated before they go live.
-export const ReplyComposer = ({ slug, hasReplies, isDarkMode, onSubmitted }) => {
+export const ReplyComposer = ({ hasReplies, isDarkMode, onSubmit, submitting }) => {
   const isAuthenticated = useStore(state => state.isAuthenticated);
-  const createReply = useCreateReply(slug);
   const [body, setBody] = useState('');
   const [photos, setPhotos] = useState([]);
   const [error, setError] = useState(null);
@@ -59,7 +51,6 @@ export const ReplyComposer = ({ slug, hasReplies, isDarkMode, onSubmitted }) => 
   const [retrying, setRetrying] = useState(false);
 
   const trimmed = body.trim();
-  const submitting = createReply.isPending;
   const canSubmit = trimmed.length >= BODY_MIN && !submitting;
 
   const pickPhotos = () => {
@@ -107,13 +98,12 @@ export const ReplyComposer = ({ slug, hasReplies, isDarkMode, onSubmitted }) => 
     }
     setError(null);
     try {
-      const data = await createReply.mutateAsync(trimmed);
+      const data = await onSubmit({ body: trimmed, parentReplyId: null });
       if (!data || data.error || typeof data.id !== 'number') {
         setError(data?.error ?? data?.message ?? GENERIC_ERROR);
         return;
       }
       setReplyId(data.id);
-      onSubmitted?.({ id: data.id, status: data.status, body: trimmed, parentReplyId: null });
       setFailedPhotos(await uploadAll(data.id, photos));
       setDone(true);
       setBody('');
@@ -241,6 +231,7 @@ export const ReplyComposer = ({ slug, hasReplies, isDarkMode, onSubmitted }) => 
           <Text style={styles.counter}>
             {body.length}/{BODY_MAX}
           </Text>
+          <Loader visible={submitting} title="Posting your reply…" />
           <BouncyPressable
             onPress={submit}
             disabled={!canSubmit}
@@ -251,13 +242,9 @@ export const ReplyComposer = ({ slug, hasReplies, isDarkMode, onSubmitted }) => 
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.postBtn}>
-              {submitting ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text style={[styles.postBtnText, !canSubmit && styles.postBtnTextDisabled]}>
-                  Post Reply 🐾
-                </Text>
-              )}
+              <Text style={[styles.postBtnText, !canSubmit && styles.postBtnTextDisabled]}>
+                Post Reply 🐾
+              </Text>
             </LinearGradient>
           </BouncyPressable>
         </View>

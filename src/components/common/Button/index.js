@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { s } from 'react-native-size-matters';
 import { theme } from '../../../theme';
@@ -24,12 +24,8 @@ export const Button = ({
     gradientColors ||
     theme.colors.primaryGradient ||
     ['rgb(59, 16, 143)', 'rgb(123, 44, 255)'];
-  const textColor = isPrimary ? theme.colors.surface : theme.colors.primary;
 
   const renderContent = () => {
-    if (isLoading) {
-      return <ActivityIndicator color={textColor} />;
-    }
     return (
       <>
         {leftIcon}

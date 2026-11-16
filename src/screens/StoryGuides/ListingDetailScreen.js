@@ -3,7 +3,6 @@ import { View, Text, StatusBar, Animated, RefreshControl, Share } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { s, vs, ms } from 'react-native-size-matters';
-
 import { useStore } from '../../store';
 import { useListingDetail } from '../../hooks/useDiscovery';
 import { Loader } from '../../components/common/Loader';
@@ -27,6 +26,7 @@ import { ListingAbout } from './ListingDetail/ListingAbout';
 import { ListingPetPolicy } from './ListingDetail/ListingPetPolicy';
 import { ListingProsCons } from './ListingDetail/ListingProsCons';
 import { ListingVerified } from './ListingDetail/ListingVerified';
+import { ListingNearby } from './ListingDetail/ListingNearby';
 import { ContactBar, BAR_HEIGHT, contactActions } from './ListingDetail/ContactBar';
 import { styles } from './ListingDetail/styles';
 
@@ -155,6 +155,7 @@ export const ListingDetailScreen = ({ navigation, route }) => {
             <ListingPetPolicy key="policy" {...sectionProps} />,
             <ListingProsCons key="pros" {...sectionProps} />,
             <ListingVerified key="verified" {...sectionProps} />,
+            <ListingNearby key="nearby" {...sectionProps} navigation={navigation} />,
           ].map(section => (
             <Reveal
               key={section.key}

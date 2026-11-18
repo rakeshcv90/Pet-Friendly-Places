@@ -15,7 +15,7 @@ import { Reveal } from './GuideDetail/Reveal';
 import { WEB_ORIGIN } from './GuideDetail/constants';
 import { buildListing } from './ListingDetail/listingModel';
 import { listingPalette } from './ListingDetail/listingPalette';
-import { useSavedListing } from './ListingDetail/useSavedListing';
+import { useSavePlace } from '../../hooks/useUser';
 import { ListingGallery } from './ListingDetail/ListingGallery';
 import { PhotoViewer } from './ListingDetail/PhotoViewer';
 import { ListingHeaderCard } from './ListingDetail/ListingHeaderCard';
@@ -43,7 +43,7 @@ export const ListingDetailScreen = ({ navigation, route }) => {
 
 
   const scroll = useGuideScroll(Boolean(listing));
-  const { saved, toggle: toggleSave } = useSavedListing(slug);
+  const { saved, toggle: toggleSave } = useSavePlace(raw?.id, raw);
   const [viewerIndex, setViewerIndex] = useState(null);
 
   // back + in-app link handling are shared with the guide page

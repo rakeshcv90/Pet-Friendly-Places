@@ -5,10 +5,8 @@ import {
   StyleSheet,
   StatusBar,
   TextInput,
-  Modal,
   ScrollView,
   Platform,
-  Share,
   RefreshControl,
   Animated,
 } from 'react-native';
@@ -26,6 +24,114 @@ import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { Loader } from '../../components/common/Loader';
 import { ScreenHeader } from '../../components/common/AppHeader/ScreenHeader';
 import { AmbientBackground } from './components';
+
+// Turns one API story (list item or GET /stories/{slug}) into what the screen renders
+const formatStory = item => {
+    const cleanBody = (item.body || item.content || item.excerpt || '')
+      .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '\n\n$1\n\n')
+      .replace(/<\/p>/gi, '\n\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    const readTime = item.estimated_read_minutes
+      ? `${item.estimated_read_minutes} min`
+      : item.drive_hours
+      ? `${item.drive_hours} hr drive`
+      : item.reading_time || '8 min';
+
+    const companions =
+      item.companions_line ||
+      (Array.isArray(item.dogs_involved) && item.dogs_involved.length > 0
+        ? item.dogs_involved.join(' + ')
+        : '') ||
+      item.primary_dog ||
+      item.author_name ||
+      'The Pack';
+
+    const location = item.destination || item.location || 'India';
+    const storyType = item.story_type || (item.km_one_way ? 'Road Trips' : 'Travel Story');
+    const tag = `${storyType.toUpperCase()} • ${readTime.toUpperCase()}`;
+
+    let category = 'road_trips';
+    const lowerType = storyType.toLowerCase();
+    const lowerTitle = (item.title || '').toLowerCase();
+    if (
+      lowerType.includes('train') ||
+      lowerTitle.includes('train') ||
+      lowerTitle.includes('express')
+    ) {
+      category = 'train_journeys';
+    } else if (
+      lowerType.includes('water') ||
+      lowerType.includes('nature') ||
+      lowerTitle.includes('lake') ||
+      lowerTitle.includes('ganga') ||
+      lowerTitle.includes('river') ||
+      lowerTitle.includes('water') ||
+      lowerTitle.includes('narmada')
+    ) {
+      category = 'water_play';
+    } else if (
+      lowerType.includes('stay') ||
+      lowerTitle.includes('stay') ||
+      lowerTitle.includes('homestay') ||
+      lowerTitle.includes('cottage')
+    ) {
+      category = 'pet_friendly_stays';
+    }
+
+    const rawTips =
+      (Array.isArray(item.parent_tips) && item.parent_tips.length > 0 && item.parent_tips) ||
+      (Array.isArray(item.pet_tips) && item.pet_tips.length > 0 && item.pet_tips) ||
+      [];
+
+    const timelineStops =
+      (Array.isArray(item.timeline_stops) &&
+        item.timeline_stops.length > 0 &&
+        item.timeline_stops) ||
+      (Array.isArray(item.timeline_blocks) &&
+        item.timeline_blocks.length > 0 &&
+        item.timeline_blocks) ||
+      [];
+
+    return {
+      id: String(item.id),
+      slug: item.slug || `story-${item.id}`,
+      has_slug: !!item.slug,
+      raw: item,
+      tag,
+      category,
+      title: item.title,
+      location,
+      destination: location,
+      companion: companions,
+      reading_time: readTime,
+      excerpt: item.excerpt || cleanBody.slice(0, 160) + '...',
+      content: cleanBody || item.excerpt,
+      cover_image: resolveImageUrl(item.cover_image_url || item.og_image_url),
+      tags: Array.isArray(item.tags)
+        ? item.tags
+        : typeof item.tags === 'string'
+        ? [item.tags]
+        : [],
+      story_type: item.story_type || '',
+      dogs_involved: Array.isArray(item.dogs_involved) ? item.dogs_involved : [],
+      pet_tips: rawTips,
+      parent_tips: rawTips,
+      timeline_stops: timelineStops,
+      quick_facts: Array.isArray(item.quick_facts) ? item.quick_facts : [],
+      dog_cards: Array.isArray(item.dog_cards) ? item.dog_cards : [],
+      author_name: item.author_name,
+      trip_cost: item.trip_cost,
+      vehicle: item.vehicle,
+      travel_date: item.travel_date,
+      km_one_way: item.km_one_way,
+    };
+};
 
 export const TravelStoryScreen = React.memo(function TravelStoryScreen({
   navigation,
@@ -112,7 +218,6 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
-  const [activeModalStory, setActiveModalStory] = useState(null);
   const [isNotified, setIsNotified] = useState(false);
 
   // Auto-open story if passed via navigation params
@@ -133,110 +238,7 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
       };
     }
 
-    const formattedStories = rawList.map(item => {
-      const cleanBody = (item.body || item.content || item.excerpt || '')
-        .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '\n\n$1\n\n')
-        .replace(/<\/p>/gi, '\n\n')
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<[^>]*>/g, '')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim();
-
-      const readTime = item.estimated_read_minutes
-        ? `${item.estimated_read_minutes} min`
-        : item.drive_hours
-        ? `${item.drive_hours} hr drive`
-        : item.reading_time || '8 min';
-
-      const companions =
-        item.companions_line ||
-        (Array.isArray(item.dogs_involved) && item.dogs_involved.length > 0
-          ? item.dogs_involved.join(' + ')
-          : '') ||
-        item.primary_dog ||
-        item.author_name ||
-        'The Pack';
-
-      const location = item.destination || item.location || 'India';
-      const storyType = item.story_type || (item.km_one_way ? 'Road Trips' : 'Travel Story');
-      const tag = `${storyType.toUpperCase()} • ${readTime.toUpperCase()}`;
-
-      let category = 'road_trips';
-      const lowerType = storyType.toLowerCase();
-      const lowerTitle = (item.title || '').toLowerCase();
-      if (
-        lowerType.includes('train') ||
-        lowerTitle.includes('train') ||
-        lowerTitle.includes('express')
-      ) {
-        category = 'train_journeys';
-      } else if (
-        lowerType.includes('water') ||
-        lowerType.includes('nature') ||
-        lowerTitle.includes('lake') ||
-        lowerTitle.includes('ganga') ||
-        lowerTitle.includes('river') ||
-        lowerTitle.includes('water') ||
-        lowerTitle.includes('narmada')
-      ) {
-        category = 'water_play';
-      } else if (
-        lowerType.includes('stay') ||
-        lowerTitle.includes('stay') ||
-        lowerTitle.includes('homestay') ||
-        lowerTitle.includes('cottage')
-      ) {
-        category = 'pet_friendly_stays';
-      }
-
-      const rawTips =
-        (Array.isArray(item.parent_tips) && item.parent_tips.length > 0 && item.parent_tips) ||
-        (Array.isArray(item.pet_tips) && item.pet_tips.length > 0 && item.pet_tips) ||
-        [];
-
-      const timelineStops =
-        (Array.isArray(item.timeline_stops) &&
-          item.timeline_stops.length > 0 &&
-          item.timeline_stops) ||
-        (Array.isArray(item.timeline_blocks) &&
-          item.timeline_blocks.length > 0 &&
-          item.timeline_blocks) ||
-        [];
-
-      return {
-        id: String(item.id),
-        slug: item.slug || `story-${item.id}`,
-        tag,
-        category,
-        title: item.title,
-        location,
-        destination: location,
-        companion: companions,
-        reading_time: readTime,
-        excerpt: item.excerpt || cleanBody.slice(0, 160) + '...',
-        content: cleanBody || item.excerpt,
-        cover_image: resolveImageUrl(item.cover_image_url || item.og_image_url),
-        tags: Array.isArray(item.tags)
-          ? item.tags
-          : typeof item.tags === 'string'
-          ? [item.tags]
-          : [],
-        story_type: item.story_type || '',
-        dogs_involved: Array.isArray(item.dogs_involved) ? item.dogs_involved : [],
-        pet_tips: rawTips,
-        parent_tips: rawTips,
-        timeline_stops: timelineStops,
-        quick_facts: Array.isArray(item.quick_facts) ? item.quick_facts : [],
-        dog_cards: Array.isArray(item.dog_cards) ? item.dog_cards : [],
-        author_name: item.author_name,
-        trip_cost: item.trip_cost,
-        vehicle: item.vehicle,
-        travel_date: item.travel_date,
-        km_one_way: item.km_one_way,
-      };
-    });
+    const formattedStories = rawList.map(formatStory);
 
     return {
       featuredStory: formattedStories[0] || null,
@@ -244,19 +246,21 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
     };
   }, [apiStoriesData]);
 
-  // Open initial story if passed
+  // A story id passed in (from Home) opens that story's screen once, then the param is cleared so
+  // coming back does not open it again
   React.useEffect(() => {
-    if (initialStoryId) {
-      if (String(initialStoryId) === featuredStory?.id) {
-        setActiveModalStory(featuredStory);
-      } else {
-        const found = allStories.find(story => String(story.id) === String(initialStoryId));
-        if (found) {
-          setActiveModalStory(found);
-        }
-      }
+    if (!initialStoryId) {
+      return;
     }
-  }, [initialStoryId, featuredStory, allStories]);
+    const found =
+      String(initialStoryId) === featuredStory?.id
+        ? featuredStory
+        : allStories.find(story => String(story.id) === String(initialStoryId));
+    if (found) {
+      navigation.setParams({ initialStoryId: undefined });
+      openStory(found);
+    }
+  }, [initialStoryId, featuredStory, allStories, navigation, openStory]);
 
   // Filter latest stories by category and search
   const filteredStories = useMemo(() => {
@@ -325,16 +329,20 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
     return result;
   }, [allStories, activeCategory, searchQuery]);
 
-  const handleShareStory = useCallback(async story => {
-    try {
-      await Share.share({
-        message: `🐾 Check out this travel story on PetFriendly: "${story.title}" (${story.location})!`,
-        title: story.title,
+  // Opens the story on its own screen. GET /stories/{slug} loads there; the list item is passed
+  // along so the page has content straight away.
+  const openStory = useCallback(
+    story => {
+      if (!story) {
+        return;
+      }
+      navigation.navigate('StoryDetailScreen', {
+        slug: story.has_slug ? story.slug : undefined,
+        preview: story.raw,
       });
-    } catch {
-      // User cancelled share
-    }
-  }, []);
+    },
+    [navigation],
+  );
 
   return (
     <View style={[styles.container, isDarkMode && styles.containerDark]}>
@@ -345,7 +353,7 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
         />
       )}
 
-      {/* ── 1. Top Navigation Bar ── */}
+  
       {!hideTopNav && (
         <>
           <AmbientBackground scrollY={scrollY} isDarkMode={isDarkMode} />
@@ -370,7 +378,6 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
         </>
       )}
 
-      {/* Optional Search Bar Popup */}
       {isSearchVisible && (
         <View style={[styles.searchBoxWrap, isDarkMode && styles.searchBoxWrapDark]}>
           <View style={[styles.searchBox, isDarkMode && styles.searchBoxDark]}>
@@ -398,7 +405,7 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
         </View>
       )}
 
-      {/* ── Scrollable Body ── */}
+  
       <Animated.ScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + s(30) }]}
@@ -416,7 +423,7 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
             colors={['#7C3AED', '#EE2A7B']}
           />
         }>
-        {/* ── 2. Royal Purple Hero Banner ("Stories from the road.") ── */}
+       
         <LinearGradient
           colors={
             isDarkMode ? ['#260D4E', '#4C1D95', '#6D28D9'] : ['#2E1065', '#581C87', '#7C3AED']
@@ -455,7 +462,7 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
           </View>
         </LinearGradient>
 
-        {/* ── 3. Category Horizontal Filter Pills ── */}
+       
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -504,7 +511,7 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
             <BouncyPressable
               style={[styles.featuredCard, isDarkMode && styles.featuredCardDark]}
               activeScale={0.98}
-              onPress={() => setActiveModalStory(featuredStory)}>
+              onPress={() => openStory(featuredStory)}>
               <FastImage
                 source={
                   featuredStory.cover_image
@@ -540,7 +547,7 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
                   <BouncyPressable
                     style={styles.readPillBtn}
                     activeScale={0.92}
-                    onPress={() => setActiveModalStory(featuredStory)}>
+                    onPress={() => openStory(featuredStory)}>
                     <Text style={styles.readPillText}>Read</Text>
                     <Feather name="arrow-right" size={ms(12)} color="#1C1C1C" />
                   </BouncyPressable>
@@ -600,7 +607,7 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
               key={story.id}
               style={[styles.storyItemCard, isDarkMode && styles.storyItemCardDark]}
               activeScale={0.97}
-              onPress={() => setActiveModalStory(story)}>
+              onPress={() => openStory(story)}>
               {/* Left: Thumbnail Image */}
               <View
                 style={[styles.storyThumbnailWrap, isDarkMode && styles.storyThumbnailWrapDark]}>
@@ -731,207 +738,6 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
           </BouncyPressable>
         </LinearGradient>
       </Animated.ScrollView>
-
-      {/* ── 8. Full Story Reader Modal ── */}
-      <Modal
-        visible={!!activeModalStory}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setActiveModalStory(null)}>
-        {activeModalStory && (
-          <View style={[styles.readerContainer, isDarkMode && styles.readerContainerDark]}>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: insets.bottom + s(40) }}>
-              {/* Header Image */}
-              <View style={styles.readerImageWrap}>
-                <FastImage
-                  source={
-                    activeModalStory.cover_image
-                      ? { uri: activeModalStory.cover_image, priority: FastImage.priority.high }
-                      : images.noimage
-                  }
-                  defaultSource={images.noimage}
-                  alt={activeModalStory.title || 'Story cover image'}
-                  accessibilityLabel={activeModalStory.title || 'Story cover image'}
-                  style={styles.readerHeroImage}
-                  resizeMode={FastImage.resizeMode.cover}
-                />
-                <LinearGradient
-                  colors={['rgba(20, 10, 35, 0.4)', 'rgba(20, 10, 35, 0.88)']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 0, y: 1 }}
-                  style={StyleSheet.absoluteFillObject}
-                />
-
-                <BouncyPressable
-                  style={[styles.readerCloseBtn, { top: Math.max(insets.top, s(14)) }]}
-                  activeScale={0.88}
-                  onPress={() => setActiveModalStory(null)}>
-                  <Feather name="x" size={ms(18)} color="#FFFFFF" />
-                </BouncyPressable>
-
-                <View style={styles.readerPillGroup}>
-                  <View style={styles.readerTypePill}>
-                    <Text style={styles.readerTypePillText}>{activeModalStory.tag}</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Reader Body */}
-              <View style={styles.readerBody}>
-                <View style={styles.locationRow}>
-                  <Ionicons name="location" size={ms(13)} color="#7B2CFF" />
-                  <Text
-                    style={[
-                      styles.readerLocationText,
-                      isDarkMode && styles.readerLocationTextDark,
-                    ]}>
-                    {activeModalStory.location || activeModalStory.destination}
-                  </Text>
-                </View>
-
-                <Text style={[styles.readerTitle, isDarkMode && styles.readerTitleDark]}>
-                  {activeModalStory.title}
-                </Text>
-
-                {/* Companion Bar */}
-                <View
-                  style={[styles.readerCompanionBar, isDarkMode && styles.readerCompanionBarDark]}>
-                  <Ionicons name="paw" size={ms(16)} color="#7B2CFF" />
-                  <Text
-                    style={[
-                      styles.readerCompanionText,
-                      isDarkMode && styles.readerCompanionTextDark,
-                    ]}>
-                    Travelling with {activeModalStory.companion || 'The Pack'}
-                  </Text>
-                  <BouncyPressable
-                    style={styles.readerShareBtn}
-                    activeScale={0.88}
-                    onPress={() => handleShareStory(activeModalStory)}>
-                    <Feather name="share-2" size={ms(15)} color="#7B2CFF" />
-                  </BouncyPressable>
-                </View>
-
-                {/* Pet Tips Highlight Box */}
-                {activeModalStory.pet_tips && activeModalStory.pet_tips.length > 0 && (
-                  <View style={[styles.tipsBox, isDarkMode && styles.tipsBoxDark]}>
-                    <View style={styles.tipsHeaderRow}>
-                      <Ionicons name="paw" size={ms(16)} color="#F59E0B" />
-                      <Text
-                        style={[styles.tipsHeaderTitle, isDarkMode && styles.tipsHeaderTitleDark]}>
-                        Pack Tips & Must-Knows
-                      </Text>
-                    </View>
-                    {activeModalStory.pet_tips.map((tip, idx) => {
-                      const heading = typeof tip === 'object' ? tip.heading : null;
-                      const text =
-                        typeof tip === 'object' ? tip.text || tip.tip || '' : String(tip);
-                      return (
-                        <View key={tip.id || idx} style={styles.tipItemRow}>
-                          <View style={styles.tipBullet} />
-                          <View style={styles.flexCol}>
-                            {heading ? (
-                              <Text
-                                style={[styles.tipHeading, isDarkMode && styles.tipHeadingDark]}>
-                                {heading}
-                              </Text>
-                            ) : null}
-                            <Text style={[styles.tipText, isDarkMode && styles.tipTextDark]}>
-                              {text}
-                            </Text>
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-
-                {/* Quick Facts from API */}
-                {activeModalStory.quick_facts && activeModalStory.quick_facts.length > 0 && (
-                  <View style={[styles.quickFactsWrap, isDarkMode && styles.quickFactsWrapDark]}>
-                    <Text
-                      style={[styles.quickFactsTitle, isDarkMode && styles.quickFactsTitleDark]}>
-                      Trip Quick Facts
-                    </Text>
-                    <View style={styles.quickFactsGrid}>
-                      {activeModalStory.quick_facts.map(qf => (
-                        <View key={qf.id || qf.label} style={styles.qfItem}>
-                          <Text style={styles.qfIcon}>{qf.icon || '📍'}</Text>
-                          <View style={styles.flexCol}>
-                            <Text style={[styles.qfLabel, isDarkMode && styles.qfLabelDark]}>
-                              {qf.label}
-                            </Text>
-                            <Text style={[styles.qfValue, isDarkMode && styles.qfValueDark]}>
-                              {qf.value}
-                            </Text>
-                          </View>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                )}
-
-                {/* Narrative Text */}
-                <Text style={[styles.storyContentText, isDarkMode && styles.storyContentTextDark]}>
-                  {activeModalStory.content}
-                </Text>
-
-                {/* Timeline Stops from API */}
-                {activeModalStory.timeline_stops && activeModalStory.timeline_stops.length > 0 && (
-                  <View style={[styles.timelineWrap, isDarkMode && styles.timelineWrapDark]}>
-                    <Text
-                      style={[
-                        styles.timelineHeaderTitle,
-                        isDarkMode && styles.timelineHeaderTitleDark,
-                      ]}>
-                      Journey Timeline & Stops
-                    </Text>
-                    {activeModalStory.timeline_stops.map((stop, idx) => (
-                      <View
-                        key={stop.id || idx}
-                        style={[styles.stopCard, isDarkMode && styles.stopCardDark]}>
-                        <View style={styles.stopTopRow}>
-                          <View style={styles.stopBadgePill}>
-                            <Text style={styles.stopBadgeText}>
-                              {stop.badge || `Stop ${idx + 1}`}
-                            </Text>
-                          </View>
-                          {stop.time ? (
-                            <Text
-                              style={[styles.stopTimeText, isDarkMode && styles.stopTimeTextDark]}>
-                              {stop.time}
-                            </Text>
-                          ) : null}
-                        </View>
-                        <Text
-                          style={[
-                            styles.stopLocationTitle,
-                            isDarkMode && styles.stopLocationTitleDark,
-                          ]}>
-                          {stop.location || stop.title}
-                        </Text>
-                        {stop.sub || stop.subtitle ? (
-                          <Text style={[styles.stopSubText, isDarkMode && styles.stopSubTextDark]}>
-                            {stop.sub || stop.subtitle}
-                          </Text>
-                        ) : null}
-                        {stop.body || stop.content ? (
-                          <Text
-                            style={[styles.stopBodyText, isDarkMode && styles.stopBodyTextDark]}>
-                            {stop.body || stop.content}
-                          </Text>
-                        ) : null}
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-            </ScrollView>
-          </View>
-        )}
-      </Modal>
     </View>
   );
 });
@@ -1132,7 +938,7 @@ const styles = StyleSheet.create({
   },
   heroDescription: {
     fontSize: s(11),
-    fontFamily: theme.typography.fontFamily.regular,
+    fontFamily: theme.typography.fontFamily.medium,
     color: 'rgba(255, 255, 255, 0.85)',
     lineHeight: s(16),
     maxWidth: '82%',
@@ -1345,7 +1151,7 @@ const styles = StyleSheet.create({
   },
   featuredExcerpt: {
     fontSize: s(11),
-    fontFamily: theme.typography.fontFamily.regular,
+    fontFamily: theme.typography.fontFamily.medium,
     color: 'rgba(255, 255, 255, 0.85)',
     lineHeight: s(16),
     marginBottom: s(14),
@@ -1457,7 +1263,7 @@ const styles = StyleSheet.create({
     color: '#C084FC',
   },
   storyItemTitle: {
-    fontFamily: theme.typography.fontFamily.regular,
+    fontFamily: theme.typography.fontFamily.medium,
     fontWeight: '400',
     fontSize: 14,
     lineHeight: 20,
@@ -1475,7 +1281,7 @@ const styles = StyleSheet.create({
   },
   storyLocationText: {
     fontSize: s(10.5),
-    fontFamily: theme.typography.fontFamily.regular,
+    fontFamily: theme.typography.fontFamily.medium,
     color: '#6B7280',
     flexShrink: 1,
   },
@@ -1499,7 +1305,7 @@ const styles = StyleSheet.create({
   },
   companionText: {
     fontSize: s(10.5),
-    fontFamily: theme.typography.fontFamily.regular,
+    fontFamily: theme.typography.fontFamily.medium,
     color: '#6B7280',
     flexShrink: 1,
   },
@@ -1565,7 +1371,7 @@ const styles = StyleSheet.create({
   },
   storytellersDesc: {
     fontSize: s(11),
-    fontFamily: theme.typography.fontFamily.regular,
+    fontFamily: theme.typography.fontFamily.medium,
     color: '#6B7280',
     lineHeight: s(16),
     marginBottom: s(14),
@@ -1613,7 +1419,7 @@ const styles = StyleSheet.create({
   },
   dogRole: {
     fontSize: s(10.5),
-    fontFamily: theme.typography.fontFamily.regular,
+    fontFamily: theme.typography.fontFamily.medium,
     color: '#6B7280',
   },
   dogRoleDark: {
@@ -1657,7 +1463,7 @@ const styles = StyleSheet.create({
   },
   notifyDesc: {
     fontSize: s(11.5),
-    fontFamily: theme.typography.fontFamily.regular,
+    fontFamily: theme.typography.fontFamily.medium,
     color: 'rgba(255, 255, 255, 0.85)',
     lineHeight: s(16),
     marginBottom: s(16),
@@ -1698,14 +1504,27 @@ const styles = StyleSheet.create({
     height: vs(240),
     width: '100%',
     position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: '#FDF8FB',
     justifyContent: 'space-between',
     padding: s(16),
   },
   readerHeroImage: {
     ...StyleSheet.absoluteFillObject,
   },
+  readerPlaceholderWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FDF8FB',
+  },
+  readerPlaceholderImage: {
+    height: '100%',
+    aspectRatio: 1230 / 1278,
+  },
   readerCloseBtn: {
     position: 'absolute',
+    top: s(14),
     left: s(16),
     width: s(36),
     height: s(36),
@@ -1828,7 +1647,7 @@ const styles = StyleSheet.create({
   tipText: {
     flex: 1,
     fontSize: s(11.5),
-    fontFamily: theme.typography.fontFamily.regular,
+    fontFamily: theme.typography.fontFamily.medium,
     color: '#78350F',
     lineHeight: s(17),
   },
@@ -1838,7 +1657,7 @@ const styles = StyleSheet.create({
 
   storyContentText: {
     fontSize: s(13.5),
-    fontFamily: theme.typography.fontFamily.regular,
+    fontFamily: theme.typography.fontFamily.medium,
     color: '#374151',
     lineHeight: s(22),
   },
@@ -1931,45 +1750,48 @@ const styles = StyleSheet.create({
   stopCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: s(14),
-    padding: s(14),
-    marginBottom: vs(12),
+    paddingVertical: s(10),
+    paddingHorizontal: s(12),
+    marginBottom: vs(8),
     borderWidth: 1,
     borderColor: '#EDE9FE',
+    shadowColor: '#5B21B6',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 2,
   },
   stopCardDark: {
     backgroundColor: '#1E1435',
     borderColor: '#37275C',
+    shadowOpacity: 0.25,
   },
-  stopTopRow: {
+  stopHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: vs(6),
   },
-  stopBadgePill: {
-    backgroundColor: '#EDE9FE',
-    paddingHorizontal: s(8),
-    paddingVertical: vs(2),
-    borderRadius: s(8),
+  stopHeaderText: {
+    flex: 1,
   },
-  stopBadgeText: {
-    fontSize: s(10),
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#6D28D9',
+  stopNode: {
+    width: s(24),
+    height: s(24),
+    borderRadius: s(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: s(10),
   },
-  stopTimeText: {
+  stopNodeText: {
+    color: '#FFFFFF',
     fontSize: s(11),
-    fontFamily: theme.typography.fontFamily.medium,
-    color: '#6B7280',
-  },
-  stopTimeTextDark: {
-    color: '#9CA3AF',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   stopLocationTitle: {
-    fontSize: s(13),
+    fontSize: s(14),
+    lineHeight: s(18),
     fontFamily: theme.typography.fontFamily.bold,
-    color: '#111827',
-    marginBottom: vs(4),
+    color: '#1E1B4B',
   },
   stopLocationTitleDark: {
     color: '#F9FAFB',
@@ -1977,17 +1799,17 @@ const styles = StyleSheet.create({
   stopSubText: {
     fontSize: s(11),
     fontFamily: theme.typography.fontFamily.medium,
-    color: '#6B7280',
-    marginBottom: vs(6),
+    color: '#7B2CFF',
+    marginTop: 1,
   },
   stopSubTextDark: {
-    color: '#9CA3AF',
+    color: '#C4B5FD',
   },
   stopBodyText: {
-    fontSize: s(11.5),
+    fontSize: s(12),
     fontFamily: theme.typography.fontFamily.regular,
-    color: '#374151',
-    lineHeight: s(17),
+    color: '#4B5563',
+    lineHeight: s(18),
   },
   stopBodyTextDark: {
     color: '#D1D5DB',
@@ -2025,7 +1847,7 @@ const styles = StyleSheet.create({
   },
   emptySubtitle: {
     fontSize: s(12),
-    fontFamily: theme.typography.fontFamily.regular,
+    fontFamily: theme.typography.fontFamily.medium,
     color: '#6B7280',
     textAlign: 'center',
     marginTop: vs(4),

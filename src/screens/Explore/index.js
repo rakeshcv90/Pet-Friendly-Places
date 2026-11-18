@@ -711,7 +711,6 @@ export const ExploreScreen = ({ navigation }) => {
           avatarRotate={avatarRotate}
           searchBarScale={searchBarScale}
           searchIconRotate={searchIconRotate}
-          onNotificationPress={() => navigation?.navigate?.('Notifications')}
           enableCityPicker={true}
           onLocationPress={handleOpenCityList}
         />

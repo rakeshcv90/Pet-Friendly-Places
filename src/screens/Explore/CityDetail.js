@@ -17,6 +17,7 @@ import {
   useCityCategoryIntros,
   useCityRoutes,
   useNearbyCities,
+  resolveImageUrl,
 } from '../../hooks/useDiscovery';
 import {
   slugifyCity,
@@ -202,7 +203,16 @@ export const CityDetail = ({ navigation, route }) => {
   const categories = useMemo(() => buildCategories(listings), [listings]);
   const verifiedCount = useMemo(() => listings.filter(isVerified).length, [listings]);
   const intro = useMemo(() => normalizeIntro(introRaw), [introRaw]);
-  const coverUri = useMemo(() => readCover(coverRaw), [coverRaw]);
+  const apiCoverUri = useMemo(() => readCover(coverRaw), [coverRaw]);
+  // No cover set for the city: use a photo of a real place there (best listing first), so the
+  // header matches the city instead of showing one fixed picture everywhere
+  const listingCoverUri = useMemo(() => {
+    const withPhoto = listings
+      .map(l => ({ ...l, coverPhoto: resolveImageUrl(l.main_image_url || l.images?.[0]?.image_url) }))
+      .filter(l => l.coverPhoto);
+    return sortListings(withPhoto)[0]?.coverPhoto || null;
+  }, [listings]);
+  const coverUri = apiCoverUri || listingCoverUri;
   const taglines = useMemo(
     () => categoryTaglines(categoryIntrosRaw, citySlug),
     [categoryIntrosRaw, citySlug],
@@ -274,13 +284,15 @@ export const CityDetail = ({ navigation, route }) => {
   };
 
   const handleBrowseAll = () => {
+    console.log("XCvcxvcxvcxvcxvcxcx",city)
     if (setCurrentLocation) {
       setCurrentLocation(city);
     }
     if (route?.params?.onSelectCity) {
       route.params.onSelectCity(city);
     }
-    navigation?.navigate?.('MainTabs', { screen: 'Explore' });
+    // navigation?.navigate?.('MainTabs', { screen: 'Explore' });
+    navigation.navigate('SearchScreen', { query: city });
   };
 
   const toggleSave = id => setSavedIds(prev => ({ ...prev, [id]: !prev[id] }));
@@ -332,7 +344,7 @@ export const CityDetail = ({ navigation, route }) => {
               <Ionicons name="location-outline" size={ms(12)} color="#FBBF24" />
               <Text style={styles.heroRegionText}>{(state || 'INDIA').toUpperCase()}</Text>
             </View>
-            <Text style={styles.heroTitle}>{`Pet-friendly ${city}`}</Text>
+            <Text style={styles.heroTitle}>{intro.title || `Pet-friendly ${city}`}</Text>
             <Text style={styles.heroSubtitle} numberOfLines={2}>
               {heroSubtitle}
             </Text>
@@ -467,7 +479,7 @@ export const CityDetail = ({ navigation, route }) => {
                 <Text style={styles.noteTitle}>{section.title}</Text>
                 {section.body.map(line => (
                   <Text key={line} style={styles.noteDesc}>
-                    {section.body.length > 1 ? `\u2022 ${line}` : line}
+                    {line}
                   </Text>
                 ))}
               </View>

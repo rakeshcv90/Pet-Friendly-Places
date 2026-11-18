@@ -4,18 +4,39 @@ import { CALLOUT_COLORS, CALLOUT_BODY, CALLOUT_BODY_DARK } from './constants';
 import { InlineText } from './InlineText';
 import { styles } from './styles/body';
 
+// Each stat card gets its own accent from the callout palette so the row reads as colourful.
+const STAT_ACCENTS = ['purple', 'teal', 'amber', 'coral'];
+
 export const StatRow = ({ stats, isDarkMode }) => (
   <View style={[styles.statRow, isDarkMode && styles.statRowDark]}>
-    {stats.map((stat, i) => (
-      <View key={i} style={[styles.statItem, isDarkMode && styles.statItemDark]}>
-        <Text style={styles.statIcon}>{stat.icon}</Text>
-        <Text style={[styles.statValue, isDarkMode && styles.statValueDark]}>{stat.value}</Text>
-        <Text style={[styles.statLabel, isDarkMode && styles.statLabelDark]}>{stat.label}</Text>
-      </View>
-    ))}
+    {stats.map((stat, i) => {
+      const accent = CALLOUT_COLORS[STAT_ACCENTS[i % STAT_ACCENTS.length]];
+      return (
+        <View
+          key={i}
+          style={[
+            styles.statItem,
+            isDarkMode && styles.statItemDark,
+            {
+              backgroundColor: isDarkMode ? accent.bgDark : accent.bg,
+              borderBottomColor: accent.bar,
+            },
+          ]}>
+          <Text style={styles.statIcon}>{stat.icon}</Text>
+          <Text
+            style={[
+              styles.statValue,
+              isDarkMode && styles.statValueDark,
+              { color: isDarkMode ? accent.titleDark : accent.title },
+            ]}>
+            {stat.value}
+          </Text>
+          <Text style={[styles.statLabel, isDarkMode && styles.statLabelDark]}>{stat.label}</Text>
+        </View>
+      );
+    })}
   </View>
 );
-
 
 export const SectionHeading = ({ level, text, isDarkMode }) => (
   <Text

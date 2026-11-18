@@ -21,6 +21,15 @@ export const stripHtml = value =>
         .trim()
     : '';
 
+// Plain text of the first paragraph, without markdown marks
+const firstParagraph = value => {
+  const first = stripHtml(value)
+    .split(/\n+/)
+    .map(line => line.replace(/\*\*|__|^#+\s*/g, '').trim())
+    .find(Boolean);
+  return first || '';
+};
+
 const asArray = res => {
   if (Array.isArray(res)) {
     return res;
@@ -94,33 +103,55 @@ export const listingToCard = l => ({
   imageUri: resolveImageUrl(l.main_image_url || l.images?.[0]?.image_url),
 });
 
-// Published category intros are a list; tolerate a `city` scope and several tagline keys
+// Published category intros are a list (camelCase keys, or snake_case on older data); tolerate a
+// `city` scope and several tagline keys
 export const categoryTaglines = (res, citySlug) => {
   const map = {};
   asArray(res).forEach(row => {
-    const label = row?.category || row?.category_name || row?.name;
-    const tagline = row?.tagline || row?.intro || row?.description;
-    const scope = row?.city_slug || (row?.city ? slugifyCity(row.city) : null);
+    const label = row?.category || row?.category_name || row?.categoryLabel || row?.name;
+    const intro = row?.tagline || row?.intro || row?.description || row?.introMarkdown;
+    const tagline = typeof intro === 'string' ? firstParagraph(intro) : '';
+    const scope = row?.city_slug || row?.citySlug || (row?.city ? slugifyCity(row.city) : null);
     if (label && tagline && (!scope || scope === citySlug)) {
-      map[label] = stripHtml(tagline);
+      map[label] = tagline;
     }
   });
   return map;
 };
 
+// [key, title, icon, other names the API may use]
 const SECTION_META = [
-  ['about', 'About', 'information-circle-outline'],
-  ['getting_there', 'Getting there', 'navigate-outline'],
-  ['pet_safety', 'Pet safety', 'shield-checkmark-outline'],
-  ['areas_to_know', 'Areas to know', 'map-outline'],
+  ['about', 'About', 'information-circle-outline', ['cityIntroMarkdown']],
+  ['getting_there', 'Getting here', 'navigate-outline', ['howToGetThereMarkdown']],
+  ['pet_safety', 'Pet safety', 'shield-checkmark-outline', ['petSafetyMarkdown']],
+  ['areas_to_know', 'Areas to know', 'map-outline', ['neighbourhoodsMarkdown']],
+  ['things_to_do', 'Things to do', 'sparkles-outline', ['thingsToDoMarkdown']],
+  ['best_time', 'Best time to visit', 'calendar-outline', ['bestTimeMarkdown']],
+  ['faq', 'FAQ', 'help-circle-outline', ['faqMarkdown']],
 ];
 
 const toCamel = s => s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 
-// Section bodies arrive as text/HTML, a list of strings, or a list of { title, description }
+// One line of markdown as plain text: no bold marks or heading hashes; list items get a bullet
+const markdownLine = line => {
+  // A horizontal rule (--- or ***) between FAQ entries is not text
+  if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
+    return '';
+  }
+  const bullet = /^\s*[-*\u2022]\s+/.test(line);
+  const text = line
+    .replace(/^\s*[-*\u2022]\s+/, '')
+    .replace(/\*\*|__/g, '')
+    .replace(/^#+\s*/, '')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .trim();
+  return text ? (bullet ? `\u2022 ${text}` : text) : '';
+};
+
+// Section bodies arrive as markdown / text / HTML, a list of strings, or a list of { title, description }
 const readBody = raw => {
   if (Array.isArray(raw)) {
-    return raw
+    const lines = raw
       .map(item =>
         typeof item === 'string'
           ? stripHtml(item)
@@ -129,22 +160,28 @@ const readBody = raw => {
               .join(': '),
       )
       .filter(Boolean);
+    // A list reads as bullets once it has more than one entry
+    return lines.length > 1 ? lines.map(line => `\u2022 ${line}`) : lines;
   }
-  const text = stripHtml(raw);
-  return text ? [text] : [];
+  return stripHtml(raw).split('\n').map(markdownLine).filter(Boolean);
 };
 
 export const normalizeIntro = res => {
   const raw = Array.isArray(res) ? res[0] : res;
   if (!raw || typeof raw !== 'object') {
-    return { summary: '', sections: [] };
+    return { title: '', summary: '', sections: [] };
   }
-  const sections = SECTION_META.map(([key, title, icon]) => {
-    const body = readBody(raw[key] ?? raw[toCamel(key)] ?? raw[`${key}_html`]);
+  const sections = SECTION_META.map(([key, title, icon, aliases]) => {
+    const value = [key, toCamel(key), `${key}_html`, ...aliases]
+      .map(name => raw[name])
+      .find(v => v !== undefined && v !== null && v !== '');
+    const body = readBody(value);
     return body.length > 0 ? { key, title, icon, body } : null;
   }).filter(Boolean);
-  const summary = stripHtml(raw.summary || raw.tagline || raw.subtitle || '');
-  return { summary, sections };
+  const summary = stripHtml(
+    raw.summary || raw.tagline || raw.subtitle || raw.heroDescription || '',
+  );
+  return { title: stripHtml(raw.h1 || ''), summary, sections };
 };
 
 export const readCover = res => {

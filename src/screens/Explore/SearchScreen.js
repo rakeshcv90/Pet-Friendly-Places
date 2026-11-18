@@ -22,7 +22,7 @@ import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { useStore } from '../../store';
 import { useUserProfile } from '../../hooks/useUser';
 import { useInfiniteListings, resolveImageUrl } from '../../hooks/useDiscovery';
-import { useSavedListing } from '../StoryGuides/ListingDetail/useSavedListing';
+import { useSavePlace } from '../../hooks/useUser';
 import {
   DEFAULT_FILTERS,
   SORT_OPTIONS,
@@ -141,10 +141,19 @@ const toPlace = item => {
 // ── 4. Place Card Component ──
 const SearchPlaceCard = ({ place, onPress }) => {
   const heartScale = useRef(new Animated.Value(1)).current;
-  const { saved: isLiked, toggle } = useSavedListing(place.slug);
+  // The heart saves the place to the account (POST / DELETE /accounts/me/saved/{id})
+  const { saved: isLiked, toggle } = useSavePlace(place.id, {
+    id: place.id,
+    slug: place.slug,
+    name: place.name,
+    main_image_url: place.image,
+    city: place.location,
+  });
 
   const handleHeartPress = () => {
-    toggle();
+    if (!toggle()) {
+      return;
+    }
     heartScale.setValue(0.65);
     Animated.spring(heartScale, {
       toValue: 1,
@@ -298,6 +307,7 @@ export const SearchScreen = ({ navigation, route }) => {
   // Route params: `apiCategory` is the listings API category id; `category` is a display title
   const initialApiCategory = resolveApiCategory(route?.params?.apiCategory, route?.params?.category);
   const tailsVerifiedOnly = Boolean(route?.params?.tailsVerified);
+  const verifiedOnly = Boolean(route?.params?.verifiedOnly);
   const initialQuery = route?.params?.query || '';
   const routeSubcategory = route?.params?.subcategory;
   const initialSubcategory = SUBCATEGORIES.includes(routeSubcategory) ? routeSubcategory : 'All stays';
@@ -321,10 +331,19 @@ export const SearchScreen = ({ navigation, route }) => {
       ...filtersToParams(filters),
       q: submittedQuery.trim() || undefined,
       tails_verified: tailsVerifiedOnly ? 'true' : undefined,
+      verified_only: verifiedOnly ? 'true' : undefined,
       sort: sortOption.param,
       specific_type: isStays ? STAY_SUBCATEGORIES[selectedSubcategory] || undefined : undefined,
     }),
-    [filters, submittedQuery, isStays, selectedSubcategory, tailsVerifiedOnly, sortOption.param],
+    [
+      filters,
+      submittedQuery,
+      isStays,
+      selectedSubcategory,
+      tailsVerifiedOnly,
+      verifiedOnly,
+      sortOption.param,
+    ],
   );
 
   // "Paws in the Wild": the API's `Outdoor` group already includes `Nature & Water`,
@@ -596,7 +615,6 @@ export const SearchScreen = ({ navigation, route }) => {
           avatarRotate={avatarRotate}
           searchBarScale={searchBarScale}
           searchIconRotate={searchIconRotate}
-          onNotificationPress={() => navigation?.navigate?.('Notifications')}
           enableCityPicker={true}
         />
 
@@ -839,7 +857,10 @@ export const SearchScreen = ({ navigation, route }) => {
             <SearchPlaceCard
               key={place.id}
               place={place}
-              onPress={() => navigation?.navigate?.('ListingDetailScreen', { slug: place.slug })}
+              onPress={() => 
+             
+              navigation?.navigate?.('ListingDetailScreen', { slug: place.slug })
+              }
             />
           ))
         )}

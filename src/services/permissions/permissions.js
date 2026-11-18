@@ -17,6 +17,11 @@ const LOCATION = Platform.select({
   default: PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION,
 });
 
+const CAMERA = Platform.select({
+  ios: PERMISSIONS.IOS.CAMERA,
+  default: PERMISSIONS.ANDROID.CAMERA,
+});
+
 // One vocabulary for both platforms:
 //  granted      allowed
 //  denied       not asked yet, or refused once (the system prompt can still be shown)
@@ -52,6 +57,10 @@ export const requestLocation = () => safe(async () => normalize(await request(LO
 
 export const requestNotificationPermission = () =>
   safe(async () => normalize((await requestNotifications(['alert', 'sound', 'badge'])).status));
+
+export const getCameraStatus = () => safe(async () => normalize(await check(CAMERA)));
+
+export const requestCamera = () => safe(async () => normalize(await request(CAMERA)));
 
 export const getPermissionStatuses = async () => {
   const [location, notifications] = await Promise.all([

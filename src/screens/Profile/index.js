@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { View, Text, StatusBar, Animated, Alert } from 'react-native';
+import { View, Text, StatusBar, Animated, Alert, RefreshControl } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
@@ -24,6 +25,7 @@ import {
 } from './components';
 import { PetCarousel } from '../Pets/components/PetCarousel';
 import { Loader } from '../../components/common/Loader';
+import { SuccessToast } from '../../components/common/SuccessToast';
 import { signOut } from '../../services/auth/signOut';
 import { enableAppLock, disableAppLock, isAppLockSupported } from '../../services/security/appLock';
 import styles from './styles';
@@ -76,20 +78,38 @@ export const ProfileScreen = ({ navigation }) => {
   const accentColor = useStore(state => state.accentColor) || '#7C3AED';
   const setAccentColor = useStore(state => state.setAccentColor);
 
-  const { data: profileData } = useUserProfile();
+  const { data: profileData, refetch: refetchProfile } = useUserProfile();
   const user =
     profileData?.account ||
     profileData?.user ||
     (profileData?.id ? profileData : null) ||
     storeUser;
-console.log('profileData', user?.stamps_count);
+
+  // Reload the pet list whenever this tab comes into view (it may have changed on another phone)
+  useFocusEffect(
+    useCallback(() => {
+      refetchPets();
+    }, [refetchPets]),
+  );
+
+  // Pull-to-refresh
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([refetchPets(), refetchProfile()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchPets, refetchProfile]);
+
   const userName = user?.name || user?.displayName || user?.display_name || user?.full_name;
   const userEmail = user?.email;
   const userInitial = (userName.trim()[0] || 'R').toUpperCase();
 
   // Safely resolve & sanitize pets list from API or store
   // /me/pets is the source of truth; the profile's own list and the store are fallbacks
-  const { data: myPets } = useMyPets();
+  const { data: myPets, refetch: refetchPets } = useMyPets();
   const apiPets = myPets ?? profileData?.pets;
   const rawPets = apiPets && apiPets.length > 0 ? apiPets : storePets;
 
@@ -99,6 +119,7 @@ console.log('profileData', user?.stamps_count);
 
   // Modals state
   const [addPetModalVisible, setAddPetModalVisible] = useState(false);
+  const [petToast, setPetToast] = useState('');
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
 
@@ -189,17 +210,8 @@ console.log('profileData', user?.stamps_count);
       photo: newPet.photo,
     });
     setNewPetId(created?.id ?? created?.pet?.id ?? null);
-    setConfirmModalConfig({
-      visible: true,
-      title: 'Pawsport Activated! 🎉',
-      subtitle: `${newPet.name} is now registered on PetFriendly!`,
-      badge: 'PACK PASSPORT',
-      type: 'success',
-      confirmText: 'Awesome!',
-      cancelText: 'Close',
-      singleButton: true,
-      onConfirm: null,
-    });
+    // A plain toast, not a modal: a second native modal right after the form closes black-screens iOS
+    setPetToast(`${newPet.name} is now registered on PetFriendly!`);
   };
 
   // Shared by the Dashboard and My Pets tabs: the pet carousel, or the create-first-pawsport card
@@ -492,7 +504,7 @@ console.log('profileData', user?.stamps_count);
         icon: 'chatbubble-ellipses-outline',
         count: postsCount,
       },
-   
+
       { id: 'reviews', label: 'Reviews', icon: 'star-outline' },
     ],
     [pets.length, postsCount, topRank],
@@ -509,7 +521,15 @@ console.log('profileData', user?.stamps_count);
         ref={scrollRef}
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + vs(6) }]}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={accentColor}
+            colors={[accentColor]}
+          />
+        }>
         {/* ── 1. Top Navigation Bar ── */}
         <View style={styles.topNavBar}>
           <View>
@@ -645,8 +665,6 @@ console.log('profileData', user?.stamps_count);
                 delay={220}
               />
             </View>
-
-       
           </View>
         )}
 
@@ -771,7 +789,6 @@ console.log('profileData', user?.stamps_count);
               </View>
             ) : (
               <>
-         
                 <ActivityCard
                   item={activityItems[0]}
                   isDarkMode={isDarkMode}
@@ -781,7 +798,6 @@ console.log('profileData', user?.stamps_count);
                     })
                   }
                 />
-            
               </>
             )}
           </View>
@@ -934,6 +950,8 @@ console.log('profileData', user?.stamps_count);
         isDarkMode={isDarkMode}
         accentColor={accentColor}
       />
+
+      <SuccessToast message={petToast} onHide={() => setPetToast('')} />
 
       {/* ── 9. Ask AI / Help Modal Component ── */}
       <HelpAiModal

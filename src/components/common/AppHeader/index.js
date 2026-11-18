@@ -8,6 +8,7 @@ import { BouncyPressable } from '../BouncyPressable';
 import { CityPickerModal } from '../CityPickerModal';
 import { useUserProfile } from '../../../hooks/useUser';
 import { useStore } from '../../../store';
+import { NotificationBell } from '../../notifications/NotificationBell';
 import { styles } from './styles';
 
 export const getTimeGreeting = () => {
@@ -96,9 +97,9 @@ export const SearchBar = ({
         </Pressable>
       )}
 
-      <BouncyPressable style={styles.searchArrowBtn} activeScale={0.88} onPress={handleSubmit}>
+      {/* <BouncyPressable style={styles.searchArrowBtn} activeScale={0.88} onPress={handleSubmit}>
         <Feather name="arrow-right" size={ms(18)} color="#FFFFFF" />
-      </BouncyPressable>
+      </BouncyPressable> */}
     </Animated.View>
   );
 };
@@ -125,7 +126,6 @@ export const AppHeader = ({
 
   // Notification
   showNotification = true,
-  hasNotification = true,
   onNotificationPress,
   rightComponent,
 
@@ -275,13 +275,7 @@ export const AppHeader = ({
         {rightComponent ? (
           rightComponent
         ) : showNotification ? (
-          <BouncyPressable
-            style={[styles.notificationBtn, isDarkMode && styles.notificationBtnDark]}
-            activeScale={0.85}
-            onPress={onNotificationPress || (() => {})}>
-            <Feather name="bell" size={ms(19)} color={isDarkMode ? '#FFFFFF' : '#1D1238'} />
-            {hasNotification && <View style={styles.notificationDot} />}
-          </BouncyPressable>
+          <NotificationBell isDarkMode={isDarkMode} onPress={onNotificationPress} />
         ) : null}
       </View>
 

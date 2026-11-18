@@ -16,14 +16,19 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Feather from 'react-native-vector-icons/Feather';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { launchImageLibrary } from 'react-native-image-picker';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../../theme';
 import { s, vs, ms } from 'react-native-size-matters';
 import { BouncyPressable } from '../../../components/common/BouncyPressable';
 import { NightSky } from '../../Community/NightSky';
 import { Bob, Enter } from '../../Community/Motion';
-import { Loader } from '../../../components/common/Loader';
+import { LoaderCard } from '../../../components/common/Loader';
+import { PhotoSourceSheet } from '../../../components/common/PhotoSourceSheet';
+import {
+  requestCamera,
+  openPhoneSettings,
+} from '../../../services/permissions/permissions';
 
 const PURPLE = '#7B2CFF';
 const DEEP_PURPLE = '#3B108F';
@@ -46,6 +51,7 @@ export const AddPetModal = ({ visible, onClose, onAddPet, isDarkMode = false }) 
   const [photo, setPhoto] = useState(null);
   const [focusedField, setFocusedField] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [sourceSheetOpen, setSourceSheetOpen] = useState(false);
 
   // Springs the preview emoji when the species changes
   const pop = useRef(new Animated.Value(1)).current;
@@ -70,19 +76,53 @@ export const AddPetModal = ({ visible, onClose, onAddPet, isDarkMode = false }) 
     ]).start();
   };
 
-  const pickPhoto = () => {
+  const handlePickResult = response => {
+    const asset = response?.assets?.[0];
+    if (response?.didCancel) {
+      return;
+    }
+    if (response?.errorCode) {
+      Alert.alert('Photo', response.errorMessage || 'Unable to open your photos.');
+    } else if (asset?.uri) {
+      setPhoto(asset);
+    }
+  };
+
+  const pickFromGallery = () => {
+    // The system photo picker needs no permission: the app only receives what the user picks
     launchImageLibrary(
       { mediaType: 'photo', quality: 0.85, selectionLimit: 1, maxWidth: 1600, maxHeight: 1600 },
-      response => {
-        const asset = response?.assets?.[0];
-        if (response?.errorCode) {
-          Alert.alert('Photo', response.errorMessage || 'Unable to open your photos.');
-        } else if (asset?.uri) {
-          setPhoto(asset);
-        }
-      },
+      handlePickResult,
     );
   };
+
+  const takePhoto = async () => {
+    const status = await requestCamera();
+    if (status === 'denied' || status === 'blocked') {
+      Alert.alert(
+        'Camera permission needed',
+        'Allow camera access to take a photo of your pet. You can change this in Settings.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => openPhoneSettings() },
+        ],
+      );
+      return;
+    }
+    // 'unavailable' means this phone cannot report it; the camera screen still asks on its own
+    launchCamera(
+      {
+        mediaType: 'photo',
+        quality: 0.85,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        saveToPhotos: false,
+      },
+      handlePickResult,
+    );
+  };
+
+  const pickPhoto = () => setSourceSheetOpen(true);
 
   const handleSubmit = async () => {
     if (submitting) {
@@ -109,6 +149,8 @@ export const AddPetModal = ({ visible, onClose, onAddPet, isDarkMode = false }) 
         bio: bio.trim(),
         photo,
       });
+      // Hide the loader before the form closes: iOS black-screens when two modals dismiss together
+      setSubmitting(false);
       handleClose();
     } catch (error) {
       Alert.alert(
@@ -327,7 +369,6 @@ export const AddPetModal = ({ visible, onClose, onAddPet, isDarkMode = false }) 
               isDarkMode && styles.dockDark,
               { paddingBottom: Math.max(insets.bottom, vs(14)) },
             ]}>
-            <Loader visible={submitting} title="Creating pawsport…" />
             <BouncyPressable
               testID="add-pet-submit"
               style={[styles.submit, !isFormValid && styles.submitDisabled]}
@@ -348,6 +389,23 @@ export const AddPetModal = ({ visible, onClose, onAddPet, isDarkMode = false }) 
             </BouncyPressable>
           </View>
         </KeyboardAvoidingView>
+
+        {/* A plain overlay, not a Loader modal: a modal inside this modal black-screens iOS */}
+        {submitting ? (
+          <View style={styles.submitOverlay} pointerEvents="auto">
+            <LoaderCard label="Creating pawsport…" subtitle="" isDarkMode={isDarkMode} />
+          </View>
+        ) : null}
+
+        <PhotoSourceSheet
+          visible={sourceSheetOpen}
+          onClose={() => setSourceSheetOpen(false)}
+          onCamera={takePhoto}
+          onGallery={pickFromGallery}
+          onRemove={photo ? () => setPhoto(null) : undefined}
+          title="Pet photo"
+          isDarkMode={isDarkMode}
+        />
       </View>
     </Modal>
   );
@@ -356,6 +414,13 @@ export const AddPetModal = ({ visible, onClose, onAddPet, isDarkMode = false }) 
 export default AddPetModal;
 
 const styles = StyleSheet.create({
+  submitOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(15, 7, 29, 0.55)',
+    zIndex: 50,
+  },
   flex: { flex: 1 },
   root: { flex: 1, backgroundColor: '#F8F9FA' },
   rootDark: { backgroundColor: '#0F071D' },

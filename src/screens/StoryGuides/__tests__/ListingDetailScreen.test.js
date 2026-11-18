@@ -12,6 +12,23 @@ import {
 import { contactActions } from '../ListingDetail/ContactBar';
 import { useListingDetail } from '../../../hooks/useDiscovery';
 
+// Saving goes to the account API; here the heart just flips so the screen can be checked
+jest.mock('../../../hooks/useUser', () => {
+  const React = require('react');
+  return {
+    useSavePlace: () => {
+      const [saved, setSaved] = React.useState(false);
+      return {
+        saved,
+        toggle: () => {
+          setSaved(value => !value);
+          return true;
+        },
+      };
+    },
+  };
+});
+
 jest.mock('../../../hooks/useDiscovery', () => ({
   useListingDetail: jest.fn(),
   resolveImageUrl: url => (url ? `https://site.test${url}` : ''),

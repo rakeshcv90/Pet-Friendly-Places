@@ -150,3 +150,18 @@ if (Animated && Animated.loop) {
     reset: jest.fn(),
   }));
 }
+
+// The header bell reads the notification hooks, which need a QueryClient. Screen tests render the
+// header without one, so by default the hooks return "no notifications". Tests of the notification
+// feature itself use jest.requireActual('./src/hooks/useNotifications') for the real implementation.
+jest.mock('./src/hooks/useNotifications', () => {
+  const actual = jest.requireActual('./src/hooks/useNotifications');
+  const idle = { mutate: jest.fn() };
+  return {
+    ...actual,
+    useUnreadCount: () => ({ data: 0 }),
+    useNotifications: () => ({ data: [], isLoading: false, isError: false, refetch: jest.fn() }),
+    useMarkRead: () => idle,
+    useMarkAllRead: () => idle,
+  };
+});

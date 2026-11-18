@@ -16,6 +16,7 @@ export const STORAGE_KEYS = {
   APP_LOCK_ENABLED: 'APP_LOCK_ENABLED',
   APP_LOCK_OFFERED: 'APP_LOCK_OFFERED',
   PERMISSIONS_OFFERED: 'PERMISSIONS_OFFERED',
+  INSTALL_MARKER: 'INSTALL_MARKER',
 };
 
 // ── Secure storage ──────────────────────────────────────────────────────────────────────────
@@ -54,8 +55,29 @@ const persistSecure = () => {
   return writeChain;
 };
 
+// The iOS Keychain survives deleting the app, so a reinstall would still find the old session and
+// sign the person straight back in. Ordinary app storage (MMKV) is wiped with the app. So: a launch
+// where MMKV is completely empty and has never been marked is a fresh install, and any session left
+// in the Keychain belongs to a previous install. An app that is simply being updated already has
+// other keys in MMKV, so it is not treated as fresh and keeps its session.
+const isFreshInstall = () => !storage.getString(STORAGE_KEYS.INSTALL_MARKER) && storage.getAllKeys().length === 0;
+
 // Loads the saved session from the Keychain, and moves tokens an older version left in MMKV into it
 export const initSecureStorage = async () => {
+  const fresh = isFreshInstall();
+  if (!storage.getString(STORAGE_KEYS.INSTALL_MARKER)) {
+    storage.set(STORAGE_KEYS.INSTALL_MARKER, '1');
+  }
+  if (fresh) {
+    secureCache = {};
+    try {
+      await Keychain.resetGenericPassword({ service: SECURE_SERVICE });
+    } catch (e) {
+      // Nothing to clear, or the Keychain is unavailable: start signed out either way
+    }
+    return;
+  }
+
   try {
     const saved = await Keychain.getGenericPassword({ service: SECURE_SERVICE });
     secureCache = saved ? JSON.parse(saved.password) || {} : {};
@@ -129,6 +151,8 @@ export const removeItem = key => {
 
 export const clearStorage = () => {
   storage.clearAll();
+  // clearAll also removes the install marker; put it back so the next launch is not read as a reinstall
+  storage.set(STORAGE_KEYS.INSTALL_MARKER, '1');
   secureCache = {};
   persistSecure();
 };

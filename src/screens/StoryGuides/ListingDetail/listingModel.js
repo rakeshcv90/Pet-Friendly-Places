@@ -64,6 +64,9 @@ const titleCase = text =>
     .replace(/\b\w/g, c => c.toUpperCase())
     .trim();
 
+/** API types are sometimes slugs ("resort_hotel"): prettify those, keep curated text as written. */
+const readableType = value => (/^[a-z0-9]+(_[a-z0-9]+)+$/.test(String(value || '')) ? titleCase(value) : value);
+
 /** Splits a policy paragraph into its sentences. */
 export const splitSentences = text =>
   (String(text || '').match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) || []).map(p => p.trim()).filter(Boolean);
@@ -141,7 +144,7 @@ const buildQuickFacts = raw => {
     : raw.pet_charges;
   add('wallet-outline', 'Pet Charges', charges);
   add('car-outline', 'Parking', raw.parking_available === true ? 'Available' : null);
-  add('home-outline', raw.category === 'Stays' ? 'Room Type' : 'Type', raw.specific_type);
+  add('home-outline', raw.category === 'Stays' ? 'Room Type' : 'Type', readableType(raw.specific_type));
   add('scale-outline', 'Dog Sizes', parseList(raw.allowed_dog_sizes).join(', '));
   add('bed-outline', 'Pets in Room', raw.pets_in_room === true ? 'Yes' : null);
   add('restaurant-outline', 'Pets in Restaurant', raw.pets_in_restaurant === true ? 'Yes' : null);

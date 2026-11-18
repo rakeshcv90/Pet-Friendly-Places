@@ -18,7 +18,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
 import { s, ms } from 'react-native-size-matters';
 import { theme } from '../../theme';
-import { useUserProfile } from '../../hooks/useUser';
+import { useUserProfile, useSavePlace } from '../../hooks/useUser';
 import { useHomeData, resolveImageUrl } from '../../hooks/useDiscovery';
 import { useStore } from '../../store';
 import { mapApiCategories } from '../../utils/categories';
@@ -28,6 +28,8 @@ import {
   AnimatedCategoryItem,
   AnimatedRehomeOption,
   useHomeAnimations,
+  StoryCoverImage,
+  StoryOverlay,
   styles,
 } from './components';
 import { LoaderCard } from '../../components/common/Loader';
@@ -35,20 +37,8 @@ import { LoaderCard } from '../../components/common/Loader';
 export const HomeScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
-  const [isFavorite, setIsFavorite] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const heartBurstAnim = useRef(new Animated.Value(1)).current;
-
-  const handleToggleFavorite = useCallback(() => {
-    setIsFavorite(prev => !prev);
-    heartBurstAnim.setValue(0.6);
-    Animated.spring(heartBurstAnim, {
-      toValue: 1,
-      friction: 3,
-      tension: 80,
-      useNativeDriver: true,
-    }).start();
-  }, [heartBurstAnim]);
 
   const { data: userProfileData } = useUserProfile();
   const isDarkMode = useStore(state => state.isDarkMode);
@@ -72,6 +62,21 @@ export const HomeScreen = ({ navigation }) => {
 
   // Memoized Tails Verified listing
   const tailsListing = homeData?.tails_verified_listings?.[0];
+
+  // The heart saves this place to the account (POST / DELETE /accounts/me/saved/{id})
+  const { saved: isFavorite, toggle: toggleSaved } = useSavePlace(tailsListing?.id, tailsListing);
+  const handleToggleFavorite = useCallback(() => {
+    if (!toggleSaved()) {
+      return;
+    }
+    heartBurstAnim.setValue(0.6);
+    Animated.spring(heartBurstAnim, {
+      toValue: 1,
+      friction: 3,
+      tension: 80,
+      useNativeDriver: true,
+    }).start();
+  }, [toggleSaved, heartBurstAnim]);
   const tailsData = useMemo(() => {
     if (!tailsListing) return null;
     return {
@@ -164,7 +169,6 @@ export const HomeScreen = ({ navigation }) => {
     cat => {
       setSelectedCategory(cat.id);
       navigation.navigate('SearchScreen', { apiCategory: cat.id, category: cat.name });
-   
     },
     [navigation],
   );
@@ -298,7 +302,9 @@ export const HomeScreen = ({ navigation }) => {
         }),
       },
       { translateX: quickShake.interpolate({ inputRange: [-1, 1], outputRange: [-s(3), s(3)] }) },
-      { rotate: quickShake.interpolate({ inputRange: [-1, 1], outputRange: ['-1.5deg', '1.5deg'] }) },
+      {
+        rotate: quickShake.interpolate({ inputRange: [-1, 1], outputRange: ['-1.5deg', '1.5deg'] }),
+      },
     ],
   });
   const quickNudgeStyle = {
@@ -409,10 +415,14 @@ export const HomeScreen = ({ navigation }) => {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onSearchSubmit={query => {
-            navigation.navigate('SearchScreen', {
-              query: query !== undefined ? query : searchQuery,
-              category: 'Pet Friendly Stays',
-            });
+            const text = (query !== undefined ? query : searchQuery || '').trim();
+            if (!text) {
+              return;
+            }
+            // SearchScreen calls GET /listings?q=<text>&page_size=18
+            navigation.navigate('SearchScreen', { query: text });
+            // Clear the Home search box so it's empty when the user comes back
+            setSearchQuery('');
           }}
           avatarScale={avatarScale}
           avatarRotate={avatarRotate}
@@ -529,7 +539,6 @@ export const HomeScreen = ({ navigation }) => {
             </Text>
 
             <View style={styles.categoriesGrid}>
-         
               {categoriesList.map((cat, index) => (
                 <Animated.View
                   key={cat.id}
@@ -597,19 +606,10 @@ export const HomeScreen = ({ navigation }) => {
                       StyleSheet.absoluteFillObject,
                       { transform: [{ translateY: storyImageParallax }, { scale: 1.12 }] },
                     ]}>
-                    <FastImage
-                      source={{ uri: storiesList[0].imageUri }}
-                      style={StyleSheet.absoluteFillObject}
-                      resizeMode={FastImage.resizeMode.cover}
-                    />
+                    <StoryCoverImage uri={storiesList[0].imageUri} />
                   </Animated.View>
 
-                  <LinearGradient
-                    colors={['rgba(20, 10, 35, 0.45)', 'rgba(20, 10, 35, 0.88)']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFillObject}
-                  />
+                  <StoryOverlay />
 
                   {/* Dynamic Glass Holographic Sheen */}
                   <Animated.View
@@ -684,17 +684,8 @@ export const HomeScreen = ({ navigation }) => {
                       onPress={() =>
                         navigation.navigate('TravelStoryScreen', { initialStoryId: item.id })
                       }>
-                      <FastImage
-                        source={{ uri: item.imageUri }}
-                        style={StyleSheet.absoluteFillObject}
-                        resizeMode={FastImage.resizeMode.cover}
-                      />
-                      <LinearGradient
-                        colors={['rgba(20, 10, 35, 0.45)', 'rgba(20, 10, 35, 0.88)']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={StyleSheet.absoluteFillObject}
-                      />
+                      <StoryCoverImage uri={item.imageUri} />
+                      <StoryOverlay />
 
                       <View style={styles.storyContent}>
                         <View style={styles.storyTopPill}>
@@ -773,7 +764,12 @@ export const HomeScreen = ({ navigation }) => {
                   ],
                 },
               ]}>
-              <BouncyPressable style={styles.fullWidth} activeScale={0.975} onPress={() => {}}>
+              <BouncyPressable
+                style={styles.fullWidth}
+                activeScale={0.975}
+                onPress={() => {
+                  navigation?.navigate?.('ListingDetailScreen', { slug: tailsListing.slug });
+                }}>
                 <View style={styles.tailsImageContainer}>
                   <Animated.View
                     style={[
@@ -814,7 +810,7 @@ export const HomeScreen = ({ navigation }) => {
                         <Ionicons
                           name={isFavorite ? 'heart' : 'heart-outline'}
                           size={ms(16)}
-                          color={isFavorite ? '#E11D48' : '#000000'}
+                          color={isFavorite ? '#E11D48' : isDarkMode ? '#FFFFFF' : '#000000'}
                         />
                       </Animated.View>
                     </Pressable>
@@ -907,7 +903,12 @@ export const HomeScreen = ({ navigation }) => {
                 <BouncyPressable
                   style={[styles.circleArrowBtn, isDarkMode && styles.circleArrowBtnDark]}
                   activeScale={0.85}
-                  onPress={() => {}}>
+                  onPress={() =>
+                    navigation.navigate('SearchScreen', {
+                      verifiedOnly: true,
+                      category: 'Recently Verified',
+                    })
+                  }>
                   <Feather
                     name="arrow-right"
                     size={ms(18)}
@@ -929,7 +930,9 @@ export const HomeScreen = ({ navigation }) => {
               <BouncyPressable
                 style={[styles.recentCompactCard, isDarkMode && styles.recentCompactCardDark]}
                 activeScale={0.965}
-                onPress={() => {}}>
+                onPress={() => {
+                  navigation?.navigate?.('ListingDetailScreen', { slug: recentListing.slug });
+                }}>
                 <View style={styles.recentImgContainer}>
                   <FastImage
                     source={{
@@ -1186,7 +1189,6 @@ export const HomeScreen = ({ navigation }) => {
                     onPress={() =>
                       navigation.navigate('RoadTripDetailScreen', {
                         slug: trip.slug,
-                       
                       })
                     }>
                     {trip.image ? (
@@ -1330,11 +1332,7 @@ export const HomeScreen = ({ navigation }) => {
                       <Ionicons name={tile.icon} size={ms(18)} color={tile.accentText} />
                     </View>
                     <Animated.View style={[styles.quickTilePill, quickNudgeStyle]}>
-                      <Feather
-                        name={tile.ctaIcon}
-                        size={ms(16)}
-                        color={tile.accentText}
-                      />
+                      <Feather name={tile.ctaIcon} size={ms(16)} color={tile.accentText} />
                     </Animated.View>
                   </View>
                   <View>
@@ -1364,6 +1362,7 @@ export { AddPlaceScreen } from './AddPlaceScreen';
 export { TransportScreen } from './TransportScreen';
 export { TransportModeScreen } from './TransportModeScreen';
 export { TravelStoryScreen } from './TravelStoryScreen';
+export { StoryDetailScreen } from './StoryDetailScreen';
 export { RoadTripRoutesScreen } from './RoadTripRoutesScreen';
 export { RoadTripDetailScreen } from './RoadTripDetailScreen';
 export { RoadTripStopDetailScreen } from './RoadTripStopDetailScreen';

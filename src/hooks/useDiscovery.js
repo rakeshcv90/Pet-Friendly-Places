@@ -197,6 +197,21 @@ export const useTravelStories = (options = {}) => {
   });
 };
 
+// One travel story with its full content: GET /stories/{slug}
+export const useTravelStory = (slug, options = {}) => {
+  return useQuery({
+    queryKey: ['discovery', 'travelStory', slug],
+    queryFn: async () => {
+      const data = await api.get(API_ENDPOINTS.USER.TRAVEL_STORY_DETAIL(slug));
+      // The API may wrap the story as { story } or { data }
+      return data?.story || data?.data || data;
+    },
+    enabled: !!slug,
+    staleTime: 1000 * 60 * 5,
+    ...options,
+  });
+};
+
 export const useListingDetail = (slug, options = {}) => {
   return useQuery({
     queryKey: ['discovery', 'listingDetail', slug],
@@ -388,7 +403,15 @@ export const useCityListings = (city, options = {}) =>
 export const useCityIntro = (citySlug, options = {}) =>
   useQuery({
     queryKey: ['discovery', 'cityIntro', citySlug],
-    queryFn: () => getOrNull(`/cities/intros?city_slug=${encodeURIComponent(citySlug)}`),
+    queryFn: async () => {
+      const one = await getOrNull(`/cities/intros?city_slug=${encodeURIComponent(citySlug)}`);
+      if (one) {
+        return one;
+      }
+      // Some deployments only answer the full list: pick this city out of it
+      const all = await getOrNull('/cities/intros');
+      return Array.isArray(all) ? all.find(row => row?.citySlug === citySlug) || null : null;
+    },
     enabled: !!citySlug,
     staleTime: 1000 * 60 * 10,
     ...options,

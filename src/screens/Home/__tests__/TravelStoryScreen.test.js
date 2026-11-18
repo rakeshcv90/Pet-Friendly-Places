@@ -5,6 +5,7 @@ import { TravelStoryScreen } from '../TravelStoryScreen';
 const mockNavigation = {
   goBack: jest.fn(),
   navigate: jest.fn(),
+  setParams: jest.fn(),
 };
 
 const mockRoute = {
@@ -68,6 +69,7 @@ jest.mock('../../../hooks/useUser', () => ({
 }));
 
 jest.mock('../../../hooks/useDiscovery', () => ({
+  useTravelStory: () => ({ data: undefined }),
   useHomeData: () => ({
     data: {
       stories: [
@@ -159,15 +161,18 @@ describe('TravelStoryScreen Component', () => {
     expect(getByText('Notify me')).toBeTruthy();
   });
 
-  it('opens reader modal when a story card is pressed', () => {
+  it('opens the story screen with its slug when a story card is pressed', () => {
+    mockNavigation.navigate.mockClear();
     const { getByText } = render(
       <TravelStoryScreen navigation={mockNavigation} route={mockRoute} />
     );
 
-    const featuredStory = getByText(/Gurgaon to Jabalpur with Dogs/);
-    fireEvent.press(featuredStory);
+    fireEvent.press(getByText(/Gurgaon to Jabalpur with Dogs/));
 
-    expect(getByText(/Pack Tips & Must-Knows/)).toBeTruthy();
+    expect(mockNavigation.navigate).toHaveBeenCalledWith(
+      'StoryDetailScreen',
+      expect.objectContaining({ slug: 'gurgaon-to-jabalpur-road-trip-dogs' })
+    );
   });
 
   it('toggles notification button state when pressed', () => {

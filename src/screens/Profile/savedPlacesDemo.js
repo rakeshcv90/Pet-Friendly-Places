@@ -1,6 +1,7 @@
 // Demo data to check the Saved Places design without an account or network.
-// Set SHOW_DEMO_SAVED_PLACES to false (or delete this file) to use the real API again.
-export const SHOW_DEMO_SAVED_PLACES = __DEV__ && true;
+// Off, so the screen shows the account's real saved places (GET /accounts/me/saved).
+// Set SHOW_DEMO_SAVED_PLACES to true only to look at the design with sample data.
+export const SHOW_DEMO_SAVED_PLACES = false;
 
 const photo = seed => `https://picsum.photos/seed/${seed}/800/500`;
 

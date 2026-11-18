@@ -11,6 +11,7 @@ import {
   TransportScreen,
   TransportModeScreen,
   TravelStoryScreen,
+  StoryDetailScreen,
   RoadTripRoutesScreen,
   RoadTripDetailScreen,
   RoadTripStopDetailScreen,
@@ -33,6 +34,7 @@ import { StoryGuidesScreen, GuideDetailScreen, ListingDetailScreen } from '../sc
 import { SavedScreen } from '../screens/Saved';
 import { InAppBrowserScreen } from '../screens/Web/InAppBrowserScreen';
 import { LeaderboardScreen } from '../screens/Leaderboard/LeaderboardScreen';
+import { NotificationsScreen } from '../screens/Notifications';
 import { CommunityDetailScreen, PostDetailScreen, NewPostScreen } from '../screens/Community';
 
 const Stack = createNativeStackNavigator();
@@ -104,6 +106,15 @@ export const AppNavigator = () => {
         }}
       />
       <Stack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
         name="MySubmissionsScreen"
         component={MySubmissionsScreen}
         options={{
@@ -142,6 +153,15 @@ export const AppNavigator = () => {
       <Stack.Screen
         name="TravelStoryScreen"
         component={TravelStoryScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="StoryDetailScreen"
+        component={StoryDetailScreen}
         options={{
           animation: 'ios_from_right',
           gestureEnabled: true,

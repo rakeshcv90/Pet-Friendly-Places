@@ -28,6 +28,8 @@ export const API_ENDPOINTS = {
     CITIES: '/discovery/cities',
     ROAD_TRIP: '/routes?status=published',
     TRAVEL_STORY: '/stories',
+    // One story by slug: GET /stories/{slug}
+    TRAVEL_STORY_DETAIL: slug => `/stories/${encodeURIComponent(slug)}`,
     ARTICLES: '/articles',
     // REQUEST_CITY: '/mobile/cities/known',
      REQUEST_CITY: '/cities/known',
@@ -52,6 +54,14 @@ export const API_ENDPOINTS = {
   SAVED_PLACES: '/accounts/me/saved',
   // The signed-in account's pets
   MY_PETS: '/me/pets',
+  // The signed-in account's notifications. GET list, GET unread-count,
+  // POST mark-read { ids: [] }, POST mark-all-read
+  NOTIFICATIONS: {
+    LIST: '/me/notifications',
+    UNREAD_COUNT: '/me/notifications/unread-count',
+    MARK_READ: '/me/notifications/mark-read',
+    MARK_ALL_READ: '/me/notifications/mark-all-read',
+  },
   // POST creates a pet: { petName, species, breed, bio? }
   PETS: '/pets',
   // PATCH updates one pet
@@ -60,6 +70,10 @@ export const API_ENDPOINTS = {
   PET_PHOTO: petId => `/pets/${petId}/photo`,
   // Adventures gallery. POST multipart { media, title?, description? } and GET take ?type=photo|video
   PET_MEDIA: petId => `/pets/${petId}/media`,
+  // A pet's private health records. GET list, POST create (JSON). Photos are added one at a time:
+  // POST multipart { file } to .../health-records/{recordId}/files
+  PET_HEALTH_RECORDS: petId => `/pets/${petId}/health-records`,
+  PET_HEALTH_RECORD_FILES: (petId, recordId) => `/pets/${petId}/health-records/${recordId}/files`,
   // Public pawsport: pet name, stamp total, distinct places, stamp details
   PAWSPORT: petSlug => `/traveller/${petSlug}/pawsport`,
 

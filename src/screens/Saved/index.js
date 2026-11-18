@@ -813,7 +813,6 @@ export const SavedScreen = ({ navigation }) => {
           onSearchSubmit={query =>
             navigation?.navigate?.('SearchScreen', { query, category: 'Pet Friendly Stays' })
           }
-          onNotificationPress={() => navigation?.navigate?.('Notifications')}
           onAvatarPress={() => navigation?.navigate?.('Profile')}
           avatarScale={avatarScale}
           avatarRotate={avatarRotate}

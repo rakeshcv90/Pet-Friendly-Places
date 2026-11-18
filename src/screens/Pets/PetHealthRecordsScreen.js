@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, StatusBar, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { s, vs, ms } from 'react-native-size-matters';
 
@@ -10,6 +11,27 @@ import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { Enter } from '../Community/Motion';
 import { PetHero, DEEP_PURPLE } from './components/PetHero';
 import { petName } from './petUtils';
+import { HealthPhotoCard, HealthRecordForm, PrimaryButton, OutlineButton } from './components/HealthRecordAdd';
+import { SuccessToast } from '../../components/common/SuccessToast';
+import { requestCamera, openPhoneSettings } from '../../services/permissions/permissions';
+import {
+  useHealthRecords,
+  useCreateHealthRecord,
+  documentTypeLabel,
+  toIsoDate,
+} from '../../hooks/usePetHealth';
+
+const MAX_PHOTOS = 10;
+const EMPTY_FORM = {
+  documentType: 'vaccination',
+  recordName: '',
+  dateIssued: '',
+  nextDueDate: '',
+  vetName: '',
+  clinicName: '',
+  documentNumber: '',
+  notes: '',
+};
 
 const comingSoon = feature =>
   Alert.alert(
@@ -23,6 +45,108 @@ export const PetHealthRecordsScreen = ({ navigation, route }) => {
   const isDarkMode = useStore(state => state.isDarkMode) || false;
   const pet = route?.params?.pet || {};
   const name = petName(pet);
+
+  const { data: records = [] } = useHealthRecords(pet.id);
+  const createRecord = useCreateHealthRecord(pet.id);
+
+  // "Add photos" / "Add record" open the add area: photo card first, then the form
+  const [adding, setAdding] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [photos, setPhotos] = useState([]);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [error, setError] = useState('');
+  const [toast, setToast] = useState('');
+
+  const openAdd = useCallback(() => {
+    setAdding(true);
+  }, []);
+  const openForm = useCallback(() => {
+    setAdding(true);
+    setFormOpen(true);
+  }, []);
+
+  const addPhotos = useCallback(assets => {
+    const picked = (assets || []).filter(asset => asset?.uri);
+    if (picked.length === 0) {
+      return;
+    }
+    setPhotos(current => [...current, ...picked].slice(0, MAX_PHOTOS));
+    setFormOpen(true);
+  }, []);
+
+  const handlePhotoResult = useCallback(
+    response => {
+      if (response?.didCancel) {
+        return;
+      }
+      if (response?.errorCode) {
+        Alert.alert('Photo', response.errorMessage || 'Unable to open your photos.');
+        return;
+      }
+      addPhotos(response?.assets);
+    },
+    [addPhotos],
+  );
+
+  const handleTakePhoto = useCallback(async () => {
+    const status = await requestCamera();
+    if (status === 'denied' || status === 'blocked') {
+      Alert.alert(
+        'Camera permission needed',
+        'Allow camera access to take a photo of the document. You can change this in Settings.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => openPhoneSettings() },
+        ],
+      );
+      return;
+    }
+    launchCamera(
+      { mediaType: 'photo', quality: 0.85, maxWidth: 2000, maxHeight: 2000, saveToPhotos: false },
+      handlePhotoResult,
+    );
+  }, [handlePhotoResult]);
+
+  const handleChoosePhotos = useCallback(() => {
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        quality: 0.85,
+        selectionLimit: Math.max(1, MAX_PHOTOS - photos.length),
+        maxWidth: 2000,
+        maxHeight: 2000,
+      },
+      handlePhotoResult,
+    );
+  }, [handlePhotoResult, photos.length]);
+
+  const handleChange = useCallback((key, value) => {
+    setForm(current => ({ ...current, [key]: value }));
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    setError('');
+    if (toIsoDate(form.dateIssued) === null || toIsoDate(form.nextDueDate) === null) {
+      setError('Enter dates as DD/MM/YYYY, for example 05/03/2026.');
+      return;
+    }
+    try {
+      const { failedPhotos } = await createRecord.mutateAsync({ form, photos });
+      setForm(EMPTY_FORM);
+      setPhotos([]);
+      setFormOpen(false);
+      setAdding(false);
+      setToast(
+        failedPhotos > 0
+          ? `Record saved. ${failedPhotos} photo${failedPhotos > 1 ? 's' : ''} could not be uploaded.`
+          : 'Health record saved',
+      );
+    } catch (e) {
+      setError(
+        e?.response?.data?.error || e?.message || 'Could not save this record. Please try again.',
+      );
+    }
+  }, [form, photos, createRecord]);
 
   const actions = [
     { id: 'download', label: 'Download summary', icon: 'download-outline' },
@@ -58,7 +182,7 @@ export const PetHealthRecordsScreen = ({ navigation, route }) => {
                 testID={`health-${action.id}`}
                 style={styles.action}
                 activeScale={0.94}
-                onPress={() => comingSoon(action.label)}>
+                onPress={() => (action.id === 'photos' ? openAdd() : comingSoon(action.label))}>
                 <Ionicons name={action.icon} size={ms(15)} color="#FFFFFF" />
                 <Text style={styles.actionText}>{action.label}</Text>
               </BouncyPressable>
@@ -67,20 +191,96 @@ export const PetHealthRecordsScreen = ({ navigation, route }) => {
         </Enter>
 
         <Enter index={1}>
-          <View style={[styles.card, isDarkMode && styles.cardDark]}>
-            <Text style={[styles.cardTitle, isDarkMode && styles.textWhite]}>No pages yet</Text>
-            <View style={[styles.divider, isDarkMode && styles.dividerDark]} />
-            <View style={styles.empty}>
-              <View style={[styles.emptyIcon, isDarkMode && styles.emptyIconDark]}>
-                <Ionicons name="document-text-outline" size={ms(30)} color="#7C3AED" />
-              </View>
-              <Text style={[styles.emptyText, isDarkMode && styles.mutedDark]}>
-                No source pages yet. Add a clear photo from the health-record editor.
-              </Text>
-            </View>
+          <View style={[styles.note, isDarkMode && styles.cardDark]}>
+            <Ionicons name="lock-closed-outline" size={ms(16)} color="#7C3AED" />
+            <Text style={[styles.noteText, isDarkMode && styles.mutedDark]}>
+              Only you can see these. Health records are never shown on your pet's public profile.
+            </Text>
           </View>
         </Enter>
+
+        <Enter index={2}>
+          <View style={[styles.card, styles.recordsCard, isDarkMode && styles.cardDark]}>
+            <Text style={[styles.cardTitle, styles.recordsTitle, isDarkMode && styles.textWhite]}>
+              Health Records
+            </Text>
+            <Text style={[styles.recordsSub, isDarkMode && styles.mutedDark]}>
+              Keep health and travel documents together for easy access.
+            </Text>
+            <View style={styles.recordsButtons}>
+              <PrimaryButton
+                testID="health-open-book"
+                label="Open health records book"
+                onPress={() => comingSoon('Health records book')}
+              />
+              <OutlineButton
+                testID="health-add-record"
+                label="Add record"
+                onPress={openForm}
+                isDarkMode={isDarkMode}
+              />
+            </View>
+
+            {records.length === 0 ? (
+              <Text style={[styles.emptyText, styles.recordsEmpty, isDarkMode && styles.mutedDark]}>
+                No health records yet. Add a record to keep important documents private and easy
+                to find.
+              </Text>
+            ) : (
+              <View style={styles.recordList}>
+                {records.map((record, index) => (
+                  <View
+                    key={record.id ?? index}
+                    style={[styles.recordRow, isDarkMode && styles.recordRowDark]}>
+                    <View style={[styles.emptyIcon, styles.recordIcon, isDarkMode && styles.emptyIconDark]}>
+                      <Ionicons name="document-text-outline" size={ms(18)} color="#7C3AED" />
+                    </View>
+                    <View style={styles.recordText}>
+                      <Text style={[styles.recordName, isDarkMode && styles.textWhite]} numberOfLines={1}>
+                        {record.recordName || record.name || documentTypeLabel(record.documentType)}
+                      </Text>
+                      <Text style={[styles.recordMeta, isDarkMode && styles.mutedDark]} numberOfLines={1}>
+                        {[
+                          documentTypeLabel(record.documentType),
+                          record.dateIssued && String(record.dateIssued).slice(0, 10),
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        </Enter>
+
+        {adding ? (
+          <>
+            <HealthPhotoCard
+              petName={name}
+              photos={photos}
+              onTakePhoto={handleTakePhoto}
+              onChoosePhotos={handleChoosePhotos}
+              onRemovePhoto={index => setPhotos(current => current.filter((_, i) => i !== index))}
+              onEnterByHand={openForm}
+              isDarkMode={isDarkMode}
+            />
+            {formOpen ? (
+              <HealthRecordForm
+                form={form}
+                onChange={handleChange}
+                onSave={handleSave}
+                saving={createRecord.isPending}
+                error={error}
+                isDarkMode={isDarkMode}
+              />
+            ) : null}
+          </>
+        ) : null}
       </ScrollView>
+
+      <SuccessToast message={toast} onHide={() => setToast('')} />
     </View>
   );
 };
@@ -158,4 +358,29 @@ const styles = StyleSheet.create({
   },
   textWhite: { color: '#FFFFFF' },
   mutedDark: { color: '#94A3B8' },
+  note: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(10),
+    marginHorizontal: s(16),
+    marginBottom: vs(14),
+    padding: s(14),
+    borderRadius: s(18),
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.2,
+    borderColor: '#DDD6FE',
+  },
+  noteText: { flex: 1, fontSize: s(12.5), lineHeight: s(18), color: '#4B5563', fontFamily: theme.typography.fontFamily.medium },
+  recordsCard: { padding: s(18) },
+  recordsTitle: { padding: 0, fontSize: s(18), fontFamily: theme.typography.fontFamily.extraBold, color: '#1E1B4B' },
+  recordsSub: { marginTop: vs(4), fontSize: s(12.5), lineHeight: s(18), color: '#6B5C85', fontFamily: theme.typography.fontFamily.medium },
+  recordsButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: s(10), marginTop: vs(14) },
+  recordsEmpty: { textAlign: 'left', marginTop: vs(16) },
+  recordList: { marginTop: vs(14), gap: s(10) },
+  recordRow: { flexDirection: 'row', alignItems: 'center', padding: s(10), borderRadius: s(16), backgroundColor: '#F8F5FF' },
+  recordRowDark: { backgroundColor: 'rgba(255,255,255,0.06)' },
+  recordIcon: { width: s(40), height: s(40), borderRadius: s(14) },
+  recordText: { flex: 1, marginLeft: s(12) },
+  recordName: { fontSize: s(14), color: '#1E1B4B', fontFamily: theme.typography.fontFamily.bold },
+  recordMeta: { marginTop: 2, fontSize: s(11.5), color: '#6B5C85', fontFamily: theme.typography.fontFamily.medium },
 });

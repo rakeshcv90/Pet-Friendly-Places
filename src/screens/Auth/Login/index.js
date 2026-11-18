@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: isSmallDevice ? s(25) : s(25),
     lineHeight: isSmallDevice ? s(25) : s(25),
-    fontFamily: theme.typography.fontFamily.bold,
+    fontFamily: theme.typography.fontFamily.extraBold,
     color: theme.colors.primaryDark,
     textAlign: 'center',
     marginBottom: s(4),

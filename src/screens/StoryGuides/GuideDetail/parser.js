@@ -182,7 +182,7 @@ export const parseArticleBody = body => {
   html = replaceDivBlocks(html, 'article-stats', (_, inner) => {
     const stats = [
       ...inner.matchAll(
-        /article-stat-icon[^>]*>([\s\S]*?)<\/span>[\s\S]*?article-stat-value[^>]*>([\s\S]*?)<\/div>[\s\S]*?article-stat-label[^>]*>([\s\S]*?)<\/div>/gi,
+        /article-stat-icon[^>]*>([\s\S]*?)<\/span>[\s\S]*?article-stat-value[^>]*>([\s\S]*?)<\/(?:div|span)>[\s\S]*?article-stat-label[^>]*>([\s\S]*?)<\/(?:div|span)>/gi,
       ),
     ].map(m => ({ icon: stripTags(m[1]), value: stripTags(m[2]), label: stripTags(m[3]) }));
     return stats.length ? stashNode({ type: 'stat-row', stats }) : '';

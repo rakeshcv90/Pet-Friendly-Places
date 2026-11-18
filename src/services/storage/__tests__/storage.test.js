@@ -94,11 +94,45 @@ describe('storage service', () => {
         SESSION,
       );
       removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+      // An app that was launched before (not a fresh install) already has its install marker
+      storage.set(STORAGE_KEYS.INSTALL_MARKER, '1');
 
       await initSecureStorage();
 
       expect(getItem(STORAGE_KEYS.ACCESS_TOKEN)).toBe('a');
       expect(getItem(STORAGE_KEYS.REFRESH_TOKEN)).toBe('r');
+    });
+
+    it('drops a session left in the Keychain by a deleted app (fresh install)', async () => {
+      // Deleting the app wipes MMKV but not the Keychain
+      storage.clearAll();
+      await Keychain.setGenericPassword(
+        'session',
+        JSON.stringify({ ACCESS_TOKEN: 'old-a', REFRESH_TOKEN: 'old-r' }),
+        SESSION,
+      );
+
+      await initSecureStorage();
+
+      expect(getItem(STORAGE_KEYS.ACCESS_TOKEN)).toBeUndefined();
+      expect(getItem(STORAGE_KEYS.REFRESH_TOKEN)).toBeUndefined();
+      expect(await Keychain.getGenericPassword(SESSION)).toBe(false);
+      // The next launch is a normal one and keeps whatever was saved since
+      expect(storage.getString(STORAGE_KEYS.INSTALL_MARKER)).toBe('1');
+    });
+
+    it('keeps the session when an app that has data is simply updated', async () => {
+      storage.clearAll();
+      storage.set(STORAGE_KEYS.SELECTED_LOCATION, 'Delhi');
+      await Keychain.setGenericPassword(
+        'session',
+        JSON.stringify({ ACCESS_TOKEN: 'a', REFRESH_TOKEN: 'r' }),
+        SESSION,
+      );
+
+      await initSecureStorage();
+
+      expect(getItem(STORAGE_KEYS.ACCESS_TOKEN)).toBe('a');
     });
 
     it('moves tokens an older version left in MMKV into the Keychain', async () => {

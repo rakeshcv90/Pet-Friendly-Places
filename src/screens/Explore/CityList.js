@@ -423,11 +423,11 @@ export const CityList = ({ navigation, route }) => {
             </View>
           </View>
         )}
-        {/* ── Spacer for Sticky Search Bar ── */}
+        
         <View style={styles.searchSpacer} />
 
         {!searchQuery.trim() && (
-          /* ── Featured Region Card (Delhi NCR) ── */
+        
           <View style={[styles.featuredRegionCard, isDarkMode && styles.featuredRegionCardDark]}>
             <LinearGradient
               colors={isDarkMode ? ['#1F1338', '#2A184D'] : ['#FFFDF7', '#FEF3C7']}
@@ -475,7 +475,11 @@ export const CityList = ({ navigation, route }) => {
               <BouncyPressable
                 style={styles.featuredCtaBtn}
                 activeScale={0.94}
-                onPress={() => handleSelectCity('Delhi NCR')}>
+                onPress={() => 
+                 navigation.navigate('SearchScreen', { query: 'Delhi NCR' })
+                // handleSelectCity('Delhi NCR')
+                }
+                >
                 <Text style={styles.featuredCtaText}>Explore Delhi NCR</Text>
                 <Feather name="arrow-right" size={ms(13)} color="#FFFFFF" style={styles.ctaArrow} />
               </BouncyPressable>
@@ -557,7 +561,7 @@ export const CityList = ({ navigation, route }) => {
         backgroundColor={isDarkMode ? '#0F071D' : '#F8F7FC'}
       />
 
-      {/* ── Top Header Bar (Fixed) ── */}
+    
       <View style={[styles.headerRow, isDarkMode && styles.headerRowDark]}>
         <BouncyPressable
           style={[styles.backButton, isDarkMode && styles.backButtonDark]}
@@ -582,7 +586,7 @@ export const CityList = ({ navigation, route }) => {
         </View>
       </View>
 
-      {/* ── Scroll Area with Sticky Search ── */}
+  
       <View style={styles.listArea}>
         <Animated.FlatList
           data={filteredCities}
@@ -642,7 +646,7 @@ export const CityList = ({ navigation, route }) => {
         </Animated.View>
       </View>
 
-      {/* ── Fixed Bottom Callout: Can't find your city? (Always visible) ── */}
+     
       <View
         style={[styles.bottomCalloutWrapper, { paddingBottom: Math.max(insets.bottom, vs(10)) }]}>
         <View style={styles.requestCalloutCard}>
@@ -673,7 +677,7 @@ export const CityList = ({ navigation, route }) => {
         </View>
       </View>
 
-      {/* ── Request City Modal ── */}
+  
       <Modal
         visible={requestModalVisible}
         transparent

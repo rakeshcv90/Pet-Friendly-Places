@@ -1,3 +1,5 @@
+import { useCallback } from 'react';
+import { Alert } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api/apiClient';
 import { API_ENDPOINTS, API_BASE_URL } from '../services/api/apiList';
@@ -72,7 +74,9 @@ export const useMyPets = (options = {}) => {
       useStore.getState().setPets(pets);
       return pets;
     },
-    staleTime: 1000 * 60,
+    staleTime: 1000 * 15,
+    // Reload when the app returns to the foreground: the account may have changed on another phone
+    refetchOnWindowFocus: true,
     ...options,
   });
 };
@@ -118,9 +122,7 @@ export const uploadPetPhoto = async (petId, photo, purpose = 'profile_photo') =>
   }
 };
 
-// Creates a pet from the Add a pet form. petName, species and breed are required, bio is optional.
-// An optional photo is uploaded right after. Resolves once the pet list has been reloaded, so the
-// new pet is already in it.
+
 export const useCreatePet = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -291,6 +293,77 @@ export const useUnsavePlace = () => {
       return { previous };
     },
     onError: (_error, _listingId, context) => {
+      queryClient.setQueryData(key, context?.previous);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
+  });
+};
+
+// Save / unsave one place for the signed-in account:
+//   POST   /accounts/me/saved/{listingId}   save
+//   DELETE /accounts/me/saved/{listingId}   remove
+// The heart flips straight away and flips back if the request fails. `listing` is optional and
+// only gives the saved list a readable entry until the server's own list loads.
+export const useSavePlace = (listingId, listing) => {
+  const queryClient = useQueryClient();
+  const isAuthenticated = useStore(state => state.isAuthenticated);
+  const { data: savedPlaces } = useSavedPlaces();
+  const key = ['user', 'saved'];
+
+  const saved =
+    listingId !== undefined &&
+    listingId !== null &&
+    (savedPlaces || []).some(place => String(place?.id) === String(listingId));
+
+  const mutation = useMutation({
+    mutationFn: ({ id, save }) =>
+      save ? api.post(API_ENDPOINTS.SAVED_PLACE(id)) : api.delete(API_ENDPOINTS.SAVED_PLACE(id)),
+    onMutate: async ({ id, save }) => {
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData(key);
+      queryClient.setQueryData(key, current => {
+        const list = (current || []).filter(place => String(place?.id) !== String(id));
+        return save ? [{ ...(listing || {}), id }, ...list] : list;
+      });
+      return { previous };
+    },
+    onError: (_error, _vars, context) => {
+      queryClient.setQueryData(key, context?.previous);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
+  });
+
+  const toggle = useCallback(() => {
+    if (listingId === undefined || listingId === null || mutation.isPending) {
+      return false;
+    }
+    if (!isAuthenticated) {
+      Alert.alert('Sign in to save', 'Log in to keep places in your saved list.');
+      return false;
+    }
+    mutation.mutate({ id: listingId, save: !saved });
+    return true;
+  }, [listingId, isAuthenticated, mutation, saved]);
+
+  return { saved, toggle, isPending: mutation.isPending, isError: mutation.isError };
+};
+
+// Puts a just-removed place back into the saved list (the Undo on the Saved Places screen)
+export const useRestoreSavedPlace = () => {
+  const queryClient = useQueryClient();
+  const key = ['user', 'saved'];
+  return useMutation({
+    mutationFn: place => api.post(API_ENDPOINTS.SAVED_PLACE(place.id)),
+    onMutate: async place => {
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData(key);
+      queryClient.setQueryData(key, current => [
+        place,
+        ...(current || []).filter(entry => String(entry?.id) !== String(place.id)),
+      ]);
+      return { previous };
+    },
+    onError: (_error, _place, context) => {
       queryClient.setQueryData(key, context?.previous);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: key }),

@@ -262,7 +262,6 @@ export const StoryGuidesScreen = React.memo(function StoryGuidesScreen({ navigat
       <AppHeader
         title="Story & Guides"
         showSearch={false}
-        onNotificationPress={() => navigation?.navigate?.('Notifications')}
         onAvatarPress={() => navigation?.navigate?.('Profile')}
       />
     ),

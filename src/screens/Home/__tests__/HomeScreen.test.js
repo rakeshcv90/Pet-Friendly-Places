@@ -15,6 +15,7 @@ jest.mock('../../../hooks/useUser', () => ({
   useUserProfile: () => ({
     data: { name: 'Luna Parent' },
   }),
+  useSavePlace: () => ({ saved: false, toggle: () => true }),
 }));
 
 jest.mock('../../../hooks/useDiscovery', () => ({

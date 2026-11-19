@@ -1,14 +1,8 @@
 // Website (not the API): used for links that open in the browser, e.g. the community guidelines
 export const WEB_BASE_URL = 'https://petfriendlyplaces.in';
 
-// export const API_BASE_URL =
-//   'https://af764897-7306-4080-80a7-e25f9325ccdf-00-1p3we5yilmeoo-jtyfzm0j.sisko.replit.dev/api';
-
- export const API_BASE_URL = "https://af764897-7306-4080-80a7-e25f9325ccdf-00-1p3we5yilmeoo-8k9dg7jy.sisko.replit.dev/api"
-
-// export const API_BASE_URL =
-//   'https://af764897-7306-4080-80a7-e25f9325ccdf-00-1p3we5yilmeoo-e24qdc9p.sisko.replit.dev/api';
-
+//  export const API_BASE_URL = "https://af764897-7306-4080-80a7-e25f9325ccdf-00-1p3we5yilmeoo-8k9dg7jy.sisko.replit.dev/api"
+export const API_BASE_URL = 'https://petfriendlyplaces.in/api'; //Live Url
 
 export const API_ENDPOINTS = {
   // Authentication
@@ -32,7 +26,7 @@ export const API_ENDPOINTS = {
     TRAVEL_STORY_DETAIL: slug => `/stories/${encodeURIComponent(slug)}`,
     ARTICLES: '/articles',
     // REQUEST_CITY: '/mobile/cities/known',
-     REQUEST_CITY: '/cities/known',
+    REQUEST_CITY: '/cities/known',
   },
 
   // Public transport guides: the hub lists the mode cards, a mode returns its hub + vehicles
@@ -52,6 +46,8 @@ export const API_ENDPOINTS = {
   MY_PLACE_SUBMISSIONS: '/me/place-submissions',
 
   SAVED_PLACES: '/accounts/me/saved',
+  // GET the signed-in account's profile privacy switches; PATCH one switch at a time
+  PRIVACY: '/accounts/me/privacy',
   // The signed-in account's pets
   MY_PETS: '/me/pets',
   // The signed-in account's notifications. GET list, GET unread-count,

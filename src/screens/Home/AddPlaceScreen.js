@@ -129,6 +129,7 @@ const Field = ({
         multiline && styles.inputBoxMultiline,
         isDarkMode && styles.inputBox3DDark,
         focused && styles.inputFocused,
+        focused && isDarkMode && styles.inputFocusedDark,
       ]}>
       {!!icon && (
         <Feather
@@ -1098,6 +1099,10 @@ const styles = StyleSheet.create({
     borderColor: '#7C3AED',
     borderBottomColor: '#5B21B6',
     backgroundColor: '#FFFFFF',
+  },
+  inputFocusedDark: {
+    backgroundColor: '#2E1259',
+    borderBottomColor: '#4C1D95',
   },
   fieldLeadIcon: { marginRight: s(8) },
   fieldLeadIconTop: { marginTop: vs(2) },

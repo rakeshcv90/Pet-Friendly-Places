@@ -11,7 +11,7 @@ import {
   Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FastImage from '../../components/common/FastImage';
+import FastImage, { prefetchImages } from '../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { s, vs, ms } from 'react-native-size-matters';
@@ -376,6 +376,10 @@ export const SearchScreen = ({ navigation, route }) => {
       .map(toPlace);
   }, [data?.pages]);
 
+  React.useEffect(() => {
+    prefetchImages(places.map(place => place.image));
+  }, [places]);
+
   const loadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
       fetchNextPage();
@@ -384,13 +388,17 @@ export const SearchScreen = ({ navigation, route }) => {
 
   const handleScroll = Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
     useNativeDriver: true,
-    listener: e => {
-      const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
-      if (contentOffset.y + layoutMeasurement.height >= contentSize.height - s(400)) {
-        loadMore();
-      }
-    },
   });
+
+  const renderPlace = useCallback(
+    ({ item }) => (
+      <SearchPlaceCard
+        place={item}
+        onPress={() => navigation?.navigate?.('ListingDetailScreen', { slug: item.slug })}
+      />
+    ),
+    [navigation],
+  );
 
   // User & location
   const { data: userProfile } = useUserProfile();
@@ -589,10 +597,19 @@ export const SearchScreen = ({ navigation, route }) => {
         />
       </Animated.View>
 
-      <Animated.ScrollView
+      <Animated.FlatList
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={handleScroll}
+        data={isLoading ? [] : places}
+        keyExtractor={item => String(item.id)}
+        renderItem={renderPlace}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        initialNumToRender={6}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews
         refreshControl={
           <RefreshControl
             refreshing={isRefetching && !isFetchingNextPage}
@@ -604,7 +621,9 @@ export const SearchScreen = ({ navigation, route }) => {
         contentContainerStyle={[
           styles.scrollContent,
           { paddingBottom: Math.max(insets.bottom, s(20)) + s(95) },
-        ]}>
+        ]}
+        ListHeaderComponent={
+          <>
         {/* ── AppHeader ── */}
         <AppHeader
           userName={userName}
@@ -821,54 +840,47 @@ export const SearchScreen = ({ navigation, route }) => {
           </Text>
         </View>
 
-        {/* ── Places Cards List ── */}
-        {isLoading ? (
-          <LoaderCard label="Loading…" isDarkMode={isDarkMode} style={styles.listLoader} />
-        ) : places.length === 0 ? (
-          <View style={[styles.noResultsCard, isDarkMode && styles.noResultsCardDark]}>
-            <Ionicons
-              name={isError ? 'cloud-offline-outline' : 'search-outline'}
-              size={ms(32)}
-              color={isDarkMode ? '#64748B' : '#A09AA8'}
-            />
-            <Text style={[styles.noResultsTitle, isDarkMode && styles.noResultsTitleDark]}>
-              {isError ? 'Could not load places' : 'No places match your filters'}
-            </Text>
-            <Text style={[styles.noResultsSubtitle, isDarkMode && styles.noResultsSubtitleDark]}>
-              {isError
-                ? 'Pull down to retry.'
-                : 'Try clearing active filters or selecting another category.'}
-            </Text>
-            {!isError ? (
-              <BouncyPressable
-                style={styles.resetFiltersBtn}
-                onPress={() => {
-                  setFilters(DEFAULT_FILTERS);
-                  setSelectedSubcategory('All stays');
-                  setSearchText('');
-                  setSubmittedQuery('');
-                }}>
-                <Text style={styles.resetFiltersBtnText}>Reset Filters</Text>
-              </BouncyPressable>
-            ) : null}
-          </View>
-        ) : (
-          places.map(place => (
-            <SearchPlaceCard
-              key={place.id}
-              place={place}
-              onPress={() => 
-             
-              navigation?.navigate?.('ListingDetailScreen', { slug: place.slug })
-              }
-            />
-          ))
-        )}
-
-        {isFetchingNextPage ? (
-          <LoaderCard label="Loading more…" isDarkMode={isDarkMode} style={styles.listLoader} />
-        ) : null}
-      </Animated.ScrollView>
+          </>
+        }
+        ListEmptyComponent={
+          isLoading ? (
+            <LoaderCard label="Loading…" isDarkMode={isDarkMode} style={styles.listLoader} />
+          ) : (
+            <View style={[styles.noResultsCard, isDarkMode && styles.noResultsCardDark]}>
+              <Ionicons
+                name={isError ? 'cloud-offline-outline' : 'search-outline'}
+                size={ms(32)}
+                color={isDarkMode ? '#64748B' : '#A09AA8'}
+              />
+              <Text style={[styles.noResultsTitle, isDarkMode && styles.noResultsTitleDark]}>
+                {isError ? 'Could not load places' : 'No places match your filters'}
+              </Text>
+              <Text style={[styles.noResultsSubtitle, isDarkMode && styles.noResultsSubtitleDark]}>
+                {isError
+                  ? 'Pull down to retry.'
+                  : 'Try clearing active filters or selecting another category.'}
+              </Text>
+              {!isError ? (
+                <BouncyPressable
+                  style={styles.resetFiltersBtn}
+                  onPress={() => {
+                    setFilters(DEFAULT_FILTERS);
+                    setSelectedSubcategory('All stays');
+                    setSearchText('');
+                    setSubmittedQuery('');
+                  }}>
+                  <Text style={styles.resetFiltersBtnText}>Reset Filters</Text>
+                </BouncyPressable>
+              ) : null}
+            </View>
+          )
+        }
+        ListFooterComponent={
+          isFetchingNextPage ? (
+            <LoaderCard label="Loading more…" isDarkMode={isDarkMode} style={styles.listLoader} />
+          ) : null
+        }
+      />
     </View>
   );
 };

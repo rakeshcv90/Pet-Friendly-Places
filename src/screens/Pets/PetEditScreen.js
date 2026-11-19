@@ -154,6 +154,7 @@ export const PetEditScreen = ({ navigation, route }) => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: vs(24) }}>
           <PetHero
+            eyebrow="EDITING"
             title={`Edit ${petName(pet)}`}
             subtitle={petSubtitle(pet) || 'Update your pet’s profile'}
             backLabel="🐾 My pets"

@@ -25,8 +25,14 @@ export const petBreed = pet => cleanText(pet?.breed);
 export const petStamps = pet =>
   Number(pet?.stamps ?? pet?.stampCount ?? pet?.stamps_count ?? 0) || 0;
 export const petLevel = pet => 1 + Math.floor(petStamps(pet) / STAMP_GOAL);
+// First letter in capitals, the rest as given ("rabbit" -> "Rabbit", "golden retriever" -> "Golden retriever")
+export const capitalizeFirst = value =>
+  typeof value === 'string' && value ? value.charAt(0).toUpperCase() + value.slice(1) : '';
+
 export const petSubtitle = pet =>
-  [petSpecies(pet).toLowerCase(), petBreed(pet)].filter(Boolean).join(' · ');
+  [capitalizeFirst(petSpecies(pet).toLowerCase()), capitalizeFirst(petBreed(pet))]
+    .filter(Boolean)
+    .join(' · ');
 
 // Profile photo URL, whichever field the API used; '' when the pet has none
 export const petPhoto = pet =>

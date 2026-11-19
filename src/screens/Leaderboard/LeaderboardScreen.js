@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
-  Image,
   ScrollView,
   StyleSheet,
   StatusBar,
@@ -12,6 +11,7 @@ import {
   Easing,
   RefreshControl,
 } from 'react-native';
+import FastImage from '../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import Feather from 'react-native-vector-icons/Feather';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -175,7 +175,7 @@ const PetAvatar = ({ url, name, size, ownerPhotoUrl, ownerDisplayName }) => {
   return (
     <View style={{ width: size, height: size }}>
       {url ? (
-        <Image
+        <FastImage
           source={{ uri: resolveImageUrl(url) }}
           style={[styles.avatarImage, { width: size, height: size, borderRadius: size / 2 }]}
         />
@@ -197,7 +197,7 @@ const PetAvatar = ({ url, name, size, ownerPhotoUrl, ownerDisplayName }) => {
       {showOwner && (
         <View style={[styles.ownerBadge, { width: badge, height: badge, borderRadius: badge / 2 }]}>
           {ownerPhotoUrl ? (
-            <Image source={{ uri: resolveImageUrl(ownerPhotoUrl) }} style={styles.ownerImage} />
+            <FastImage source={{ uri: resolveImageUrl(ownerPhotoUrl) }} style={styles.ownerImage} />
           ) : (
             <Text style={[styles.ownerInitial, { fontSize: badge * 0.45 }]}>
               {(ownerDisplayName || '?').charAt(0).toUpperCase()}
@@ -617,7 +617,7 @@ export const LeaderboardScreen = ({ navigation }) => {
           <Text style={styles.emptyText}>Be the first to write a review and earn points!</Text>
           <BouncyPressable
             activeScale={0.95}
-            onPress={() => goTab('Explore')}
+            onPress={() => navigation.navigate('SearchScreen')}
             style={styles.emptyBtn}>
             <Text style={styles.emptyBtnText}>Find places to visit 🗺️</Text>
           </BouncyPressable>

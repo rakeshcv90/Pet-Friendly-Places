@@ -884,7 +884,7 @@ const styles = StyleSheet.create({
     color: '#1A1A2E',
   },
   inputDark: { backgroundColor: '#170A2E', borderColor: '#2E1654', color: '#FFFFFF' },
-  inputFocused: { borderColor: PURPLE, backgroundColor: '#FFFFFF', ...shadow(PURPLE, 0.18, 8, 3) },
+  inputFocused: { borderColor: PURPLE, ...shadow(PURPLE, 0.18, 8, 3) },
   bodyInput: { minHeight: s(140) },
   meterTrack: {
     height: s(3),

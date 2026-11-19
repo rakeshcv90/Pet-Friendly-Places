@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Image, ScrollView, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, StatusBar } from 'react-native';
+import FastImage from '../../../components/common/FastImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -71,7 +72,7 @@ export const PetDetailsScreen = ({ navigation, route }) => {
           <View style={styles.identity}>
             <Bob style={styles.avatar} distance={4} duration={2400}>
               {photo ? (
-                <Image source={{ uri: photo }} style={styles.avatarPhoto} />
+                <FastImage source={{ uri: photo }} style={styles.avatarPhoto} />
               ) : (
                 <Text style={styles.avatarEmoji}>{speciesEmoji(species)}</Text>
               )}

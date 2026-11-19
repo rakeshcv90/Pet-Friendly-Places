@@ -13,6 +13,15 @@ export const images = {
   mailbox: require('../assets/images/mailbox.webp'),
   noimage: require('../assets/images/noImage .webp'),
   noimage1: require('../assets/images/NoImage.webp'),
+  urbaniaVan: require('../assets/images/urbania_van.webp'),
+  // Photos of the Urbania for the booking page, in the order the gallery shows them
+  urbaniaGallery: [
+    require('../assets/images/van5.webp'),
+    require('../assets/images/van1.webp'),
+    require('../assets/images/van2.webp'),
+    require('../assets/images/van3.webp'),
+    require('../assets/images/van4.webp'),
+  ],
 
   onboarding: {
     slide1: require('../assets/images/intro1.webp'),

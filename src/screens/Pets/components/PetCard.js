@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Image, Animated, Easing, StyleSheet } from 'react-native';
+import { View, Text, Animated, Easing, StyleSheet } from 'react-native';
+import FastImage from '../../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { s, vs, ms } from 'react-native-size-matters';
@@ -148,7 +149,7 @@ export const PetCard = ({ pet, onOpen, onHealth, onPawsport, onEdit }) => {
           <LinearGradient colors={['#FFFFFF', '#F5D0FE', '#C4B5FD']} style={styles.emblemRing}>
             <View style={styles.emblem}>
               {photo ? (
-                <Image source={{ uri: photo }} style={styles.emblemPhoto} />
+                <FastImage source={{ uri: photo }} style={styles.emblemPhoto} />
               ) : (
                 <Animated.Text
                   style={[

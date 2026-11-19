@@ -31,6 +31,7 @@ import {
   StoryCoverImage,
   StoryOverlay,
   styles,
+  UrbaniaBanner,
 } from './components';
 import { LoaderCard } from '../../components/common/Loader';
 
@@ -100,6 +101,7 @@ export const HomeScreen = ({ navigation }) => {
 
   // Memoized Recently Verified listing
   const recentListing = homeData?.recently_verified?.[0];
+
   const recentData = useMemo(() => {
     if (!recentListing) return null;
     return {
@@ -430,6 +432,8 @@ export const HomeScreen = ({ navigation }) => {
           searchIconRotate={searchIconRotate}
         />
 
+        <UrbaniaBanner onBookNow={() => navigation.navigate('UrbaniaBookingScreen')} />
+{/* 
         <Animated.View
           style={[
             styles.heroCard,
@@ -456,7 +460,7 @@ export const HomeScreen = ({ navigation }) => {
             style={StyleSheet.absoluteFillObject}
           />
 
-          {/* Dynamic Holographic Glass Light Sheen */}
+          
           <Animated.View
             pointerEvents="none"
             style={[
@@ -509,7 +513,7 @@ export const HomeScreen = ({ navigation }) => {
               </BouncyPressable>
             </Animated.View>
           </View>
-        </Animated.View>
+        </Animated.View> */}
 
         {/* Loading Indicator when initial home data is in-flight */}
         {isHomeLoading && !homeData && (
@@ -741,7 +745,8 @@ export const HomeScreen = ({ navigation }) => {
                       tailsVerified: true,
                       category: 'Tails Verified',
                     })
-                  }>
+                  }
+                  >
                   <Feather
                     name="arrow-right"
                     size={ms(18)}
@@ -890,6 +895,7 @@ export const HomeScreen = ({ navigation }) => {
         {/* ── 7. Recently verified near you ── */}
         {recentListing ? (
           <>
+
             <Animated.View style={{ opacity: recentHeaderOpacity }}>
               <View style={styles.sectionHeaderRow}>
                 <View>
@@ -897,7 +903,7 @@ export const HomeScreen = ({ navigation }) => {
                     FRESHLY CHECKED AROUND DELHI NCR
                   </Text>
                   <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
-                    Recently verified near you
+                    Recently verified 
                   </Text>
                 </View>
                 <BouncyPressable
@@ -1366,3 +1372,4 @@ export { StoryDetailScreen } from './StoryDetailScreen';
 export { RoadTripRoutesScreen } from './RoadTripRoutesScreen';
 export { RoadTripDetailScreen } from './RoadTripDetailScreen';
 export { RoadTripStopDetailScreen } from './RoadTripStopDetailScreen';
+export { UrbaniaBookingScreen } from './UrbaniaBookingScreen';

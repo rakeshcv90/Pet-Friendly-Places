@@ -217,21 +217,32 @@ export const AppHeader = ({
             <Animated.View
               style={avatarTransform.length > 0 ? { transform: avatarTransform } : null}>
               {avatarComponent || (
-                <LinearGradient
-                  colors={['#8A2DE2', '#EE2A7B', '#FF7A00']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.avatarBadge}>
-                  <View style={styles.pawGroup}>
-                    <Ionicons name="paw" size={ms(17)} color="#28163D" style={styles.pawTopLeft} />
-                    <Ionicons
-                      name="paw"
-                      size={ms(14)}
-                      color="#28163D"
-                      style={styles.pawBottomRight}
-                    />
+                // The rounded shape comes from plain views (shadow outside, clip inside) so it does
+                // not depend on the gradient applying its own radius on the first draw
+                <View style={styles.avatarBadge} testID="app-header-avatar">
+                  <View style={styles.avatarClip}>
+                    <LinearGradient
+                      colors={['#8A2DE2', '#EE2A7B', '#FF7A00']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.avatarGradient}>
+                      <View style={styles.pawGroup}>
+                        <Ionicons
+                          name="paw"
+                          size={ms(17)}
+                          color="#28163D"
+                          style={styles.pawTopLeft}
+                        />
+                        <Ionicons
+                          name="paw"
+                          size={ms(14)}
+                          color="#28163D"
+                          style={styles.pawBottomRight}
+                        />
+                      </View>
+                    </LinearGradient>
                   </View>
-                </LinearGradient>
+                </View>
               )}
             </Animated.View>
           </BouncyPressable>

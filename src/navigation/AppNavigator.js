@@ -12,6 +12,7 @@ import {
   TransportModeScreen,
   TravelStoryScreen,
   StoryDetailScreen,
+  UrbaniaBookingScreen,
   RoadTripRoutesScreen,
   RoadTripDetailScreen,
   RoadTripStopDetailScreen,
@@ -30,6 +31,7 @@ import { SavedPlacesScreen } from '../screens/Profile/SavedPlacesScreen';
 import { MyActivityScreen } from '../screens/Profile/MyActivityScreen';
 import { MySubmissionsScreen } from '../screens/Profile/MySubmissionsScreen';
 import { MyProfileScreen } from '../screens/Profile/MyProfileScreen';
+import { PrivacyScreen } from '../screens/Profile/PrivacyScreen';
 import { StoryGuidesScreen, GuideDetailScreen, ListingDetailScreen } from '../screens/StoryGuides';
 import { SavedScreen } from '../screens/Saved';
 import { InAppBrowserScreen } from '../screens/Web/InAppBrowserScreen';
@@ -162,6 +164,15 @@ export const AppNavigator = () => {
       <Stack.Screen
         name="StoryDetailScreen"
         component={StoryDetailScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="UrbaniaBookingScreen"
+        component={UrbaniaBookingScreen}
         options={{
           animation: 'ios_from_right',
           gestureEnabled: true,
@@ -376,6 +387,15 @@ export const AppNavigator = () => {
       <Stack.Screen
         name="MyProfileScreen"
         component={MyProfileScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="PrivacyScreen"
+        component={PrivacyScreen}
         options={{
           animation: 'ios_from_right',
           gestureEnabled: true,

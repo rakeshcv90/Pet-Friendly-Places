@@ -102,7 +102,8 @@ describe('LeaderboardScreen', () => {
     expect(getByText('Be the first to write a review and earn points!')).toBeTruthy();
 
     fireEvent.press(getAllByText('Find places to visit 🗺️')[0]);
-    expect(mockNavigation.navigate).toHaveBeenCalledWith('MainTabs', { screen: 'Explore' });
+    // All places: no Tails Verified or other filter is passed
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('SearchScreen');
   });
 
   it('shows a loader while loading and a retry when loading fails', () => {

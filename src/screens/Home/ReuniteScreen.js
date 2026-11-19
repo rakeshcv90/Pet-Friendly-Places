@@ -394,20 +394,20 @@ export const ReuniteScreen = ({ navigation, route }) => {
         subtitle="COMMUNITY CARE"
         onBack={() => navigation.goBack()}
         testID="reunite-back-btn"
-        rightComponent={
-          <BouncyPressable
-            style={[styles.navRoundBtn, isDarkMode && styles.navRoundBtnDark]}
-            activeScale={0.88}
-            onPress={handleToggleFavorite}>
-            <Animated.View style={{ transform: [{ scale: heartBurstScale }] }}>
-              <Ionicons
-                name={isFavorite ? 'heart' : 'heart-outline'}
-                size={ms(18)}
-                color={isFavorite ? colors.reunite.heartActive : (isDarkMode ? '#A78BFA' : colors.reunite.heartInactive)}
-              />
-            </Animated.View>
-          </BouncyPressable>
-        }
+        // rightComponent={
+        //   <BouncyPressable
+        //     style={[styles.navRoundBtn, isDarkMode && styles.navRoundBtnDark]}
+        //     activeScale={0.88}
+        //     onPress={handleToggleFavorite}>
+        //     <Animated.View style={{ transform: [{ scale: heartBurstScale }] }}>
+        //       <Ionicons
+        //         name={isFavorite ? 'heart' : 'heart-outline'}
+        //         size={ms(18)}
+        //         color={isFavorite ? colors.reunite.heartActive : (isDarkMode ? '#A78BFA' : colors.reunite.heartInactive)}
+        //       />
+        //     </Animated.View>
+        //   </BouncyPressable>
+        // }
       />
 
       {/* ── 2. Scrollable Body ── */}

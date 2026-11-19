@@ -1277,7 +1277,6 @@ const styles = StyleSheet.create({
   },
   inputWrapperFocused: {
     borderColor: colors.reunite.petAlertsInputFocusBorder,
-    backgroundColor: colors.surface,
   },
   inputWrapperActiveBorder: {
     borderColor: '#C4B5FD',

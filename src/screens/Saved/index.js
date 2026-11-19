@@ -3,14 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Animated,
   Easing,
   Dimensions,
   Pressable,
   StatusBar,
-  Image,
 } from 'react-native';
+import FastImage from '../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -60,7 +59,6 @@ const STEPS = [
   { icon: '✨', bg: '#D1FAE5', title: 'Reviewed', desc: 'Moderated and verified with care.' },
 ];
 
-// Fades and lifts its children in, staggered by `index`.
 const FadeIn = ({ index = 0, children, style }) => {
   const progress = useRef(new Animated.Value(0)).current;
 
@@ -90,8 +88,6 @@ const FadeIn = ({ index = 0, children, style }) => {
   );
 };
 
-// Card that tilts toward the touch point, like a physical card being pressed.
-// Style keys that position the card; they stay on the static touch wrapper
 const LAYOUT_KEYS = [
   'width',
   'height',
@@ -121,9 +117,6 @@ const splitLayoutStyle = style => {
   return [outer, inner];
 };
 
-// Card that tilts toward the touch point, like a physical card being pressed.
-// The touch area is a static Pressable; only the card inside it is animated, so
-// the transforms can never shift or shrink where taps are detected.
 const Tilt3D = ({ style, children, onPress, max = 10 }) => {
   const ref = useRef(null);
   const pressed = useRef(false);
@@ -193,7 +186,6 @@ const Tilt3D = ({ style, children, onPress, max = 10 }) => {
   );
 };
 
-// Gently bobs its children up and down.
 const Float = ({ children, style, distance = 4, duration = 2400, delay = 0 }) => {
   const progress = useRef(new Animated.Value(0)).current;
 
@@ -377,9 +369,7 @@ const shade = (hex, amount) => {
   const mix = start => Math.round(parseInt(hex.slice(start, start + 2), 16) * (1 - amount));
   return `rgb(${mix(1)}, ${mix(3)}, ${mix(5)})`;
 };
-
-// Rich accent-to-deep gradient card, the same family as the leaderboard banner: glass icon,
-// white text, frosted count pills and a slow shine
+ 
 const CommunityTile = ({ item, accent, onPress, index = 0 }) => (
   <View style={styles.gridItem}>
     <Tilt3D
@@ -495,7 +485,7 @@ const LeaderboardCard = ({ topPets, onPress }) => (
               key={pet.petProfileId}
               style={[styles.lbAvatar, index > 0 && styles.lbAvatarOverlap]}>
               {pet.profilePhotoUrl ? (
-                <Image
+                <FastImage
                   source={{ uri: resolveImageUrl(pet.profilePhotoUrl) }}
                   style={styles.lbAvatarImage}
                 />
@@ -680,11 +670,11 @@ const FeaturedThread = ({ featured, isDarkMode }) => {
 export const SavedScreen = ({ navigation }) => {
   const isDarkMode = useStore(state => state.isDarkMode);
   const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef(null);
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [infoVisible, setInfoVisible] = useState(false);
   const { data: apiCommunities, isLoading, isError, refetch } = useCommunities();
-  console.log('SavedScreen: apiCommunities', apiCommunities);
   const communities = apiCommunities || [];
   const topics = communities.filter(c => c.type === 'TOPIC').map(toCommunityCard);
   const cities = communities.filter(c => c.type === 'CITY').map(toCommunityCard);
@@ -797,6 +787,7 @@ export const SavedScreen = ({ navigation }) => {
       </Animated.View>
 
       <Animated.ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
@@ -943,19 +934,25 @@ export const SavedScreen = ({ navigation }) => {
 
         {/* Closing banner */}
         <Reveal scrollY={scrollY}>
-          <Tilt3D style={styles.bannerWrap} max={6}>
+          <Tilt3D
+            style={styles.bannerWrap}
+            max={6}
+            onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}>
             <LinearGradient
               colors={['#2E008B', DEEP_PURPLE, PURPLE]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.banner}>
               <View style={styles.flex}>
-                <Text style={styles.bannerTitle}>Someone has already solved your pet problem</Text>
+                <Text style={styles.bannerTitle}>
+                  Somewhere in India, a pet parent has already solved the problem you're facing
+                  tonight. Find them, or be them for someone else.
+                </Text>
                 <Text style={styles.bannerText}>Join pet parents sharing what they learned.</Text>
               </View>
-              <TouchableOpacity activeOpacity={0.88} style={styles.bannerBtn}>
+              <View style={styles.bannerBtn} testID="browse-btn">
                 <Text style={styles.bannerBtnText}>Browse 🐾</Text>
-              </TouchableOpacity>
+              </View>
             </LinearGradient>
           </Tilt3D>
         </Reveal>
@@ -965,7 +962,8 @@ export const SavedScreen = ({ navigation }) => {
 
       <DraggableFab
         label="Ask a Question"
-        icon="help"
+        icon="chatbubble-ellipses"
+        badge="?"
         onPress={() => navigation?.navigate?.('NewPostScreen', { type: 'QUESTION' })}
         minY={insets.top + s(60)}
         bottomGap={Math.max(insets.bottom, s(4)) + s(80)}

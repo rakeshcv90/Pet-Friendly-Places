@@ -949,7 +949,6 @@ const styles = StyleSheet.create({
   inputCardWrapperFocused: {
     borderColor: '#7C3AED',
     borderBottomColor: '#5B21B6',
-    backgroundColor: '#FAF5FF',
     shadowColor: '#7C3AED',
     shadowOpacity: 0.18,
     shadowRadius: 8,

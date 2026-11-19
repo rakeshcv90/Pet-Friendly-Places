@@ -11,7 +11,7 @@ import {
   Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FastImage from '../../components/common/FastImage';
+import FastImage, { prefetchImages } from '../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import Feather from 'react-native-vector-icons/Feather';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -245,6 +245,11 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
       allStories: formattedStories,
     };
   }, [apiStoriesData]);
+
+  // Download the first covers ahead of time so they are ready when they scroll into view
+  React.useEffect(() => {
+    prefetchImages(allStories.map(story => story.cover_image));
+  }, [allStories]);
 
   // A story id passed in (from Home) opens that story's screen once, then the param is cleared so
   // coming back does not open it again

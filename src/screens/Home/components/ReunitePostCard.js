@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import FastImage from '../../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { s, ms } from 'react-native-size-matters';
@@ -38,7 +39,7 @@ export const ReunitePostCard = React.memo(({ post, isDarkMode, onPress, tilt = '
       onPress={onPress}>
       <View style={[styles.card, isDarkMode && styles.cardDark]}>
         <View style={styles.imageBox}>
-          <Image
+          <FastImage
             source={post.image && !imageFailed ? { uri: post.image } : NO_IMAGE}
             style={styles.image}
             resizeMode="cover"

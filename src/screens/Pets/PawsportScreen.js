@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, Image, ScrollView, StyleSheet, StatusBar, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, StatusBar, Alert } from 'react-native';
+import FastImage from '../../components/common/FastImage';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -179,7 +180,7 @@ export const PawsportScreen = ({ navigation, route }) => {
                 activeScale={0.94}
                 onPress={changePhoto}>
                 {photo ? (
-                  <Image source={{ uri: photo }} style={styles.avatarPhoto} />
+                  <FastImage source={{ uri: photo }} style={styles.avatarPhoto} />
                 ) : (
                   <Text style={styles.avatarEmoji}>{speciesEmoji(petSpecies(pet))}</Text>
                 )}
@@ -343,7 +344,7 @@ export const PawsportScreen = ({ navigation, route }) => {
                   return (
                     <View key={`${item.isVideo ? 'v' : 'p'}-${item.id}`} style={styles.tile}>
                       {uri ? (
-                        <Image source={{ uri }} style={styles.tileImage} />
+                        <FastImage source={{ uri }} style={styles.tileImage} />
                       ) : (
                         <View style={[styles.tileImage, styles.tileEmpty]}>
                           <Ionicons name="image-outline" size={ms(22)} color="#A78BFA" />

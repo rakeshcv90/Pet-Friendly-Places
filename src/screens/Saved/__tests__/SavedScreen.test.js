@@ -1,4 +1,5 @@
 import React from 'react';
+import { ScrollView } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SavedScreen } from '../index';
@@ -119,6 +120,15 @@ describe('SavedScreen (Community tab)', () => {
 
     expect(queryByText('Browse Communities')).toBeNull();
     expect(queryByText('Ask a Question')).toBeNull();
+  });
+
+  it('scrolls back to the top when Browse is pressed', () => {
+    const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo').mockImplementation(() => {});
+    const { getByText } = renderScreen();
+
+    fireEvent.press(getByText('Browse 🐾'));
+    expect(scrollTo).toHaveBeenCalledWith({ y: 0, animated: true });
+    scrollTo.mockRestore();
   });
 
   it('opens the new post screen from the floating Ask a Question button', () => {

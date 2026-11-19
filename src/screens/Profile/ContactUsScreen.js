@@ -1119,7 +1119,6 @@ const styles = StyleSheet.create({
   inputFocused: {
     borderColor: '#7C3AED',
     borderBottomColor: '#5B21B6',
-    backgroundColor: '#FFFFFF',
   },
   selectBoxActive: {
     borderColor: '#EC4899',

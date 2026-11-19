@@ -59,14 +59,47 @@ describe('HomeScreen Component', () => {
     jest.clearAllMocks();
   });
 
-  it('renders the hero section with branding text', () => {
-    const { getByText } = renderWithNavigation(
+  it('opens with the Urbania road trip banner as the main card under the header', () => {
+    const { getByText, getByTestId, queryByText } = renderWithNavigation(
       <HomeScreen navigation={mockNavigation} />
     );
 
-    expect(getByText('MADE FOR PET PARENTS')).toBeTruthy();
-    expect(getByText(/Traveling is better/)).toBeTruthy();
-    expect(getByText(/Verified stays, cafes and trails/)).toBeTruthy();
+    expect(getByTestId('urbania-banner')).toBeTruthy();
+    expect(getByText('NEWLY LAUNCHED')).toBeTruthy();
+    expect(getByText('Road trips are better together')).toBeTruthy();
+    expect(getByText('Pet-friendly Urbania from Gurugram')).toBeTruthy();
+    expect(getByText('10% off for pet parents')).toBeTruthy();
+    // The old "Explore nearby" hero card is switched off
+    expect(queryByText('MADE FOR PET PARENTS')).toBeNull();
+    expect(queryByText('Explore nearby')).toBeNull();
+  });
+
+  it('shows the banner before the category section', () => {
+    const { toJSON } = renderWithNavigation(<HomeScreen navigation={mockNavigation} />);
+
+    const texts = [];
+    const walk = node => {
+      if (typeof node === 'string') {
+        texts.push(node);
+      } else if (Array.isArray(node)) {
+        node.forEach(walk);
+      } else if (node && node.children) {
+        node.children.forEach(walk);
+      }
+    };
+    walk(toJSON());
+    const banner = texts.indexOf('Road trips are better together');
+    const categories = texts.indexOf('Explore by category');
+    expect(banner).toBeGreaterThan(-1);
+    expect(categories).toBeGreaterThan(-1);
+    expect(banner).toBeLessThan(categories);
+  });
+
+  it('opens the booking screen from the banner Book Now button', () => {
+    const { getByTestId } = renderWithNavigation(<HomeScreen navigation={mockNavigation} />);
+
+    fireEvent.press(getByTestId('urbania-book'));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('UrbaniaBookingScreen');
   });
 
   it('renders categories from home data', () => {

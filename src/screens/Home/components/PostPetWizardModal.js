@@ -15,6 +15,7 @@ import {
   Animated,
   PermissionsAndroid,
 } from 'react-native';
+import FastImage from '../../../components/common/FastImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Feather from 'react-native-vector-icons/Feather';
@@ -1950,7 +1951,7 @@ export const PostPetWizardModal = ({
 
               {/* Cover Photo */}
               <View style={styles.previewHeroImageWrapper}>
-                <Image
+                <FastImage
                   source={{ uri: currentHeroPhoto }}
                   style={styles.previewHeroImage}
                   resizeMode="cover"

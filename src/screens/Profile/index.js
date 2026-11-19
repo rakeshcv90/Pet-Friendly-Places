@@ -325,19 +325,8 @@ export const ProfileScreen = ({ navigation }) => {
   }, [navigation]);
 
   const handleOpenPrivacy = useCallback(() => {
-    setConfirmModalConfig({
-      visible: true,
-      title: 'Privacy & Security 🛡️',
-      subtitle:
-        'Your profile, booking data, and pet credentials are protected with salted hashes and encrypted transport. You can manage your public profile visibility anytime.',
-      badge: 'DATA PRIVACY',
-      type: 'info',
-      confirmText: 'Privacy Settings',
-      cancelText: 'Close',
-      singleButton: false,
-      onConfirm: () => setSettingsModalVisible(true),
-    });
-  }, []);
+    navigation.navigate('PrivacyScreen');
+  }, [navigation]);
 
   const menuSections = useMemo(
     () => [

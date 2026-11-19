@@ -12,6 +12,7 @@ export const ProfileVipCard = ({
   userEmail = 'rishabsharma@cvinfotech.com',
   userInitial = 'R',
   isDarkMode = false,
+  onPressProfile,
 }) => {
   // Ambient breathing aura animation for avatar ring
   const auraAnim = useRef(new Animated.Value(0)).current;
@@ -163,11 +164,13 @@ export const ProfileVipCard = ({
               <BouncyPressable
                 style={styles.publicProfileLink3D}
                 activeScale={0.92}
-                onPress={() =>
-                  Alert.alert(
-                    'Public Profile',
-                    'Your PetFriendly public profile is live to the pack!',
-                  )
+                onPress={
+                  onPressProfile ||
+                  (() =>
+                    Alert.alert(
+                      'Public Profile',
+                      'Your PetFriendly public profile is live to the pack!',
+                    ))
                 }>
                 <Feather
                   name="external-link"

@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Platform,
   StatusBar,
   Dimensions,
   TouchableOpacity,
@@ -14,7 +13,7 @@ import { s } from 'react-native-size-matters';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../../components/common/FastImage';
 import { Input } from '../../../components/common/Input';
 import { Button } from '../../../components/common/Button';
 import { Loader } from '../../../components/common/Loader';
@@ -69,10 +68,7 @@ export const ForgotPasswordScreen = ({ navigation }) => {
     const minDelay = new Promise(resolve => setTimeout(resolve, 800));
 
     try {
-      await Promise.all([
-        forgotPasswordAsync(email.trim()),
-        minDelay,
-      ]);
+      await Promise.all([forgotPasswordAsync(email.trim()), minDelay]);
       setIsSent(true);
     } catch {
       await minDelay;
@@ -86,9 +82,9 @@ export const ForgotPasswordScreen = ({ navigation }) => {
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       <FastImage
-        source={theme.images.backgroundimg1}
+        source={theme.images.backgroundimg}
         style={[styles.backgroundImage, { bottom: insets.bottom }]}
-        objectFit={Platform.OS === 'ios' && isSmallDevice ? 'fill' : 'cover'}
+        objectFit="cover"
       />
 
       {/* Premium Animated Loader Modal */}
@@ -167,7 +163,6 @@ export const ForgotPasswordScreen = ({ navigation }) => {
             </View>
           </View>
         ) : (
-          /* Email Input Form */
           <>
             {/* Center Illustration */}
             <View style={styles.illustrationContainer}>
@@ -203,7 +198,7 @@ export const ForgotPasswordScreen = ({ navigation }) => {
                 }}
                 inputWrapperStyle={[
                   styles.inputBox,
-                  (emailError || apiError) ? styles.inputBoxError : null,
+                  emailError || apiError ? styles.inputBoxError : null,
                 ]}
                 inputStyle={styles.inputText}
                 leftIcon={
@@ -217,9 +212,7 @@ export const ForgotPasswordScreen = ({ navigation }) => {
                 autoCapitalize="none"
                 autoCorrect={false}
               />
-              {emailError ? (
-                <Text style={styles.fieldErrorText}>{emailError}</Text>
-              ) : null}
+              {emailError ? <Text style={styles.fieldErrorText}>{emailError}</Text> : null}
 
               {/* Error Alert Banner */}
               {apiError ? (
@@ -258,8 +251,8 @@ export const ForgotPasswordScreen = ({ navigation }) => {
                 activeOpacity={0.7}>
                 <FeatherIcon
                   name="arrow-left"
-                  size={s(16)}
-                  color={theme.colors.primary}
+                  size={s(18)}
+                  color={ theme.colors.primaryDark}
                   style={styles.backToLoginIcon}
                 />
                 <Text style={styles.backToLoginText}>Back to login</Text>
@@ -275,7 +268,7 @@ export const ForgotPasswordScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7FAF7',
+    backgroundColor: '#FAF8F2',
   },
   backgroundImage: {
     position: 'absolute',
@@ -307,8 +300,13 @@ const styles = StyleSheet.create({
     marginBottom: isSmallDevice ? s(20) : s(28),
   },
   title: {
-    fontSize: isSmallDevice ? s(23) : s(23),
-    fontFamily: theme.typography.fontFamily.bold,
+    // fontSize: isSmallDevice ? s(23) : s(23),
+    // fontFamily: theme.typography.fontFamily.bold,
+    // color: theme.colors.primaryDark,
+    // textAlign: 'center',
+    fontSize: isSmallDevice ? s(25) : s(25),
+    lineHeight: isSmallDevice ? s(25) : s(25),
+    fontFamily: theme.typography.fontFamily.extraBold,
     color: theme.colors.primaryDark,
     textAlign: 'center',
     marginBottom: s(6),
@@ -403,7 +401,7 @@ const styles = StyleSheet.create({
     marginRight: s(6),
   },
   backToLoginText: {
-    color: theme.colors.primary,
+    color: theme.colors.primaryDark,
     fontFamily: theme.typography.fontFamily.bold,
     fontSize: isSmallDevice ? s(14) : s(15),
   },

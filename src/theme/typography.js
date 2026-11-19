@@ -2,13 +2,14 @@ import { s } from 'react-native-size-matters';
 
 export const typography = {
   fontFamily: {
-    regular: 'Inter-Regular',
-    medium: 'Inter-Medium',
-    semiBold: 'Inter-SemiBold',
-    bold: 'Inter-Bold',
-    extraBold: 'Inter-ExtraBold',
-    light: 'Inter-Light',
-    black: 'Inter-Black',
+    regular: 'Manrope-Regular',
+    medium: 'Manrope-Medium',
+    semiBold: 'Manrope-SemiBold',
+    bold: 'Manrope-Bold',
+    extraBold: 'Manrope-ExtraBold',
+    light: 'Manrope-Light',
+    extraLight: 'Manrope-ExtraLight',
+    black: 'Manrope-ExtraBold',
   },
   sizes: {
     h1: s(32),

@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>PetFriendly</string>
+	<string>Pet Friendly Places</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -33,10 +33,12 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>PetFriendly needs your location to find nearby pet-friendly places and lost pets.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>PetFriendly needs camera access so you can take photos of your pet.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>PetFriendly uses Face ID to unlock the app and keep your account private.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>PetFriendly needs your location to find nearby pet-friendly places and lost pets.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>PetFriendly needs access to your photo library to select photos of your pet.</string>
 	<key>RCTNewArchEnabled</key>
@@ -65,6 +67,24 @@
 		<string>Inter-ExtraBold.ttf</string>
 		<string>Inter-Light.ttf</string>
 		<string>Inter-Black.ttf</string>
+		<string>Manrope-Regular.ttf</string>
+		<string>Manrope-Medium.ttf</string>
+		<string>Manrope-SemiBold.ttf</string>
+		<string>Manrope-Bold.ttf</string>
+		<string>Manrope-ExtraBold.ttf</string>
+		<string>Manrope-Light.ttf</string>
+		<string>Manrope-ExtraLight.ttf</string>
+		<string>Inter-ExtraLightItalic.ttf</string>
+		<string>Inter-SemiBoldItalic.ttf</string>
+		<string>Inter-Thin.ttf</string>
+		<string>Inter-LightItalic.ttf</string>
+		<string>Inter-ThinItalic.ttf</string>
+		<string>Inter-ExtraLight.ttf</string>
+		<string>Inter-BoldItalic.ttf</string>
+		<string>Inter-ExtraBoldItalic.ttf</string>
+		<string>Inter-MediumItalic.ttf</string>
+		<string>Inter-Italic.ttf</string>
+		<string>Inter-BlackItalic.ttf</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
@@ -80,6 +100,8 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	<key>UIRequiresFullScreen</key>
+	<true/>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
 </dict>

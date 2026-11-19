@@ -1,8 +1,10 @@
-import React, { useState, useRef, useMemo, useCallback } from 'react';
+/* eslint-disable react-native/no-inline-styles */
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   Animated,
+  Easing,
   ScrollView,
   StatusBar,
   Pressable,
@@ -10,14 +12,13 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
 import { s, ms } from 'react-native-size-matters';
 import { theme } from '../../theme';
-import { useUserProfile } from '../../hooks/useUser';
+import { useUserProfile, useSavePlace } from '../../hooks/useUser';
 import { useHomeData, resolveImageUrl } from '../../hooks/useDiscovery';
 import { useStore } from '../../store';
 import { mapApiCategories } from '../../utils/categories';
@@ -27,18 +28,48 @@ import {
   AnimatedCategoryItem,
   AnimatedRehomeOption,
   useHomeAnimations,
+  StoryCoverImage,
+  StoryOverlay,
   styles,
+  UrbaniaBanner,
 } from './components';
+import { LoaderCard } from '../../components/common/Loader';
 
 export const HomeScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
-  const [isFavorite, setIsFavorite] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const heartBurstAnim = useRef(new Animated.Value(1)).current;
 
-  const handleToggleFavorite = () => {
-    setIsFavorite(prev => !prev);
+  const { data: userProfileData } = useUserProfile();
+  const isDarkMode = useStore(state => state.isDarkMode);
+  const storeUser = useStore(state => state.user);
+
+  const userName = useMemo(() => {
+    const user =
+      userProfileData?.account ||
+      userProfileData?.user ||
+      (userProfileData?.id ? userProfileData : null) ||
+      storeUser;
+    return user?.name || user?.displayName || user?.display_name || user?.full_name || 'Pet Parent';
+  }, [userProfileData, storeUser]);
+
+  const {
+    data: homeData,
+    refetch: refetchHome,
+    isRefetching: isHomeRefetching,
+    isLoading: isHomeLoading,
+  } = useHomeData();
+
+  // Memoized Tails Verified listing
+  const tailsListing = homeData?.tails_verified_listings?.[0];
+
+  // The heart saves this place to the account (POST / DELETE /accounts/me/saved/{id})
+  const { saved: isFavorite, toggle: toggleSaved } = useSavePlace(tailsListing?.id, tailsListing);
+  const handleToggleFavorite = useCallback(() => {
+    if (!toggleSaved()) {
+      return;
+    }
     heartBurstAnim.setValue(0.6);
     Animated.spring(heartBurstAnim, {
       toValue: 1,
@@ -46,41 +77,52 @@ export const HomeScreen = ({ navigation }) => {
       tension: 80,
       useNativeDriver: true,
     }).start();
-  };
+  }, [toggleSaved, heartBurstAnim]);
+  const tailsData = useMemo(() => {
+    if (!tailsListing) return null;
+    return {
+      imageUri: resolveImageUrl(tailsListing.main_image_url),
+      title: tailsListing.name,
+      location: [tailsListing.city, tailsListing.state].filter(Boolean).join(', '),
+      highlight: tailsListing.excerpt_highlight || tailsListing.specific_type,
+      price: tailsListing.price_range,
+      rating: tailsListing.google_rating || tailsListing.user_average_rating,
+    };
+  }, [tailsListing]);
 
-  const { data } = useUserProfile();
-  const isDarkMode = useStore(state => state.isDarkMode);
-  const storeUser = useStore(state => state.user);
-  const user = data?.account || data?.user || (data?.id ? data : null) || storeUser;
-  const userName =
-    user?.name || user?.displayName || user?.display_name || user?.full_name || 'Pet Parent';
+  const {
+    imageUri: tailsImageUri,
+    title: tailsTitle,
+    location: tailsLocation,
+    highlight: tailsHighlight,
+    price: tailsPrice,
+    rating: tailsRating,
+  } = tailsData || {};
 
-  const { data: homeData, refetch: refetchHome, isRefetching: isHomeRefetching } = useHomeData();
-  useFocusEffect(
-    useCallback(() => {
-      refetchHome();
-    }, [refetchHome]),
-  );
-
-  // Dynamic Tails Verified listing solely from API
-  const tailsListing = homeData?.tails_verified_listings?.[0];
-  const tailsImageUri = resolveImageUrl(tailsListing?.main_image_url);
-  const tailsTitle = tailsListing?.name;
-  const tailsLocation = [tailsListing?.city, tailsListing?.state].filter(Boolean).join(', ');
-  const tailsHighlight = tailsListing?.excerpt_highlight || tailsListing?.specific_type;
-  const tailsPrice = tailsListing?.price_range;
-  const tailsRating = tailsListing?.google_rating || tailsListing?.user_average_rating;
-
-  // Dynamic Recently Verified listing solely from API
+  // Memoized Recently Verified listing
   const recentListing = homeData?.recently_verified?.[0];
-  const recentImageUri = resolveImageUrl(recentListing?.main_image_url);
-  const recentTitle = recentListing?.name;
-  const recentLocation =
-    [recentListing?.local_area || recentListing?.famous_area, recentListing?.city]
-      .filter(Boolean)
-      .join(' • ') || recentListing?.city;
-  const recentCategory = recentListing?.category || recentListing?.specific_type;
-  const recentRating = recentListing?.google_rating || recentListing?.user_average_rating;
+
+  const recentData = useMemo(() => {
+    if (!recentListing) return null;
+    return {
+      imageUri: resolveImageUrl(recentListing.main_image_url),
+      title: recentListing.name,
+      location:
+        [recentListing.local_area || recentListing.famous_area, recentListing.city]
+          .filter(Boolean)
+          .join(' • ') || recentListing.city,
+      category: recentListing.category || recentListing.specific_type,
+      rating: recentListing.google_rating || recentListing.user_average_rating,
+    };
+  }, [recentListing]);
+
+  const {
+    imageUri: recentImageUri,
+    title: recentTitle,
+    location: recentLocation,
+    category: recentCategory,
+    rating: recentRating,
+  } = recentData || {};
 
   // Dynamic Real Travel Stories solely from API (homeData.stories)
   const storiesList = useMemo(() => {
@@ -109,7 +151,8 @@ export const HomeScreen = ({ navigation }) => {
       badge: `${route.total_distance_km ? `${route.total_distance_km} KM` : 'ROAD TRIP'} • ${
         route.est_drive_hours ? `${route.est_drive_hours}H DRIVE` : 'SCENIC'
       }`,
-      title: route.title,
+      // The API sends no `title` for routes, so build it from the cities like the Routes screen does
+      title: route.title || `${route.origin_city || ''} → ${route.destination_city || ''}`,
       details: `${route.stop_count || 0} pet stops • ${route.origin_city || ''} to ${
         route.destination_city || ''
       }`,
@@ -123,6 +166,18 @@ export const HomeScreen = ({ navigation }) => {
     () => mapApiCategories(homeData?.top_categories),
     [homeData?.top_categories],
   );
+
+  const handleCategoryPress = useCallback(
+    cat => {
+      setSelectedCategory(cat.id);
+      navigation.navigate('SearchScreen', { apiCategory: cat.id, category: cat.name });
+    },
+    [navigation],
+  );
+
+  const handleRefresh = useCallback(() => {
+    refetchHome();
+  }, [refetchHome]);
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -177,13 +232,88 @@ export const HomeScreen = ({ navigation }) => {
     roadTripScale,
     roadTripRotateX,
     roadTripOpacity,
-    calloutScale,
-    calloutRotateX,
-    calloutOpacity,
-    calloutSheenX,
-    calloutBadgeRotate,
-    calloutBtnScale,
   } = useHomeAnimations(scrollY);
+
+  // Quick actions: header fade-in, staggered card slide-in and a looping CTA nudge
+  const quickHeaderAnim = useRef(new Animated.Value(0)).current;
+  const quickCardAnims = useRef([new Animated.Value(0), new Animated.Value(0)]).current;
+  const quickNudge = useRef(new Animated.Value(0)).current;
+  const quickShake = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(quickHeaderAnim, {
+        toValue: 1,
+        duration: 450,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.stagger(
+        140,
+        quickCardAnims.map(v =>
+          Animated.spring(v, { toValue: 1, friction: 7, tension: 70, useNativeDriver: true }),
+        ),
+      ),
+    ]).start();
+    const nudgeLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(quickNudge, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(quickNudge, {
+          toValue: 0,
+          duration: 700,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    nudgeLoop.start();
+    // Quick wiggle every few seconds to catch the eye
+    const shakeStep = toValue =>
+      Animated.timing(quickShake, { toValue, duration: 70, useNativeDriver: true });
+    const shakeLoop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(2600),
+        shakeStep(1),
+        shakeStep(-1),
+        shakeStep(1),
+        shakeStep(-1),
+        shakeStep(0),
+      ]),
+    );
+    shakeLoop.start();
+    return () => {
+      nudgeLoop.stop();
+      shakeLoop.stop();
+    };
+  }, [quickHeaderAnim, quickCardAnims, quickNudge, quickShake]);
+
+  // dir: -1 = left card (tilts left, enters from left), 1 = right card
+  const quickTileStyle = (anim, dir) => ({
+    opacity: anim,
+    transform: [
+      { translateX: anim.interpolate({ inputRange: [0, 1], outputRange: [dir * s(60), 0] }) },
+      {
+        rotate: anim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [`${dir * 12}deg`, `${dir * 2}deg`],
+        }),
+      },
+      { translateX: quickShake.interpolate({ inputRange: [-1, 1], outputRange: [-s(3), s(3)] }) },
+      {
+        rotate: quickShake.interpolate({ inputRange: [-1, 1], outputRange: ['-1.5deg', '1.5deg'] }),
+      },
+    ],
+  });
+  const quickNudgeStyle = {
+    transform: [
+      { translateX: quickNudge.interpolate({ inputRange: [0, 1], outputRange: [0, s(3)] }) },
+    ],
+  };
 
   return (
     <View
@@ -269,7 +399,7 @@ export const HomeScreen = ({ navigation }) => {
         refreshControl={
           <RefreshControl
             refreshing={isHomeRefetching}
-            onRefresh={refetchHome}
+            onRefresh={handleRefresh}
             tintColor="#7B2CFF"
             colors={['#7B2CFF', '#EE2A7B']}
           />
@@ -287,10 +417,14 @@ export const HomeScreen = ({ navigation }) => {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onSearchSubmit={query => {
-            navigation.navigate('SearchScreen', {
-              query: query !== undefined ? query : searchQuery,
-              category: 'Pet Friendly Stays',
-            });
+            const text = (query !== undefined ? query : searchQuery || '').trim();
+            if (!text) {
+              return;
+            }
+            // SearchScreen calls GET /listings?q=<text>&page_size=18
+            navigation.navigate('SearchScreen', { query: text });
+            // Clear the Home search box so it's empty when the user comes back
+            setSearchQuery('');
           }}
           avatarScale={avatarScale}
           avatarRotate={avatarRotate}
@@ -298,6 +432,8 @@ export const HomeScreen = ({ navigation }) => {
           searchIconRotate={searchIconRotate}
         />
 
+        <UrbaniaBanner onBookNow={() => navigation.navigate('UrbaniaBookingScreen')} />
+{/* 
         <Animated.View
           style={[
             styles.heroCard,
@@ -312,7 +448,7 @@ export const HomeScreen = ({ navigation }) => {
             ]}>
             <FastImage
               source={theme.images.home}
-              style={StyleSheet.absoluteFillObject}
+              style={{ width: '100%', height: '100%' }}
               resizeMode={FastImage.resizeMode.cover}
             />
           </Animated.View>
@@ -324,7 +460,7 @@ export const HomeScreen = ({ navigation }) => {
             style={StyleSheet.absoluteFillObject}
           />
 
-          {/* Dynamic Holographic Glass Light Sheen */}
+          
           <Animated.View
             pointerEvents="none"
             style={[
@@ -371,15 +507,21 @@ export const HomeScreen = ({ navigation }) => {
                 <Feather
                   name="arrow-right"
                   size={ms(16)}
-                  color="#2B0E68"
+                  color="#3B108F"
                   style={styles.btnArrowMargin}
                 />
               </BouncyPressable>
             </Animated.View>
           </View>
-        </Animated.View>
+        </Animated.View> */}
 
-        {/* ── 4. Explore by category Card ── */}
+        {/* Loading Indicator when initial home data is in-flight */}
+        {isHomeLoading && !homeData && (
+          <View style={{ paddingVertical: s(40), alignItems: 'center', justifyContent: 'center' }}>
+            <LoaderCard label="Finding pet-friendly places..." isDarkMode={isDarkMode} />
+          </View>
+        )}
+
         {categoriesList && categoriesList.length > 0 ? (
           <Animated.View
             style={[
@@ -411,7 +553,7 @@ export const HomeScreen = ({ navigation }) => {
                   <AnimatedCategoryItem
                     cat={cat}
                     isSelected={selectedCategory === cat.id}
-                    onPress={() => setSelectedCategory(prev => (prev === cat.id ? null : cat.id))}
+                    onPress={() => handleCategoryPress(cat)}
                   />
                 </Animated.View>
               ))}
@@ -432,13 +574,18 @@ export const HomeScreen = ({ navigation }) => {
                     Real travel stories
                   </Text>
                 </View>
-                <View style={styles.newBadge}>
-                  <Text style={styles.newBadgeText}>NEW</Text>
-                </View>
+                <BouncyPressable
+                  testID="view-all-stories-btn"
+                  activeScale={0.9}
+                  onPress={() => navigation.navigate('TravelStoryScreen')}>
+                  <Text style={[styles.viewAllText, isDarkMode && styles.viewAllTextDark]}>
+                    View all
+                  </Text>
+                </BouncyPressable>
               </View>
             </Animated.View>
 
-            {storiesList.length === 1 ? (
+            {storiesList?.length === 1 ? (
               <Animated.View
                 style={[
                   styles.storyCard,
@@ -455,25 +602,18 @@ export const HomeScreen = ({ navigation }) => {
                   containerStyle={StyleSheet.absoluteFillObject}
                   style={styles.fullSize}
                   activeScale={0.97}
-                  onPress={() => {}}>
+                  onPress={() =>
+                    navigation.navigate('TravelStoryScreen', { initialStoryId: storiesList[0].id })
+                  }>
                   <Animated.View
                     style={[
                       StyleSheet.absoluteFillObject,
                       { transform: [{ translateY: storyImageParallax }, { scale: 1.12 }] },
                     ]}>
-                    <FastImage
-                      source={{ uri: storiesList[0].imageUri }}
-                      style={StyleSheet.absoluteFillObject}
-                      resizeMode={FastImage.resizeMode.cover}
-                    />
+                    <StoryCoverImage uri={storiesList[0].imageUri} />
                   </Animated.View>
 
-                  <LinearGradient
-                    colors={['rgba(20, 10, 35, 0.45)', 'rgba(20, 10, 35, 0.88)']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFillObject}
-                  />
+                  <StoryOverlay />
 
                   {/* Dynamic Glass Holographic Sheen */}
                   <Animated.View
@@ -540,23 +680,16 @@ export const HomeScreen = ({ navigation }) => {
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.storiesScroll}>
-                  {storiesList.map(item => (
+                  {storiesList?.map(item => (
                     <BouncyPressable
                       key={item.id}
                       style={styles.storyScrollCard}
                       activeScale={0.97}
-                      onPress={() => {}}>
-                      <FastImage
-                        source={{ uri: item.imageUri }}
-                        style={StyleSheet.absoluteFillObject}
-                        resizeMode={FastImage.resizeMode.cover}
-                      />
-                      <LinearGradient
-                        colors={['rgba(20, 10, 35, 0.45)', 'rgba(20, 10, 35, 0.88)']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={StyleSheet.absoluteFillObject}
-                      />
+                      onPress={() =>
+                        navigation.navigate('TravelStoryScreen', { initialStoryId: item.id })
+                      }>
+                      <StoryCoverImage uri={item.imageUri} />
+                      <StoryOverlay />
 
                       <View style={styles.storyContent}>
                         <View style={styles.storyTopPill}>
@@ -607,8 +740,18 @@ export const HomeScreen = ({ navigation }) => {
                 <BouncyPressable
                   style={[styles.circleArrowBtn, isDarkMode && styles.circleArrowBtnDark]}
                   activeScale={0.85}
-                  onPress={() => {}}>
-                  <Feather name="arrow-right" size={ms(14)} color={isDarkMode ? '#A855F7' : '#7B2CFF'} />
+                  onPress={() =>
+                    navigation.navigate('SearchScreen', {
+                      tailsVerified: true,
+                      category: 'Tails Verified',
+                    })
+                  }
+                  >
+                  <Feather
+                    name="arrow-right"
+                    size={ms(18)}
+                    color={isDarkMode ? '#A855F7' : '#7B2CFF'}
+                  />
                 </BouncyPressable>
               </View>
             </Animated.View>
@@ -619,10 +762,19 @@ export const HomeScreen = ({ navigation }) => {
                 isDarkMode && styles.tailsVerifiedCardDark,
                 {
                   opacity: tailsOpacity,
-                  transform: [{ perspective: 1000 }, { scale: tailsScale }, { rotateX: tailsRotateX }],
+                  transform: [
+                    { perspective: 1000 },
+                    { scale: tailsScale },
+                    { rotateX: tailsRotateX },
+                  ],
                 },
               ]}>
-              <BouncyPressable style={styles.fullWidth} activeScale={0.975} onPress={() => {}}>
+              <BouncyPressable
+                style={styles.fullWidth}
+                activeScale={0.975}
+                onPress={() => {
+                  navigation?.navigate?.('ListingDetailScreen', { slug: tailsListing.slug });
+                }}>
                 <View style={styles.tailsImageContainer}>
                   <Animated.View
                     style={[
@@ -663,7 +815,7 @@ export const HomeScreen = ({ navigation }) => {
                         <Ionicons
                           name={isFavorite ? 'heart' : 'heart-outline'}
                           size={ms(16)}
-                          color={isFavorite ? '#E11D48' : '#FFFFFF'}
+                          color={isFavorite ? '#E11D48' : isDarkMode ? '#FFFFFF' : '#000000'}
                         />
                       </Animated.View>
                     </Pressable>
@@ -679,8 +831,14 @@ export const HomeScreen = ({ navigation }) => {
                     </Text>
                     {tailsRating ? (
                       <View style={[styles.ratingBadge, isDarkMode && styles.ratingBadgeDark]}>
-                        <Ionicons name="star" size={ms(10)} color={isDarkMode ? '#F59E0B' : '#D97706'} />
-                        <Text style={[styles.ratingText, isDarkMode && styles.ratingTextDark]}>{tailsRating}</Text>
+                        <Ionicons
+                          name="star"
+                          size={ms(10)}
+                          color={isDarkMode ? '#F59E0B' : '#D97706'}
+                        />
+                        <Text style={[styles.ratingText, isDarkMode && styles.ratingTextDark]}>
+                          {tailsRating}
+                        </Text>
                       </View>
                     ) : null}
                   </View>
@@ -737,6 +895,7 @@ export const HomeScreen = ({ navigation }) => {
         {/* ── 7. Recently verified near you ── */}
         {recentListing ? (
           <>
+
             <Animated.View style={{ opacity: recentHeaderOpacity }}>
               <View style={styles.sectionHeaderRow}>
                 <View>
@@ -744,14 +903,23 @@ export const HomeScreen = ({ navigation }) => {
                     FRESHLY CHECKED AROUND DELHI NCR
                   </Text>
                   <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
-                    Recently verified near you
+                    Recently verified 
                   </Text>
                 </View>
                 <BouncyPressable
                   style={[styles.circleArrowBtn, isDarkMode && styles.circleArrowBtnDark]}
                   activeScale={0.85}
-                  onPress={() => {}}>
-                  <Feather name="arrow-right" size={ms(14)} color={isDarkMode ? '#A855F7' : '#7B2CFF'} />
+                  onPress={() =>
+                    navigation.navigate('SearchScreen', {
+                      verifiedOnly: true,
+                      category: 'Recently Verified',
+                    })
+                  }>
+                  <Feather
+                    name="arrow-right"
+                    size={ms(18)}
+                    color={isDarkMode ? '#A855F7' : '#7B2CFF'}
+                  />
                 </BouncyPressable>
               </View>
             </Animated.View>
@@ -759,12 +927,18 @@ export const HomeScreen = ({ navigation }) => {
             <Animated.View
               style={{
                 opacity: recentOpacity,
-                transform: [{ perspective: 1000 }, { scale: recentScale }, { rotateX: recentRotateX }],
+                transform: [
+                  { perspective: 1000 },
+                  { scale: recentScale },
+                  { rotateX: recentRotateX },
+                ],
               }}>
               <BouncyPressable
                 style={[styles.recentCompactCard, isDarkMode && styles.recentCompactCardDark]}
                 activeScale={0.965}
-                onPress={() => {}}>
+                onPress={() => {
+                  navigation?.navigate?.('ListingDetailScreen', { slug: recentListing.slug });
+                }}>
                 <View style={styles.recentImgContainer}>
                   <FastImage
                     source={{
@@ -794,9 +968,23 @@ export const HomeScreen = ({ navigation }) => {
                       </View>
                     ) : null}
                     {recentRating ? (
-                      <View style={[styles.recentRatingBadge, isDarkMode && styles.recentRatingBadgeDark]}>
-                        <Ionicons name="star" size={ms(9)} color={isDarkMode ? '#F59E0B' : '#D97706'} />
-                        <Text style={[styles.recentRatingText, isDarkMode && styles.recentRatingTextDark]}>{recentRating}</Text>
+                      <View
+                        style={[
+                          styles.recentRatingBadge,
+                          isDarkMode && styles.recentRatingBadgeDark,
+                        ]}>
+                        <Ionicons
+                          name="star"
+                          size={ms(9)}
+                          color={isDarkMode ? '#F59E0B' : '#D97706'}
+                        />
+                        <Text
+                          style={[
+                            styles.recentRatingText,
+                            isDarkMode && styles.recentRatingTextDark,
+                          ]}>
+                          {recentRating}
+                        </Text>
                       </View>
                     ) : null}
                   </View>
@@ -810,7 +998,7 @@ export const HomeScreen = ({ navigation }) => {
 
                   {recentLocation ? (
                     <View style={styles.recentLocationRow}>
-                      <Ionicons name="location-outline" size={ms(11)} color="#8E8E93" />
+                      <Ionicons name="location-outline" size={ms(15)} color="#8E8E93" />
                       <Text
                         style={[
                           styles.recentLocationText,
@@ -837,11 +1025,7 @@ export const HomeScreen = ({ navigation }) => {
                         Verified
                       </Text>
                     </View>
-                    <View
-                      style={[
-                        styles.amenityPetPill,
-                        isDarkMode && styles.amenityPetPillDark,
-                      ]}>
+                    <View style={[styles.amenityPetPill, isDarkMode && styles.amenityPetPillDark]}>
                       <Ionicons name="paw" size={ms(9)} color="#7C3AED" />
                       <Text style={styles.amenityPetText}>Pet Friendly</Text>
                     </View>
@@ -866,20 +1050,13 @@ export const HomeScreen = ({ navigation }) => {
             },
           ]}>
           <LinearGradient
-            colors={
-              isDarkMode
-                ? ['#1C0E34', '#120824']
-                : ['#FFFFFF', '#FBF9FE']
-            }
+            colors={isDarkMode ? ['#1C0E34', '#120824'] : ['#FFFFFF', '#FBF9FE']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[styles.rehomeCard, isDarkMode && styles.rehomeCardDark]}>
             {/* Ambient subtle light orb in corner */}
             <View
-              style={[
-                styles.rehomeCardAmbientOrb,
-                isDarkMode && styles.rehomeCardAmbientOrbDark,
-              ]}
+              style={[styles.rehomeCardAmbientOrb, isDarkMode && styles.rehomeCardAmbientOrbDark]}
               pointerEvents="none"
             />
 
@@ -898,33 +1075,20 @@ export const HomeScreen = ({ navigation }) => {
 
               <View style={styles.rehomeTextGroup}>
                 <View style={styles.rehomeOverlineRow}>
-                  <View
-                    style={[
-                      styles.rehomePulseDot,
-                      isDarkMode && styles.rehomePulseDotDark,
-                    ]}
-                  />
-                  <Text
-                    style={[
-                      styles.rehomeOverline,
-                      isDarkMode && styles.rehomeOverlineDark,
-                    ]}>
-                    COMMUNITY SOS
+                  <View style={[styles.rehomePulseDot, isDarkMode && styles.rehomePulseDotDark]} />
+                  <Text style={[styles.rehomeOverline, isDarkMode && styles.rehomeOverlineDark]}>
+                    Reunite & rehome
                   </Text>
                 </View>
                 <Text style={[styles.rehomeTitle, isDarkMode && styles.rehomeTitleDark]}>
                   Help a pet find their way
                 </Text>
                 <Text style={[styles.rehomeSubtitle, isDarkMode && styles.rehomeSubtitleDark]}>
-                  Urgent alerts & adoption network
+                  Quick access to urgent community posts near you.
                 </Text>
               </View>
 
-              <View
-                style={[
-                  styles.rehomeArrowCircle,
-                  isDarkMode && styles.rehomeArrowCircleDark,
-                ]}>
+              <View style={[styles.rehomeArrowCircle, isDarkMode && styles.rehomeArrowCircleDark]}>
                 <Feather
                   name="arrow-up-right"
                   size={ms(16)}
@@ -934,12 +1098,7 @@ export const HomeScreen = ({ navigation }) => {
             </Pressable>
 
             {/* Subtle Divider */}
-            <View
-              style={[
-                styles.rehomeDivider,
-                isDarkMode && styles.rehomeDividerDark,
-              ]}
-            />
+            <View style={[styles.rehomeDivider, isDarkMode && styles.rehomeDividerDark]} />
 
             {/* 3 Interactive Action Mini-Cards */}
             <View style={styles.rehomeActionRow}>
@@ -1004,7 +1163,10 @@ export const HomeScreen = ({ navigation }) => {
                     Curated road trips
                   </Text>
                 </View>
-                <BouncyPressable activeScale={0.9} onPress={() => {}}>
+                <BouncyPressable
+                  testID="view-all-road-trips-btn"
+                  activeScale={0.9}
+                  onPress={() => navigation.navigate('RoadTripRoutesScreen')}>
                   <Text style={[styles.viewAllText, isDarkMode && styles.viewAllTextDark]}>
                     View all
                   </Text>
@@ -1030,12 +1192,32 @@ export const HomeScreen = ({ navigation }) => {
                     key={trip.id}
                     style={[styles.roadTripCard, isDarkMode && styles.roadTripCardDark]}
                     activeScale={0.95}
-                    onPress={() => {}}>
-                    <FastImage
-                      source={{ uri: trip.image }}
-                      style={StyleSheet.absoluteFillObject}
-                      resizeMode={FastImage.resizeMode.cover}
-                    />
+                    onPress={() =>
+                      navigation.navigate('RoadTripDetailScreen', {
+                        slug: trip.slug,
+                      })
+                    }>
+                    {trip.image ? (
+                      <FastImage
+                        source={{ uri: trip.image }}
+                        style={StyleSheet.absoluteFillObject}
+                        resizeMode={FastImage.resizeMode.cover}
+                      />
+                    ) : (
+                      // Routes currently come back without a cover image
+                      <LinearGradient
+                        colors={['#3B108F', '#7B2CFF', '#EE2A7B']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={StyleSheet.absoluteFillObject}>
+                        <Ionicons
+                          name="car-sport"
+                          size={ms(90)}
+                          color="rgba(255, 255, 255, 0.12)"
+                          style={styles.roadTripPlaceholderIcon}
+                        />
+                      </LinearGradient>
+                    )}
                     <LinearGradient
                       colors={['rgba(15, 6, 32, 0.3)', 'rgba(15, 6, 32, 0.88)']}
                       start={{ x: 0, y: 0 }}
@@ -1075,77 +1257,119 @@ export const HomeScreen = ({ navigation }) => {
           </>
         ) : null}
 
-        {/* ── 10. Know a pet-friendly place? Callout Banner ── */}
+        {/* ── 10. Quick Actions: Add place + Transport with Dogs ── */}
         <Animated.View
           style={{
-            opacity: calloutOpacity,
+            opacity: quickHeaderAnim,
             transform: [
-              { perspective: 1000 },
-              { scale: calloutScale },
-              { rotateX: calloutRotateX },
+              {
+                translateY: quickHeaderAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [s(12), 0],
+                }),
+              },
             ],
           }}>
-          <BouncyPressable style={styles.fullWidth} activeScale={0.98} onPress={() => {}}>
-            <LinearGradient
-              colors={['#4C1378', '#6D28D9', '#8B5CF6']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.communityCalloutCard}>
-              {/* Dynamic Glass Holographic Sheen */}
-              <Animated.View
-                pointerEvents="none"
-                style={[
-                  styles.glassSheenOverlay,
-                  {
-                    transform: [{ translateX: calloutSheenX }, { rotate: '25deg' }],
-                  },
-                ]}>
-                <LinearGradient
-                  colors={[
-                    'rgba(255, 255, 255, 0)',
-                    'rgba(255, 255, 255, 0.22)',
-                    'rgba(255, 255, 255, 0)',
-                  ]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={StyleSheet.absoluteFillObject}
-                />
-              </Animated.View>
-
-              {/* Decorative concentric rings in background */}
-              <View style={styles.calloutDecoCircleOuter} />
-              <View style={styles.calloutDecoCircleInner} />
-
-              <Animated.View style={{ transform: [{ rotate: calloutBadgeRotate }] }}>
-                <View style={styles.calloutIconBadge}>
-                  <Ionicons name="storefront" size={ms(20)} color="#1E1035" />
-                </View>
-              </Animated.View>
-
-              <Text style={styles.calloutOverline}>HELP THE PACK GROW</Text>
-              <Text style={styles.calloutTitle}>Know a pet-friendly place?</Text>
-              <Text style={styles.calloutDesc}>
-                Add it for review and help other pet parents explore with confidence.
+          <View style={styles.sectionHeaderRow}>
+            <View>
+              <Text style={[styles.sectionOverline, isDarkMode && styles.sectionOverlineDark]}>
+                MORE FOR PET PARENTS
               </Text>
-
-              <Animated.View
-                style={[styles.alignSelfStart, { transform: [{ scale: calloutBtnScale }] }]}>
-                <BouncyPressable style={styles.calloutBtn} activeScale={0.92} onPress={() => {}}>
-                  <Text style={styles.calloutBtnText}>Add place</Text>
-                  <Feather
-                    name="arrow-right"
-                    size={ms(13)}
-                    color="#220D47"
-                    style={styles.btnArrowMargin}
-                  />
-                </BouncyPressable>
-              </Animated.View>
-            </LinearGradient>
-          </BouncyPressable>
+              <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
+                Quick actions
+              </Text>
+            </View>
+          </View>
         </Animated.View>
+
+        <View style={styles.quickTilesRow}>
+          {[
+            {
+              key: 'add-place',
+              colors: ['#2E0A5C', '#5B21B6', '#8B5CF6'],
+              border: '#3B0F73',
+              accent: '#FBBF24',
+              accentText: '#1E1035',
+              icon: 'storefront',
+              overline: 'HELP THE PACK GROW',
+              title: 'Add a place',
+              desc: 'Add it for review',
+              ctaIcon: 'plus',
+              onPress: () => navigation.navigate('AddPlaceScreen'),
+            },
+            {
+              key: 'transport',
+              colors: ['#053F3A', '#0F766E', '#2DD4BF'],
+              border: '#064E48',
+              accent: '#99F6E4',
+              accentText: '#134E4A',
+              icon: 'car',
+              overline: 'TRAVEL EASY',
+              title: 'Transport With Dogs',
+              desc: 'Taxis, trains & more',
+              ctaIcon: 'arrow-right',
+              onPress: () => navigation.navigate('TransportScreen'),
+            },
+          ].map((tile, i) => (
+            <Animated.View
+              key={tile.key}
+              style={[styles.quickTileWrap, quickTileStyle(quickCardAnims[i], i === 0 ? -1 : 1)]}>
+              <BouncyPressable style={styles.fullWidth} activeScale={0.97} onPress={tile.onPress}>
+                <LinearGradient
+                  colors={tile.colors}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.quickTile, { borderBottomColor: tile.border }]}>
+                  {/* Large faint watermark icon */}
+                  <Ionicons
+                    name={tile.icon}
+                    size={ms(96)}
+                    color="rgba(255,255,255,0.09)"
+                    style={styles.quickTileWatermark}
+                  />
+                  {/* Soft top glass highlight */}
+                  <LinearGradient
+                    pointerEvents="none"
+                    colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0)']}
+                    style={styles.quickTileGloss}
+                  />
+                  <View style={styles.quickTileTop}>
+                    <View style={[styles.quickActionBadge, { backgroundColor: tile.accent }]}>
+                      <Ionicons name={tile.icon} size={ms(18)} color={tile.accentText} />
+                    </View>
+                    <Animated.View style={[styles.quickTilePill, quickNudgeStyle]}>
+                      <Feather name={tile.ctaIcon} size={ms(16)} color={tile.accentText} />
+                    </Animated.View>
+                  </View>
+                  <View>
+                    <Text style={styles.quickTileOverline} numberOfLines={1}>
+                      {tile.overline}
+                    </Text>
+                    <Text style={styles.quickTileTitle}>{tile.title}</Text>
+                    <Text style={styles.quickActionDesc} numberOfLines={1}>
+                      {tile.desc}
+                    </Text>
+                  </View>
+                </LinearGradient>
+              </BouncyPressable>
+            </Animated.View>
+          ))}
+        </View>
       </Animated.ScrollView>
     </View>
   );
 };
 
 export { ReuniteScreen } from './ReuniteScreen';
+export { ReuniteListScreen } from './ReuniteListScreen';
+export { ReuniteDetailScreen } from './ReuniteDetailScreen';
+export { PetAlertsScreen } from './PetAlertsScreen';
+export { AddPlaceScreen } from './AddPlaceScreen';
+export { TransportScreen } from './TransportScreen';
+export { TransportModeScreen } from './TransportModeScreen';
+export { TravelStoryScreen } from './TravelStoryScreen';
+export { StoryDetailScreen } from './StoryDetailScreen';
+export { RoadTripRoutesScreen } from './RoadTripRoutesScreen';
+export { RoadTripDetailScreen } from './RoadTripDetailScreen';
+export { RoadTripStopDetailScreen } from './RoadTripStopDetailScreen';
+export { UrbaniaBookingScreen } from './UrbaniaBookingScreen';

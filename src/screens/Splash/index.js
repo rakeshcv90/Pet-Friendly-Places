@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet, StatusBar, useWindowDimensions } from 'react-native';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../components/common/FastImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { theme } from '../../theme';
@@ -15,7 +15,7 @@ const IMAGE_RATIO = IMAGE_WIDTH / IMAGE_HEIGHT; // ~ 0.50028
 export const SplashScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const { isAuthenticated } = useStore();
+  const isAuthenticated = useStore(state => state.isAuthenticated);
 
   const handleGetStarted = () => {
     navigation.replace('Onboarding');

@@ -1,4 +1,5 @@
 import { createMMKV } from 'react-native-mmkv';
+import * as Keychain from 'react-native-keychain';
 
 export const storage = createMMKV();
 
@@ -8,9 +9,112 @@ export const STORAGE_KEYS = {
   USER_INFO: 'USER_INFO',
   APP_SETTINGS: 'APP_SETTINGS',
   SELECTED_LOCATION: 'SELECTED_LOCATION',
+  TAILS_GUIDE_SESSION_TOKEN: 'TAILS_GUIDE_SESSION_TOKEN',
+  SAVED_TRIPS: 'SAVED_TRIPS',
+  COMMUNITY_MEMBERSHIPS: 'COMMUNITY_MEMBERSHIPS',
+  COMMUNITY_PENDING_REPLIES: 'COMMUNITY_PENDING_REPLIES',
+  APP_LOCK_ENABLED: 'APP_LOCK_ENABLED',
+  APP_LOCK_OFFERED: 'APP_LOCK_OFFERED',
+  PERMISSIONS_OFFERED: 'PERMISSIONS_OFFERED',
+  INSTALL_MARKER: 'INSTALL_MARKER',
+};
+
+// ── Secure storage ──────────────────────────────────────────────────────────────────────────
+// The access and refresh tokens never go into MMKV (ordinary app storage). They live only in the
+// iOS Keychain / Android Keystore, as one entry so both are always saved together. The OS API is
+// async, so the tokens are held in memory while the app runs: reads stay synchronous, writes go to
+// the Keychain in order straight away. `initSecureStorage()` must finish before anything reads the
+// session (see index.js).
+const SECURE_SERVICE = 'com.petfriendly.session';
+const SECURE_KEYS = [STORAGE_KEYS.ACCESS_TOKEN, STORAGE_KEYS.REFRESH_TOKEN];
+const isSecureKey = key => SECURE_KEYS.includes(key);
+
+let secureCache = {};
+let writeChain = Promise.resolve(true);
+
+// Writes the whole session to the Keychain. Writes are queued, so they land in call order.
+// Resolves to whether this write succeeded; it never rejects.
+const persistSecure = () => {
+  const snapshot = { ...secureCache };
+  writeChain = writeChain.then(async () => {
+    try {
+      if (Object.keys(snapshot).length === 0) {
+        await Keychain.resetGenericPassword({ service: SECURE_SERVICE });
+      } else {
+        await Keychain.setGenericPassword('session', JSON.stringify(snapshot), {
+          service: SECURE_SERVICE,
+          // Not backed up, not synced to another device, readable once the phone was unlocked
+          accessible: Keychain.ACCESSIBLE.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+        });
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  });
+  return writeChain;
+};
+
+// The iOS Keychain survives deleting the app, so a reinstall would still find the old session and
+// sign the person straight back in. Ordinary app storage (MMKV) is wiped with the app. So: a launch
+// where MMKV is completely empty and has never been marked is a fresh install, and any session left
+// in the Keychain belongs to a previous install. An app that is simply being updated already has
+// other keys in MMKV, so it is not treated as fresh and keeps its session.
+const isFreshInstall = () => !storage.getString(STORAGE_KEYS.INSTALL_MARKER) && storage.getAllKeys().length === 0;
+
+// Loads the saved session from the Keychain, and moves tokens an older version left in MMKV into it
+export const initSecureStorage = async () => {
+  const fresh = isFreshInstall();
+  if (!storage.getString(STORAGE_KEYS.INSTALL_MARKER)) {
+    storage.set(STORAGE_KEYS.INSTALL_MARKER, '1');
+  }
+  if (fresh) {
+    secureCache = {};
+    try {
+      await Keychain.resetGenericPassword({ service: SECURE_SERVICE });
+    } catch (e) {
+      // Nothing to clear, or the Keychain is unavailable: start signed out either way
+    }
+    return;
+  }
+
+  try {
+    const saved = await Keychain.getGenericPassword({ service: SECURE_SERVICE });
+    secureCache = saved ? JSON.parse(saved.password) || {} : {};
+  } catch (e) {
+    secureCache = {};
+  }
+
+  const legacy = SECURE_KEYS.filter(key => storage.getString(key));
+  if (legacy.length > 0) {
+    legacy.forEach(key => {
+      if (!secureCache[key]) {
+        secureCache[key] = storage.getString(key);
+      }
+    });
+    // Only delete the plain copies once the Keychain really has them
+    if (await persistSecure()) {
+      legacy.forEach(key => storage.remove(key));
+    }
+  }
+};
+
+// Saves both tokens in one Keychain write and waits for it. Use this when the tokens are rotated,
+// so a refresh token that was just spent is never the one left on disk.
+export const saveSecureTokens = (accessToken, refreshToken) => {
+  secureCache[STORAGE_KEYS.ACCESS_TOKEN] = accessToken;
+  if (refreshToken) {
+    secureCache[STORAGE_KEYS.REFRESH_TOKEN] = refreshToken;
+  }
+  return persistSecure();
 };
 
 export const setItem = (key, value) => {
+  if (isSecureKey(key)) {
+    secureCache[key] = String(value);
+    persistSecure();
+    return;
+  }
   if (typeof value === 'object') {
     storage.set(key, JSON.stringify(value));
   } else {
@@ -19,6 +123,9 @@ export const setItem = (key, value) => {
 };
 
 export const getItem = (key, isObject = false) => {
+  if (isSecureKey(key)) {
+    return secureCache[key];
+  }
   if (isObject) {
     const jsonStr = storage.getString(key);
     if (jsonStr) {
@@ -34,9 +141,18 @@ export const getItem = (key, isObject = false) => {
 };
 
 export const removeItem = key => {
+  if (isSecureKey(key)) {
+    delete secureCache[key];
+    persistSecure();
+    return;
+  }
   storage.remove(key);
 };
 
 export const clearStorage = () => {
   storage.clearAll();
+  // clearAll also removes the install marker; put it back so the next launch is not read as a reinstall
+  storage.set(STORAGE_KEYS.INSTALL_MARKER, '1');
+  secureCache = {};
+  persistSecure();
 };

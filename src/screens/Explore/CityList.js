@@ -1,9 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
   TextInput,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Modal,
@@ -12,266 +11,308 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   TouchableOpacity,
+  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import Feather from 'react-native-vector-icons/Feather';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { s, vs, ms } from 'react-native-size-matters';
 import { theme } from '../../theme';
 import { useStore } from '../../store';
-import { useDiscoveryCities } from '../../hooks/useDiscovery';
+import { useDiscoveryCities, resolveImageUrl } from '../../hooks/useDiscovery';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
-
-// Initial curated pet-friendly cities exactly matching the design
-const DEFAULT_CITIES = [
-  {
-    city: 'Rishikesh',
-    state: 'Uttarakhand',
-    listing_count: 67,
-    region: 'North',
-    icon: 'water-outline',
-    paletteIndex: 0,
-  },
-  {
-    city: 'Dehradun',
-    state: 'Uttarakhand',
-    listing_count: 51,
-    region: 'North',
-    icon: 'leaf-outline',
-    paletteIndex: 1,
-  },
-  {
-    city: 'Gurugram',
-    state: 'Haryana',
-    listing_count: 34,
-    region: 'North',
-    icon: 'business-outline',
-    paletteIndex: 2,
-  },
-  {
-    city: 'Mussoorie',
-    state: 'Uttarakhand',
-    listing_count: 34,
-    region: 'North',
-    icon: 'trail-sign-outline',
-    paletteIndex: 3,
-  },
-  {
-    city: 'Jaipur',
-    state: 'Rajasthan',
-    listing_count: 33,
-    region: 'North',
-    icon: 'compass-outline',
-    paletteIndex: 0,
-  },
-  {
-    city: 'Bengaluru',
-    state: 'Karnataka',
-    listing_count: 28,
-    region: 'South',
-    icon: 'flower-outline',
-    paletteIndex: 1,
-  },
-  {
-    city: 'Manali',
-    state: 'Himachal Pradesh',
-    listing_count: 26,
-    region: 'North',
-    icon: 'triangle-outline',
-    paletteIndex: 2,
-  },
-  {
-    city: 'Mumbai',
-    state: 'Maharashtra',
-    listing_count: 20,
-    region: 'West',
-    icon: 'navigate-outline',
-    paletteIndex: 3,
-  },
-  {
-    city: 'Noida',
-    state: 'Uttar Pradesh',
-    listing_count: 19,
-    region: 'North',
-    icon: 'cube-outline',
-    paletteIndex: 0,
-  },
-  {
-    city: 'Bhimtal',
-    state: 'Uttarakhand',
-    listing_count: 17,
-    region: 'North',
-    icon: 'water-outline',
-    paletteIndex: 1,
-  },
-  {
-    city: 'Pune',
-    state: 'Maharashtra',
-    listing_count: 15,
-    region: 'West',
-    icon: 'book-outline',
-    paletteIndex: 2,
-  },
-  {
-    city: 'Dharamshala',
-    state: 'Himachal Pradesh',
-    listing_count: 13,
-    region: 'North',
-    icon: 'sparkles-outline',
-    paletteIndex: 3,
-  },
-  {
-    city: 'Varanasi',
-    state: 'Uttar Pradesh',
-    listing_count: 12,
-    region: 'North',
-    icon: 'flame-outline',
-    paletteIndex: 0,
-  },
-  {
-    city: 'Chennai',
-    state: 'Tamil Nadu',
-    listing_count: 9,
-    region: 'South',
-    icon: 'sunny-outline',
-    paletteIndex: 1,
-  },
-  {
-    city: 'Kolkata',
-    state: 'West Bengal',
-    listing_count: 10,
-    region: 'East',
-    icon: 'library-outline',
-    paletteIndex: 2,
-  },
-  {
-    city: 'Udaipur',
-    state: 'Rajasthan',
-    listing_count: 8,
-    region: 'North',
-    icon: 'heart-outline',
-    paletteIndex: 3,
-  },
-];
-
-const REGION_MAPPING = {
-  Uttarakhand: 'North',
-  Delhi: 'North',
-  'Delhi NCR': 'North',
-  Haryana: 'North',
-  'Himachal Pradesh': 'North',
-  Rajasthan: 'North',
-  Punjab: 'North',
-  'Uttar Pradesh': 'North',
-  'Jammu and Kashmir': 'North',
-  Chandigarh: 'North',
-  Ladakh: 'North',
-  Maharashtra: 'West',
-  Gujarat: 'West',
-  Goa: 'West',
-  Karnataka: 'South',
-  'Tamil Nadu': 'South',
-  Kerala: 'South',
-  Telangana: 'South',
-  'Andhra Pradesh': 'South',
-  Puducherry: 'South',
-  'West Bengal': 'East',
-  Odisha: 'East',
-  Bihar: 'East',
-  Jharkhand: 'East',
-  Assam: 'East',
-  Sikkim: 'East',
-  Meghalaya: 'East',
-  'Madhya Pradesh': 'North',
-};
+import { LoaderCard } from '../../components/common/Loader';
 
 const PALETTES = [
-  { bg: '#EDE9FE', border: '#DDD6FE', iconColor: '#7C3AED', icon: 'trail-sign-outline' }, // Purple
-  { bg: '#CCFBF1', border: '#99F6E4', iconColor: '#0D9488', icon: 'leaf-outline' }, // Teal
-  { bg: '#FEF3C7', border: '#FDE68A', iconColor: '#D97706', icon: 'business-outline' }, // Amber
-  { bg: '#FCE7F3', border: '#FBCFE8', iconColor: '#DB2777', icon: 'heart-outline' }, // Pink
+  {
+    bg: '#EDE9FE',
+    border: '#DDD6FE',
+    shadowBorder: '#C4B5FD',
+    iconColor: '#7C3AED',
+    icon: 'trail-sign-outline',
+  }, // Purple
+  {
+    bg: '#CCFBF1',
+    border: '#99F6E4',
+    shadowBorder: '#5EEAD4',
+    iconColor: '#0D9488',
+    icon: 'leaf-outline',
+  }, // Teal
+  {
+    bg: '#FEF3C7',
+    border: '#FDE68A',
+    shadowBorder: '#FCD34D',
+    iconColor: '#D97706',
+    icon: 'business-outline',
+  }, // Amber
+  {
+    bg: '#FCE7F3',
+    border: '#FBCFE8',
+    shadowBorder: '#F472B6',
+    iconColor: '#DB2777',
+    icon: 'heart-outline',
+  }, // Pink
 ];
 
 const DARK_PALETTES = [
-  { bg: 'rgba(124, 58, 237, 0.22)', border: '#3B1D6E', iconColor: '#C4B5FD', icon: 'trail-sign-outline' }, // Purple
-  { bg: 'rgba(13, 148, 136, 0.22)', border: '#134E4A', iconColor: '#5EEAD4', icon: 'leaf-outline' }, // Teal
-  { bg: 'rgba(217, 119, 6, 0.22)', border: '#78350F', iconColor: '#FCD34D', icon: 'business-outline' }, // Amber
-  { bg: 'rgba(219, 39, 119, 0.22)', border: '#831843', iconColor: '#F472B6', icon: 'heart-outline' }, // Pink
+  {
+    bg: 'rgba(124, 58, 237, 0.22)',
+    border: '#3B1D6E',
+    shadowBorder: '#230E4A',
+    iconColor: '#C4B5FD',
+    icon: 'trail-sign-outline',
+  }, // Purple
+  {
+    bg: 'rgba(13, 148, 136, 0.22)',
+    border: '#134E4A',
+    shadowBorder: '#0A2D2A',
+    iconColor: '#5EEAD4',
+    icon: 'leaf-outline',
+  }, // Teal
+  {
+    bg: 'rgba(217, 119, 6, 0.22)',
+    border: '#78350F',
+    shadowBorder: '#451A03',
+    iconColor: '#FCD34D',
+    icon: 'business-outline',
+  }, // Amber
+  {
+    bg: 'rgba(219, 39, 119, 0.22)',
+    border: '#831843',
+    shadowBorder: '#4C0D24',
+    iconColor: '#F472B6',
+    icon: 'heart-outline',
+  }, // Pink
 ];
 
-const REGIONS = ['All', 'North', 'West', 'South', 'East'];
+const CityCardItem = React.memo(
+  ({ item, index, isDarkMode, failedImages, setFailedImages, onSelectCity }) => {
+    const enterAnim = useRef(new Animated.Value(0)).current;
+
+    React.useEffect(() => {
+      Animated.spring(enterAnim, {
+        toValue: 1,
+        tension: 80,
+        friction: 8,
+        delay: Math.min(index * 35, 240),
+        useNativeDriver: true,
+      }).start();
+    }, [enterAnim, index]);
+
+    const paletteList = isDarkMode ? DARK_PALETTES : PALETTES;
+    const palette = paletteList[index % paletteList.length];
+    const iconName = item.icon || palette.icon;
+    const verifiedCount =
+      typeof item.verified_count === 'number' && item.verified_count > 0
+        ? item.verified_count
+        : item.listing_count || 0;
+    const totalCount =
+      typeof item.total_count === 'number' && item.total_count > 0
+        ? item.total_count
+        : verifiedCount || 1;
+    const displayVerified = verifiedCount > 0 ? verifiedCount : totalCount;
+    const hasCover = !!item.cover_image_url && !failedImages[item.cover_image_url];
+
+    const translateY = enterAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [18, 0],
+    });
+
+    const scale = enterAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.96, 1],
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.cityCardAnimatedWrap,
+          {
+            opacity: enterAnim,
+            transform: [{ translateY }, { scale }],
+          },
+        ]}>
+        <BouncyPressable
+          style={[styles.cityCard, isDarkMode && styles.cityCardDark]}
+          activeScale={0.96}
+          springTension={180}
+          springFriction={7}
+          onPress={() => onSelectCity(item)}>
+          <View style={styles.cityCardLeft}>
+            {hasCover ? (
+              <View style={[styles.cityImageBox, isDarkMode && styles.cityImageBoxDark]}>
+                <View style={styles.imageFallbackHolder}>
+                  <Ionicons name={iconName} size={ms(18)} color={palette.iconColor} />
+                </View>
+                <FastImage
+                  source={{
+                    uri: item.cover_image_url,
+                    priority: FastImage.priority.normal,
+                  }}
+                  style={styles.cityCoverImage}
+                  resizeMode={FastImage.resizeMode.cover}
+                  onError={() => {
+                    setFailedImages(prev => ({
+                      ...prev,
+                      [item.cover_image_url]: true,
+                    }));
+                  }}
+                />
+              </View>
+            ) : (
+              <View
+                style={[
+                  styles.cityIconBox,
+                  {
+                    backgroundColor: palette.bg,
+                    borderColor: palette.border,
+                    borderBottomColor: palette.shadowBorder,
+                  },
+                ]}>
+                <Ionicons name={iconName} size={ms(18)} color={palette.iconColor} />
+              </View>
+            )}
+
+            <View style={styles.cityNameGroup}>
+              <Text
+                style={[styles.cityNameText, isDarkMode && styles.cityNameTextDark]}
+                numberOfLines={2}>
+                {item.city}
+              </Text>
+              <Text
+                style={[styles.cityStateText, isDarkMode && styles.cityStateTextDark]}
+                numberOfLines={1}>
+                {item.state}
+              </Text>
+              {totalCount > 0 && (
+                <Text
+                  style={[styles.cityTotalText, isDarkMode && styles.cityTotalTextDark]}
+                  numberOfLines={1}>
+                  {`${totalCount} total`}
+                </Text>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.cityCardRight}>
+            <View style={[styles.verifiedBadge, isDarkMode && styles.verifiedBadgeDark]}>
+              <Text style={[styles.verifiedBadgeText, isDarkMode && styles.verifiedBadgeTextDark]}>
+                {`${displayVerified} Verified ${displayVerified === 1 ? 'Place' : 'Places'}`}
+              </Text>
+            </View>
+            <View style={[styles.cityArrowWell, isDarkMode && styles.cityArrowWellDark]}>
+              <Feather
+                name="arrow-right"
+                size={ms(12)}
+                color={isDarkMode ? '#A78BFA' : '#7C3AED'}
+              />
+            </View>
+          </View>
+        </BouncyPressable>
+      </Animated.View>
+    );
+  },
+);
+
+CityCardItem.displayName = 'CityCardItem';
 
 export const CityList = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const setCurrentLocation = useStore(state => state.setCurrentLocation);
   const isDarkMode = useStore(state => state.isDarkMode);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRegion, setSelectedRegion] = useState('All');
   const [requestModalVisible, setRequestModalVisible] = useState(false);
   const [requestCityName, setRequestCityName] = useState('');
   const [requestSuccess, setRequestSuccess] = useState(false);
+  const [failedImages, setFailedImages] = useState({});
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const HERO_DISTANCE = s(220) + vs(16);
 
-  // Fetch live discovery cities from API if available
-  const { data: apiCities } = useDiscoveryCities();
+  const isSearching = searchQuery.trim().length > 0;
+  const translateY = isSearching
+    ? 0
+    : scrollY.interpolate({
+        inputRange: [0, HERO_DISTANCE],
+        outputRange: [HERO_DISTANCE, 0],
+        extrapolate: 'clamp',
+      });
+
+  const backgroundOpacity = isSearching
+    ? 1
+    : scrollY.interpolate({
+        inputRange: [Math.max(0, HERO_DISTANCE - vs(16)), HERO_DISTANCE],
+        outputRange: [0, 1],
+        extrapolate: 'clamp',
+      });
+
+  // Fetch live discovery cities from API (/cities/known)
+  const { data: apiCities, isLoading } = useDiscoveryCities();
+  
 
   const citiesData = useMemo(() => {
     if (Array.isArray(apiCities) && apiCities.length > 0) {
-      // Merge live API data with design fallbacks for icons/regions
-      const apiMap = new Map();
-      apiCities.forEach(c => {
-        if (c.city) {
-          apiMap.set(c.city.toLowerCase(), c);
-        }
-      });
+      const mapped = apiCities
+        .map(c => {
+          const cityName = c.name || c.city;
+          if (!cityName) {
+            return null;
+          }
+          const state = c.state || 'India';
+          const verifiedCount =
+            typeof c.verified_count === 'number'
+              ? c.verified_count
+              : typeof c.listing_count === 'number'
+              ? c.listing_count
+              : 0;
+          const totalCount = typeof c.total_count === 'number' ? c.total_count : verifiedCount;
+          const listingCount = verifiedCount > 0 ? verifiedCount : totalCount || 1;
 
-      // Update default cities with fresh live count if available
-      const mergedDefaults = DEFAULT_CITIES.map(def => {
-        const live = apiMap.get(def.city.toLowerCase());
-        return {
-          ...def,
-          listing_count: live?.listing_count || def.listing_count,
-        };
-      });
+          const rawCover =
+            c.cover_image_url || c.cover_image || c.coverImage || c.image_url || c.image;
+          let coverImageUrl = rawCover ? resolveImageUrl(rawCover) : null;
 
-      // Add any additional cities from API that weren't in default list
-      const existingNames = new Set(DEFAULT_CITIES.map(d => d.city.toLowerCase()));
-      const extraCities = [];
-      apiCities.forEach((c, idx) => {
-        if (c.city && !existingNames.has(c.city.toLowerCase())) {
-          const region = REGION_MAPPING[c.state] || 'North';
-          extraCities.push({
-            city: c.city,
-            state: c.state || 'India',
-            listing_count: c.listing_count || 1,
-            region,
-            icon: 'location-outline',
-            paletteIndex: (DEFAULT_CITIES.length + idx) % PALETTES.length,
-          });
-        }
-      });
+          // If Rishikesh has the expired 404 Unsplash ID from backend, replace with verified working photo
+          if (coverImageUrl && coverImageUrl.includes('photo-1600100397608-4f0cefd4f05b')) {
+            coverImageUrl =
+              'https://images.unsplash.com/photo-1720819029162-8500607ae232?w=800&auto=format&fit=crop&q=80';
+          }
 
-      return [...mergedDefaults, ...extraCities];
+          return {
+            city: cityName,
+            state,
+            verified_count: verifiedCount,
+            total_count: totalCount,
+            listing_count: listingCount,
+            cover_image_url: coverImageUrl,
+          };
+        })
+        .filter(Boolean);
+
+      // Alphabetical sorting (A to Z) so destinations like Agonda appear at the top
+      return mapped.sort((a, b) => a.city.localeCompare(b.city));
     }
-    return DEFAULT_CITIES;
+    return [];
   }, [apiCities]);
 
-  // Filtered by Search query & Region tab
+  const totalVerifiedCount = useMemo(() => {
+    return citiesData.reduce(
+      (acc, curr) => acc + (curr.verified_count || curr.listing_count || 0),
+      0,
+    );
+  }, [citiesData]);
+
+  // Filtered by Search query
   const filteredCities = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) {
+      return citiesData;
+    }
     return citiesData.filter(item => {
-      const q = searchQuery.trim().toLowerCase();
-      const matchesSearch =
-        !q ||
-        item.city.toLowerCase().includes(q) ||
-        item.state.toLowerCase().includes(q);
-
-      const matchesRegion =
-        selectedRegion === 'All' || item.region === selectedRegion;
-
-      return matchesSearch && matchesRegion;
+      return item.city.toLowerCase().includes(q) || item.state.toLowerCase().includes(q);
     });
-  }, [citiesData, searchQuery, selectedRegion]);
+  }, [citiesData, searchQuery]);
 
   const handleSelectCity = cityName => {
     if (setCurrentLocation) {
@@ -285,6 +326,14 @@ export const CityList = ({ navigation, route }) => {
     } else {
       navigation?.navigate?.('MainTabs', { screen: 'Explore' });
     }
+  };
+
+  const handleOpenCity = item => {
+    navigation?.navigate?.('CityDetail', {
+      city: item.city,
+      state: item.state,
+      onSelectCity: route?.params?.onSelectCity,
+    });
   };
 
   const handleBack = () => {
@@ -308,245 +357,298 @@ export const CityList = ({ navigation, route }) => {
     }, 1600);
   };
 
-  return (
-    <View style={[styles.container, isDarkMode && styles.containerDark, { paddingTop: Math.max(insets.top, s(10)) }]}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={isDarkMode ? '#0F071D' : '#F8F7FC'} />
+  const renderListHeader = () => {
+    return (
+      <View>
+        {!searchQuery.trim() && (
+          /* ── Hero Banner ── */
+          <View style={styles.heroCard}>
+            <FastImage
+              source={{
+                uri: 'https://images.unsplash.com/photo-1599661046289-e31897846e41?w=800&auto=format&fit=crop&q=80',
+              }}
+              style={StyleSheet.absoluteFillObject}
+              resizeMode={FastImage.resizeMode.cover}
+            />
+            <LinearGradient
+              colors={['rgba(28, 12, 52, 0.45)', 'rgba(24, 9, 44, 0.94)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
 
-      {/* ── Top Header Bar ── */}
-      <View style={styles.headerRow}>
-        <BouncyPressable style={[styles.backButton, isDarkMode && styles.backButtonDark]} activeScale={0.88} onPress={handleBack}>
+            {/* Subtle Decorative Floating Glyphs */}
+            <View style={[styles.ambientGlyph, styles.glyphPaw]}>
+              <Ionicons name="paw" size={ms(18)} color="rgba(255, 255, 255, 0.14)" />
+            </View>
+            <View style={[styles.ambientGlyph, styles.glyphMusic]}>
+              <Ionicons name="musical-notes" size={ms(16)} color="rgba(255, 255, 255, 0.11)" />
+            </View>
+            <View style={[styles.ambientGlyph, styles.glyphHeart]}>
+              <Ionicons name="heart" size={ms(18)} color="rgba(255, 255, 255, 0.11)" />
+            </View>
+
+            {/* 3D Border Bevel Overlay */}
+            <View style={styles.hero3DBorderOverlay} pointerEvents="none" />
+
+            <View style={styles.heroContent}>
+              <View style={styles.heroBadgeRow}>
+                <Ionicons name="paw" size={ms(12)} color="#FBBF24" />
+                <Text style={styles.heroBadgeText}>PET-FRIENDLY DESTINATIONS</Text>
+              </View>
+
+              <View style={styles.heroTitleGroup}>
+                <Text style={styles.heroTitle}>Find your next city</Text>
+                <Text style={styles.heroTitle}>together</Text>
+                <Text style={styles.heroSubtitle}>
+                  Real pet rules, verified places, and local guides for travelling across India with
+                  your best friend.
+                </Text>
+              </View>
+
+              <View style={styles.heroStatsRow}>
+                <View style={styles.heroStatPill}>
+                  <Text style={styles.heroStatPillText}>
+                    {citiesData.length > 0 ? `${citiesData.length}+ cities` : '97+ cities'}
+                  </Text>
+                </View>
+                <View style={styles.heroStatPill}>
+                  <Text style={styles.heroStatPillText}>
+                    {totalVerifiedCount > 0
+                      ? `${totalVerifiedCount}+ verified places`
+                      : '500+ verified places'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+        
+        <View style={styles.searchSpacer} />
+
+        {!searchQuery.trim() && (
+        
+          <View style={[styles.featuredRegionCard, isDarkMode && styles.featuredRegionCardDark]}>
+            <LinearGradient
+              colors={isDarkMode ? ['#1F1338', '#2A184D'] : ['#FFFDF7', '#FEF3C7']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+
+            <Ionicons
+              name="business"
+              size={ms(58)}
+              color={isDarkMode ? 'rgba(251, 191, 36, 0.08)' : 'rgba(217, 119, 6, 0.12)'}
+              style={styles.featuredWatermark}
+            />
+
+            <View style={styles.featuredCardContent}>
+              <Text style={[styles.featuredOverline, isDarkMode && styles.featuredOverlineDark]}>
+                FEATURED REGION
+              </Text>
+              <Text style={[styles.featuredTitle, isDarkMode && styles.featuredTitleDark]}>
+                Delhi NCR
+              </Text>
+              <Text style={[styles.featuredSubtitle, isDarkMode && styles.featuredSubtitleDark]}>
+                Delhi · Gurugram · Noida · Faridabad · Aerocity
+              </Text>
+
+              <View style={styles.featuredTagsRow}>
+                <View style={[styles.featuredTagPill, isDarkMode && styles.featuredTagPillDark]}>
+                  <Text style={[styles.featuredTagText, isDarkMode && styles.featuredTagTextDark]}>
+                    🐕 Dog walks
+                  </Text>
+                </View>
+                <View style={[styles.featuredTagPill, isDarkMode && styles.featuredTagPillDark]}>
+                  <Text style={[styles.featuredTagText, isDarkMode && styles.featuredTagTextDark]}>
+                    ☕ Pet cafes
+                  </Text>
+                </View>
+                <View style={[styles.featuredTagPill, isDarkMode && styles.featuredTagPillDark]}>
+                  <Text style={[styles.featuredTagText, isDarkMode && styles.featuredTagTextDark]}>
+                    🏨 Stays
+                  </Text>
+                </View>
+              </View>
+
+              <BouncyPressable
+                style={styles.featuredCtaBtn}
+                activeScale={0.94}
+                onPress={() => 
+                 navigation.navigate('SearchScreen', { query: 'Delhi NCR' })
+                // handleSelectCity('Delhi NCR')
+                }
+                >
+                <Text style={styles.featuredCtaText}>Explore Delhi NCR</Text>
+                <Feather name="arrow-right" size={ms(13)} color="#FFFFFF" style={styles.ctaArrow} />
+              </BouncyPressable>
+            </View>
+          </View>
+        )}
+
+        {/* ── Browse Destinations Header ── */}
+        <View style={styles.sectionHeaderRow}>
+          <View>
+            <Text style={[styles.sectionOverline, isDarkMode && styles.sectionOverlineDark]}>
+              BROWSE DESTINATIONS
+            </Text>
+            <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
+              Pick a city, pack the leash
+            </Text>
+          </View>
+          <Text
+            style={[
+              styles.shownCountText,
+              isDarkMode && styles.shownCountTextDark,
+            ]}>{`${filteredCities.length} shown`}</Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderCityCard = ({ item, index }) => {
+    return (
+      <CityCardItem
+        item={item}
+        index={index}
+        isDarkMode={isDarkMode}
+        failedImages={failedImages}
+        setFailedImages={setFailedImages}
+        onSelectCity={handleOpenCity}
+      />
+    );
+  };
+
+  const renderListEmpty = () => {
+    if (isLoading && citiesData.length === 0) {
+      return (
+        <View style={styles.loadingContainer}>
+          <LoaderCard label="Loading pet-friendly cities..." isDarkMode={isDarkMode} />
+        </View>
+      );
+    }
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="search-outline" size={ms(38)} color={isDarkMode ? '#475569' : '#CBD5E1'} />
+        <Text style={[styles.emptyTitle, isDarkMode && styles.emptyTitleDark]}>
+          No cities found
+        </Text>
+        <Text style={[styles.emptySubtitle, isDarkMode && styles.emptySubtitleDark]}>
+          {`We couldn't find any destination matching "${searchQuery}".`}
+        </Text>
+        <BouncyPressable
+          style={[styles.emptyResetBtn, isDarkMode && styles.emptyResetBtnDark]}
+          activeScale={0.92}
+          onPress={() => setSearchQuery('')}>
+          <Text style={[styles.emptyResetText, isDarkMode && styles.emptyResetTextDark]}>
+            Clear search
+          </Text>
+        </BouncyPressable>
+      </View>
+    );
+  };
+
+  return (
+    <View
+      style={[
+        styles.container,
+        isDarkMode && styles.containerDark,
+        { paddingTop: Math.max(insets.top, s(10)) },
+      ]}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor={isDarkMode ? '#0F071D' : '#F8F7FC'}
+      />
+
+    
+      <View style={[styles.headerRow, isDarkMode && styles.headerRowDark]}>
+        <BouncyPressable
+          style={[styles.backButton, isDarkMode && styles.backButtonDark]}
+          activeScale={0.88}
+          onPress={handleBack}>
           <Feather name="arrow-left" size={ms(18)} color={isDarkMode ? '#FFFFFF' : '#1E1035'} />
         </BouncyPressable>
 
         <View style={styles.headerTextGroup}>
-          <Text style={[styles.headerOverline, isDarkMode && styles.headerOverlineDark]}>EXPLORE INDIA</Text>
-          <Text style={[styles.headerTitle, isDarkMode && styles.headerTitleDark]}>Pet-friendly cities</Text>
+          <Text style={[styles.headerOverline, isDarkMode && styles.headerOverlineDark]}>
+            EXPLORE INDIA
+          </Text>
+          <Text style={[styles.headerTitle, isDarkMode && styles.headerTitleDark]}>
+            Pet-friendly cities
+          </Text>
         </View>
 
         <View style={[styles.headerBadge, isDarkMode && styles.headerBadgeDark]}>
-          <Text style={[styles.headerBadgeText, isDarkMode && styles.headerBadgeTextDark]}>97+</Text>
+          <Text style={[styles.headerBadgeText, isDarkMode && styles.headerBadgeTextDark]}>
+            {citiesData.length > 0 ? `${citiesData.length}+` : '97+'}
+          </Text>
         </View>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: Math.max(insets.bottom, vs(24)) + vs(40) },
-        ]}>
-        {/* ── Hero Banner ── */}
-        <View style={styles.heroCard}>
-          <FastImage
-            source={{
-              uri: 'https://images.unsplash.com/photo-1599661046289-e31897846e41?w=800&auto=format&fit=crop&q=80',
-            }}
-            style={StyleSheet.absoluteFillObject}
-            resizeMode={FastImage.resizeMode.cover}
-          />
-          <LinearGradient
-            colors={['rgba(28, 12, 52, 0.45)', 'rgba(24, 9, 44, 0.94)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-
-          <View style={styles.heroContent}>
-            <View style={styles.heroBadgeRow}>
-              <Ionicons name="paw" size={ms(12)} color="#FBBF24" />
-              <Text style={styles.heroBadgeText}>PET-FRIENDLY DESTINATIONS</Text>
-            </View>
-
-            <View style={styles.heroTitleGroup}>
-              <Text style={styles.heroTitle}>Find your next city</Text>
-              <Text style={styles.heroTitle}>together</Text>
-              <Text style={styles.heroSubtitle}>
-                Real pet rules, verified places, and local guides for travelling across India with your
-                best friend.
-              </Text>
-            </View>
-
-            <View style={styles.heroStatsRow}>
-              <View style={styles.heroStatPill}>
-                <Text style={styles.heroStatPillText}>97+ cities</Text>
-              </View>
-              <View style={styles.heroStatPill}>
-                <Text style={styles.heroStatPillText}>500+ verified places</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* ── Search Bar ── */}
-        <View style={[styles.searchContainer, isDarkMode && styles.searchContainerDark]}>
-          <Feather name="search" size={ms(16)} color="#7C3AED" style={styles.searchIcon} />
-          <TextInput
-            style={[styles.searchInput, isDarkMode && styles.searchInputDark]}
-            placeholder="Search a city or state"
-            placeholderTextColor={isDarkMode ? '#94A3B8' : '#A59DB7'}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCorrect={false}
-            returnKeyType="search"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity
-              onPress={() => setSearchQuery('')}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-circle" size={ms(17)} color={isDarkMode ? '#94A3B8' : '#9CA3AF'} />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* ── Featured Region Card (Delhi NCR) ── */}
-        <View style={[styles.featuredRegionCard, isDarkMode && styles.featuredRegionCardDark]}>
-          <LinearGradient
-            colors={isDarkMode ? ['#1F1338', '#2A184D'] : ['#FFFDF7', '#FEF3C7']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-
-          {/* Decorative architectural watermark icon */}
-          <Ionicons
-            name="business"
-            size={ms(58)}
-            color={isDarkMode ? 'rgba(251, 191, 36, 0.08)' : 'rgba(217, 119, 6, 0.12)'}
-            style={styles.featuredWatermark}
-          />
-
-          <View style={styles.featuredCardContent}>
-            <Text style={[styles.featuredOverline, isDarkMode && styles.featuredOverlineDark]}>FEATURED REGION</Text>
-            <Text style={[styles.featuredTitle, isDarkMode && styles.featuredTitleDark]}>Delhi NCR</Text>
-            <Text style={[styles.featuredSubtitle, isDarkMode && styles.featuredSubtitleDark]}>
-              Delhi · Gurugram · Noida · Faridabad · Aerocity
-            </Text>
-
-            <View style={styles.featuredTagsRow}>
-              <View style={[styles.featuredTagPill, isDarkMode && styles.featuredTagPillDark]}>
-                <Text style={[styles.featuredTagText, isDarkMode && styles.featuredTagTextDark]}>🐕  Dog walks</Text>
-              </View>
-              <View style={[styles.featuredTagPill, isDarkMode && styles.featuredTagPillDark]}>
-                <Text style={[styles.featuredTagText, isDarkMode && styles.featuredTagTextDark]}>☕  Pet cafes</Text>
-              </View>
-              <View style={[styles.featuredTagPill, isDarkMode && styles.featuredTagPillDark]}>
-                <Text style={[styles.featuredTagText, isDarkMode && styles.featuredTagTextDark]}>🏨  Stays</Text>
-              </View>
-            </View>
-
-            <BouncyPressable
-              style={styles.featuredCtaBtn}
-              activeScale={0.94}
-              onPress={() => handleSelectCity('Delhi NCR')}>
-              <Text style={styles.featuredCtaText}>Explore Delhi NCR</Text>
-              <Feather name="arrow-right" size={ms(13)} color="#FFFFFF" style={styles.ctaArrow} />
-            </BouncyPressable>
-          </View>
-        </View>
-
-        {/* ── Browse Destinations Header & Region Tabs ── */}
-        <View style={styles.sectionHeaderRow}>
-          <View>
-            <Text style={[styles.sectionOverline, isDarkMode && styles.sectionOverlineDark]}>BROWSE DESTINATIONS</Text>
-            <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>Pick a city, pack the leash</Text>
-          </View>
-          <Text style={[styles.shownCountText, isDarkMode && styles.shownCountTextDark]}>{`${filteredCities.length} shown`}</Text>
-        </View>
-
-        {/* Region Filter Chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.regionTabsScroll}>
-          {REGIONS.map(region => {
-            const isSelected = selectedRegion === region;
-            return (
-              <BouncyPressable
-                key={region}
-                style={[
-                  styles.regionTabChip,
-                  isSelected
-                    ? styles.regionTabChipActive
-                    : [styles.regionTabChipInactive, isDarkMode && styles.regionTabChipInactiveDark],
-                ]}
-                activeScale={0.92}
-                onPress={() => setSelectedRegion(region)}>
-                <Text
-                  style={[
-                    styles.regionTabText,
-                    isSelected
-                      ? styles.regionTabTextActive
-                      : [styles.regionTabTextInactive, isDarkMode && styles.regionTabTextInactiveDark],
-                  ]}>
-                  {region}
-                </Text>
-              </BouncyPressable>
-            );
+  
+      <View style={styles.listArea}>
+        <Animated.FlatList
+          data={filteredCities}
+          keyExtractor={item => item.city}
+          renderItem={renderCityCard}
+          ListHeaderComponent={renderListHeader}
+          ListEmptyComponent={renderListEmpty}
+          contentContainerStyle={styles.flatListContent}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={8}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          keyboardShouldPersistTaps="handled"
+          style={styles.flatListFlex}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+            useNativeDriver: true,
           })}
-        </ScrollView>
+          scrollEventThrottle={16}
+        />
 
-        {/* ── City Cards List ── */}
-        {filteredCities.length > 0 ? (
-          filteredCities.map((item, index) => {
-            const paletteList = isDarkMode ? DARK_PALETTES : PALETTES;
-            const palette = paletteList[item.paletteIndex ?? index % paletteList.length];
-            const iconName = item.icon || palette.icon;
-
-            return (
-              <BouncyPressable
-                key={`${item.city}-${index}`}
-                style={[styles.cityCard, isDarkMode && styles.cityCardDark]}
-                activeScale={0.97}
-                onPress={() => handleSelectCity(item.city)}>
-                <View style={styles.cityCardLeft}>
-                  <View
-                    style={[
-                      styles.cityIconBox,
-                      { backgroundColor: palette.bg, borderColor: palette.border },
-                    ]}>
-                    <Ionicons name={iconName} size={ms(18)} color={palette.iconColor} />
-                  </View>
-
-                  <View style={styles.cityNameGroup}>
-                    <Text style={[styles.cityNameText, isDarkMode && styles.cityNameTextDark]} numberOfLines={1}>
-                      {item.city}
-                    </Text>
-                    <Text style={[styles.cityStateText, isDarkMode && styles.cityStateTextDark]} numberOfLines={1}>
-                      {item.state}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.cityCardRight}>
-                  <View style={[styles.verifiedBadge, isDarkMode && styles.verifiedBadgeDark]}>
-                    <Text style={[styles.verifiedBadgeText, isDarkMode && styles.verifiedBadgeTextDark]}>
-                      {`${item.listing_count} Verified Places`}
-                    </Text>
-                  </View>
-                  <Feather name="arrow-right" size={ms(14)} color={isDarkMode ? '#64748B' : '#9CA3AF'} />
-                </View>
-              </BouncyPressable>
-            );
-          })
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="search-outline" size={ms(38)} color={isDarkMode ? '#475569' : '#CBD5E1'} />
-            <Text style={[styles.emptyTitle, isDarkMode && styles.emptyTitleDark]}>No cities found</Text>
-            <Text style={[styles.emptySubtitle, isDarkMode && styles.emptySubtitleDark]}>
-              {`We couldn't find any destination matching "${searchQuery}".`}
-            </Text>
-            <BouncyPressable
-              style={[styles.emptyResetBtn, isDarkMode && styles.emptyResetBtnDark]}
-              activeScale={0.92}
-              onPress={() => {
-                setSearchQuery('');
-                setSelectedRegion('All');
-              }}>
-              <Text style={[styles.emptyResetText, isDarkMode && styles.emptyResetTextDark]}>Clear filters</Text>
-            </BouncyPressable>
+        {/* ── Sticky Search Bar (Sticks near header when scrolled) ── */}
+        <Animated.View
+          style={[styles.stickySearchWrapper, { transform: [{ translateY }] }]}
+          pointerEvents="box-none">
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFillObject,
+              styles.stickyBackgroundMask,
+              isDarkMode && styles.stickyBackgroundMaskDark,
+              { opacity: backgroundOpacity },
+            ]}
+            pointerEvents="none"
+          />
+          <View style={[styles.searchContainer, isDarkMode && styles.searchContainerDark]}>
+            <Feather name="search" size={ms(16)} color="#7C3AED" style={styles.searchIcon} />
+            <TextInput
+              style={[styles.searchInput, isDarkMode && styles.searchInputDark]}
+              placeholder="Search a city or state"
+              placeholderTextColor={isDarkMode ? '#94A3B8' : '#A59DB7'}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCorrect={false}
+              returnKeyType="search"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchQuery('')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons
+                  name="close-circle"
+                  size={ms(17)}
+                  color={isDarkMode ? '#94A3B8' : '#9CA3AF'}
+                />
+              </TouchableOpacity>
+            )}
           </View>
-        )}
+        </Animated.View>
+      </View>
 
-        {/* ── Can't find your city? Callout Banner ── */}
+     
+      <View
+        style={[styles.bottomCalloutWrapper, { paddingBottom: Math.max(insets.bottom, vs(10)) }]}>
         <View style={styles.requestCalloutCard}>
           <LinearGradient
             colors={['#3B0764', '#581C87', '#6D28D9']}
@@ -573,9 +675,9 @@ export const CityList = ({ navigation, route }) => {
             <Text style={styles.requestBtnText}>Request</Text>
           </BouncyPressable>
         </View>
-      </ScrollView>
+      </View>
 
-      {/* ── Request City Modal ── */}
+  
       <Modal
         visible={requestModalVisible}
         transparent
@@ -594,7 +696,11 @@ export const CityList = ({ navigation, route }) => {
                   <TouchableOpacity
                     onPress={() => setRequestModalVisible(false)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close" size={ms(20)} color={isDarkMode ? '#94A3B8' : '#6B7280'} />
+                    <Ionicons
+                      name="close"
+                      size={ms(20)}
+                      color={isDarkMode ? '#94A3B8' : '#6B7280'}
+                    />
                   </TouchableOpacity>
                 </View>
 
@@ -603,15 +709,18 @@ export const CityList = ({ navigation, route }) => {
                     <Ionicons name="checkmark-circle" size={ms(44)} color="#10B981" />
                     <Text style={styles.successTitle}>Request Submitted!</Text>
                     <Text style={[styles.successDesc, isDarkMode && styles.successDescDark]}>
-                      Our team is prioritizing {requestCityName.trim()} to research and verify pet-friendly
-                      places for you.
+                      Our team is prioritizing {requestCityName.trim()} to research and verify
+                      pet-friendly places for you.
                     </Text>
                   </View>
                 ) : (
                   <>
-                    <Text style={[styles.modalTitle, isDarkMode && styles.modalTitleDark]}>Request a Pet-Friendly City</Text>
+                    <Text style={[styles.modalTitle, isDarkMode && styles.modalTitleDark]}>
+                      Request a Pet-Friendly City
+                    </Text>
                     <Text style={[styles.modalDesc, isDarkMode && styles.modalDescDark]}>
-                      Tell us which city or town you want our pack to map and personally verify next.
+                      Tell us which city or town you want our pack to map and personally verify
+                      next.
                     </Text>
 
                     <TextInput
@@ -627,7 +736,13 @@ export const CityList = ({ navigation, route }) => {
                       <TouchableOpacity
                         style={styles.modalCancelBtn}
                         onPress={() => setRequestModalVisible(false)}>
-                        <Text style={[styles.modalCancelText, isDarkMode && styles.modalCancelTextDark]}>Cancel</Text>
+                        <Text
+                          style={[
+                            styles.modalCancelText,
+                            isDarkMode && styles.modalCancelTextDark,
+                          ]}>
+                          Cancel
+                        </Text>
                       </TouchableOpacity>
 
                       <BouncyPressable
@@ -669,6 +784,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: s(16),
     paddingVertical: vs(8),
     marginBottom: vs(4),
+    backgroundColor: '#F8F7FC',
+    zIndex: 20,
   },
   backButton: {
     width: s(38),
@@ -724,10 +841,43 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#1E0E35',
     shadowColor: '#1E0E35',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.22,
-    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
     elevation: 6,
+  },
+  hero3DBorderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: s(24),
+    borderTopWidth: 1.5,
+    borderTopColor: 'rgba(255, 255, 255, 0.35)',
+    borderLeftWidth: 1.2,
+    borderLeftColor: 'rgba(255, 255, 255, 0.15)',
+    borderRightWidth: 1.2,
+    borderRightColor: 'rgba(255, 255, 255, 0.15)',
+    borderBottomWidth: 3.8,
+    borderBottomColor: '#1E0A45',
+  },
+  ambientGlyph: {
+    position: 'absolute',
+    width: s(36),
+    height: s(36),
+    borderRadius: s(12),
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  glyphPaw: {
+    top: s(22),
+    right: s(24),
+  },
+  glyphMusic: {
+    top: s(68),
+    right: s(64),
+  },
+  glyphHeart: {
+    bottom: s(30),
+    right: s(22),
   },
   heroContent: {
     flex: 1,
@@ -788,12 +938,31 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.bold,
   },
 
-  /* ── 3. Search Bar ── */
+  /* ── 3. Search Bar & Sticky Positioning ── */
+  listArea: {
+    flex: 1,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  searchSpacer: {
+    height: s(45) + vs(14),
+  },
+  stickySearchWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    paddingTop: vs(6),
+    paddingBottom: vs(8),
+  },
+  stickyBackgroundMask: {
+    backgroundColor: '#F8F7FC',
+  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: s(16),
-    marginTop: vs(14),
     height: s(45),
     borderRadius: s(24),
     backgroundColor: '#FFFFFF',
@@ -823,8 +992,14 @@ const styles = StyleSheet.create({
     marginTop: vs(14),
     borderRadius: s(22),
     overflow: 'hidden',
-    borderWidth: 1.2,
-    borderColor: '#FDE68A',
+    borderTopWidth: 1.5,
+    borderTopColor: '#FFFFFF',
+    borderLeftWidth: 1.2,
+    borderLeftColor: '#FDE68A',
+    borderRightWidth: 1.2,
+    borderRightColor: '#FDE68A',
+    borderBottomWidth: 3.5,
+    borderBottomColor: '#F59E0B',
     shadowColor: '#D97706',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -929,87 +1104,97 @@ const styles = StyleSheet.create({
     color: '#8E8A9F',
   },
 
-  /* ── Region Filter Chips ── */
-  regionTabsScroll: {
-    paddingLeft: s(16),
-    paddingRight: s(8),
-    marginBottom: vs(12),
+  /* ── 6. City Cards (3D Tactile Design with Spring Animation) ── */
+  cityCardAnimatedWrap: {
+    marginHorizontal: 0,
   },
-  regionTabChip: {
-    borderRadius: s(20),
-    paddingHorizontal: s(15),
-    paddingVertical: vs(6),
-    marginRight: s(8),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  regionTabChipActive: {
-    backgroundColor: '#7C3AED',
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  regionTabChipInactive: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#ECE7F6',
-  },
-  regionTabText: {
-    fontSize: s(11.5),
-    fontFamily: theme.typography.fontFamily.bold,
-  },
-  regionTabTextActive: {
-    color: '#FFFFFF',
-  },
-  regionTabTextInactive: {
-    color: '#6B7280',
-  },
-
-  /* ── 6. City Cards ── */
   cityCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginHorizontal: s(16),
-    marginBottom: vs(9),
+    marginBottom: vs(11),
     backgroundColor: '#FFFFFF',
-    borderRadius: s(18),
-    borderWidth: 1,
-    borderColor: '#F0ECF8',
-    paddingHorizontal: s(14),
+    borderRadius: s(20),
+    borderTopWidth: 1.5,
+    borderTopColor: '#FFFFFF',
+    borderLeftWidth: 1.2,
+    borderLeftColor: '#ECE7F6',
+    borderRightWidth: 1.2,
+    borderRightColor: '#ECE7F6',
+    borderBottomWidth: 3.8,
+    borderBottomColor: '#DDD6FE',
+    paddingHorizontal: s(13),
     paddingVertical: vs(12),
-    shadowColor: '#1E1035',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.035,
-    shadowRadius: 6,
-    elevation: 1.5,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   cityCardLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: s(6),
   },
   cityIconBox: {
-    width: s(40),
-    height: s(40),
-    borderRadius: s(13),
+    width: s(44),
+    height: s(44),
+    borderRadius: s(14),
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    marginRight: s(12),
+    borderTopWidth: 1,
+    borderTopColor: '#FFFFFF',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 2.8,
+    marginRight: s(10),
+  },
+  cityImageBox: {
+    width: s(44),
+    height: s(44),
+    borderRadius: s(14),
+    overflow: 'hidden',
+    marginRight: s(10),
+    backgroundColor: '#F1EDFA',
+    borderTopWidth: 1,
+    borderTopColor: '#FFFFFF',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#ECE7F6',
+    borderBottomWidth: 2.8,
+    borderBottomColor: '#C4B5FD',
+  },
+  cityCoverImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: s(13),
+  },
+  imageFallbackHolder: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cityNameGroup: {
     flex: 1,
+    marginRight: s(4),
   },
   cityNameText: {
-    fontSize: s(14),
+    fontSize: ms(15),
+    lineHeight: ms(19),
     fontFamily: theme.typography.fontFamily.bold,
     color: '#1A0B2E',
+    letterSpacing: -0.2,
   },
   cityStateText: {
-    fontSize: s(11),
+    fontSize: ms(12),
+    fontFamily: theme.typography.fontFamily.regular,
+    color: '#8E8A9F',
+    marginTop: vs(1.5),
+  },
+  cityTotalText: {
+    fontSize: ms(11),
     fontFamily: theme.typography.fontFamily.medium,
     color: '#6B7280',
     marginTop: vs(1.5),
@@ -1017,20 +1202,47 @@ const styles = StyleSheet.create({
   cityCardRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
   },
   verifiedBadge: {
     backgroundColor: '#FEF3C7',
-    borderWidth: 0.8,
+    borderTopWidth: 1,
+    borderTopColor: '#FFFBEB',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
     borderColor: '#FDE68A',
-    borderRadius: s(6),
+    borderBottomWidth: 2.5,
+    borderBottomColor: '#F59E0B',
+    borderRadius: s(14),
     paddingHorizontal: s(8),
-    paddingVertical: vs(3.5),
-    marginRight: s(8),
+    paddingVertical: vs(4.5),
+    marginRight: s(6),
   },
   verifiedBadgeText: {
-    fontSize: s(9.5),
+    fontSize: ms(9.5),
     fontFamily: theme.typography.fontFamily.bold,
     color: '#92400E',
+  },
+  cityArrowWell: {
+    width: s(24),
+    height: s(24),
+    borderRadius: s(12),
+    backgroundColor: '#F8F6FD',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#FFFFFF',
+    borderBottomWidth: 1.8,
+    borderBottomColor: '#DDD6FE',
+  },
+  flatListFlex: {
+    flex: 1,
+  },
+  flatListContent: {
+    paddingBottom: vs(12),
+  },
+  bottomCalloutWrapper: {
+    backgroundColor: 'transparent',
   },
 
   /* ── Empty State ── */
@@ -1076,6 +1288,14 @@ const styles = StyleSheet.create({
     padding: s(16),
     flexDirection: 'row',
     alignItems: 'center',
+    borderTopWidth: 1.5,
+    borderTopColor: 'rgba(255, 255, 255, 0.35)',
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(255, 255, 255, 0.15)',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255, 255, 255, 0.15)',
+    borderBottomWidth: 3.5,
+    borderBottomColor: '#26094A',
     shadowColor: '#581C87',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.25,
@@ -1234,6 +1454,12 @@ const styles = StyleSheet.create({
   containerDark: {
     backgroundColor: '#0F071D',
   },
+  headerRowDark: {
+    backgroundColor: '#0F071D',
+  },
+  stickyBackgroundMaskDark: {
+    backgroundColor: '#0F071D',
+  },
   backButtonDark: {
     backgroundColor: '#1E0E38',
     borderColor: '#2E1654',
@@ -1261,7 +1487,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   featuredRegionCardDark: {
-    borderColor: '#3B1D6E',
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
+    borderLeftColor: '#3B1D6E',
+    borderRightColor: '#3B1D6E',
+    borderBottomColor: '#260B4E',
     shadowColor: '#000000',
   },
   featuredOverlineDark: {
@@ -1289,17 +1518,19 @@ const styles = StyleSheet.create({
   shownCountTextDark: {
     color: '#94A3B8',
   },
-  regionTabChipInactiveDark: {
-    backgroundColor: '#170A2E',
-    borderColor: '#2E1654',
-  },
-  regionTabTextInactiveDark: {
-    color: '#94A3B8',
-  },
   cityCardDark: {
     backgroundColor: '#170A2E',
-    borderColor: '#2E1654',
+    borderTopColor: 'rgba(255, 255, 255, 0.12)',
+    borderLeftColor: '#2E1654',
+    borderRightColor: '#2E1654',
+    borderBottomColor: '#260B4E',
     shadowColor: '#000000',
+  },
+  cityImageBoxDark: {
+    backgroundColor: '#261245',
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: '#3B1D6E',
+    borderBottomColor: '#1E0E38',
   },
   cityNameTextDark: {
     color: '#FFFFFF',
@@ -1307,12 +1538,22 @@ const styles = StyleSheet.create({
   cityStateTextDark: {
     color: '#94A3B8',
   },
+  cityTotalTextDark: {
+    color: '#A78BFA',
+  },
   verifiedBadgeDark: {
     backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderTopColor: 'rgba(251, 191, 36, 0.3)',
     borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderBottomColor: 'rgba(217, 119, 6, 0.6)',
   },
   verifiedBadgeTextDark: {
     color: '#FCD34D',
+  },
+  cityArrowWellDark: {
+    backgroundColor: '#261245',
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomColor: '#3B1D6E',
   },
   emptyTitleDark: {
     color: '#FFFFFF',
@@ -1350,5 +1591,19 @@ const styles = StyleSheet.create({
   },
   successDescDark: {
     color: '#CBD5E1',
+  },
+  loadingContainer: {
+    paddingVertical: vs(48),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: vs(12),
+    fontSize: ms(13),
+    fontFamily: theme.typography.fontFamily.medium,
+    color: '#6B7280',
+  },
+  loadingTextDark: {
+    color: '#94A3B8',
   },
 });

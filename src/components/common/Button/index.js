@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { s } from 'react-native-size-matters';
 import { theme } from '../../../theme';
@@ -16,18 +16,16 @@ export const Button = ({
   leftIcon,
   gradientColors,
   width,
+  testID,
+  ...props
 }) => {
   const isPrimary = variant === 'primary';
   const colors =
     gradientColors ||
     theme.colors.primaryGradient ||
     ['rgb(59, 16, 143)', 'rgb(123, 44, 255)'];
-  const textColor = isPrimary ? theme.colors.surface : theme.colors.primary;
 
   const renderContent = () => {
-    if (isLoading) {
-      return <ActivityIndicator color={textColor} />;
-    }
     return (
       <>
         {leftIcon}
@@ -49,6 +47,7 @@ export const Button = ({
   if (isPrimary) {
     return (
       <TouchableOpacity
+        testID={testID}
         onPress={onPress}
         disabled={disabled || isLoading}
         activeOpacity={0.85}
@@ -59,6 +58,7 @@ export const Button = ({
           customWidthStyle,
           style,
         ]}
+        {...props}
       >
         <LinearGradient
           colors={colors}
@@ -74,6 +74,7 @@ export const Button = ({
 
   return (
     <TouchableOpacity
+      testID={testID}
       style={[
         styles.container,
         styles.outlineContainer,
@@ -83,6 +84,7 @@ export const Button = ({
       ]}
       onPress={onPress}
       disabled={disabled || isLoading}
+      {...props}
       activeOpacity={0.8}
     >
       {renderContent()}

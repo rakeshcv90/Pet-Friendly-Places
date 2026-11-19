@@ -25,13 +25,23 @@ export const styles = StyleSheet.create({
     width: s(52),
     height: s(52),
     borderRadius: s(18),
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#EE2A7B',
     shadowColor: '#EE2A7B',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 6,
+  },
+  avatarClip: {
+    width: s(52),
+    height: s(52),
+    borderRadius: s(18),
+    overflow: 'hidden',
+  },
+  avatarGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pawGroup: {
     width: s(36),
@@ -55,19 +65,22 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   greetingSubtitle: {
-    fontSize: s(9.5),
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#7E7889',
+    fontSize: s(10),
+    fontFamily: theme.typography.fontFamily.extraBold,
+    color: '#8D809E',
+    lineHeight: s(15),
     letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
   greetingSubtitleDark: {
     color: '#94A3B8',
   },
   greetingTitle: {
-    fontSize: s(14),
+    fontSize: s(16),
     fontFamily: theme.typography.fontFamily.bold,
-    color: '#1D1238',
-    letterSpacing: -0.3,
+    color: '#241B35',
+    lineHeight: s(21.25),
+    letterSpacing: -0.51,
     marginTop: s(1),
   },
   greetingTitleDark: {
@@ -80,8 +93,10 @@ export const styles = StyleSheet.create({
   },
   locationCity: {
     fontSize: s(11),
-    fontFamily: theme.typography.fontFamily.medium,
-    color: '#635E70',
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#695F7B',
+    lineHeight: s(16.5),
+    letterSpacing: 0,
     marginLeft: s(3),
   },
   locationCityDark: {
@@ -91,6 +106,8 @@ export const styles = StyleSheet.create({
     fontSize: s(11),
     fontFamily: theme.typography.fontFamily.bold,
     color: '#7B2CFF',
+    lineHeight: s(16.5),
+    letterSpacing: 0,
   },
   locationChangeDark: {
     color: '#A855F7',
@@ -175,9 +192,10 @@ export const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: s(13.5),
-    fontFamily: theme.typography.fontFamily.medium,
+    fontSize: s(13),
+    fontFamily: theme.typography.fontFamily.regular,
     color: '#1D1238',
+    letterSpacing: 0,
     paddingVertical: 0,
   },
   searchInputDark: {
@@ -189,9 +207,10 @@ export const styles = StyleSheet.create({
     height: '100%',
   },
   searchPlaceholder: {
-    fontSize: s(13.5),
-    fontFamily: theme.typography.fontFamily.medium,
-    color: '#A09AA8',
+    fontSize: s(13),
+    fontFamily: theme.typography.fontFamily.regular,
+    color: '#A49AAF',
+    letterSpacing: 0,
   },
   searchPlaceholderDark: {
     color: '#94A3B8',

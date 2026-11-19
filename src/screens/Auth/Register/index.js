@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Platform,
   StatusBar,
   Dimensions,
   Keyboard,
@@ -14,7 +13,7 @@ import { s } from 'react-native-size-matters';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../../components/common/FastImage';
 import { Input } from '../../../components/common/Input';
 import { Button } from '../../../components/common/Button';
 import { Loader } from '../../../components/common/Loader';
@@ -24,6 +23,7 @@ import { useRegister } from '../../../hooks/useAuth';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isSmallDevice = SCREEN_HEIGHT < 750;
+
 const CARD_WIDTH = Math.min(Math.round(SCREEN_WIDTH * 0.76), s(290));
 const CARD_MARGIN = s(12);
 const SNAP_INTERVAL = CARD_WIDTH + CARD_MARGIN;
@@ -273,8 +273,8 @@ export const RegisterScreen = ({ navigation }) => {
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       <FastImage
         source={theme.images.backgroundimg1}
-        style={[styles.backgroundImage, { bottom: insets.bottom }]}
-        objectFit={Platform.OS === 'ios' && isSmallDevice ? 'fill' : 'cover'}
+        style={styles.backgroundImage}
+        resizeMode="cover"
       />
 
       {/* Premium Animated Loading Modal */}
@@ -836,7 +836,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAF8F2',
   },
   backgroundImage: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   keyboardView: {
     flex: 1,
@@ -857,7 +863,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: s(22),
     lineHeight: s(30),
-    fontFamily: theme.typography.fontFamily.bold,
+    fontFamily: theme.typography.fontFamily.extraBold,
     color: theme.colors.primaryDark,
     textAlign: 'center',
     marginBottom: s(4),
@@ -867,7 +873,6 @@ const styles = StyleSheet.create({
     color: theme.colors.primaryDark,
     fontFamily: theme.typography.fontFamily.medium,
     textAlign: 'center',
-    opacity: 0.85,
   },
 
   // ── Back Button ──
@@ -963,7 +968,7 @@ const styles = StyleSheet.create({
   citySubtext: {
     fontSize: s(10.5),
     color: theme.colors.primaryDark,
-    fontFamily: theme.typography.fontFamily.regular,
+    fontFamily: theme.typography.fontFamily.medium,
     opacity: 0.7,
     marginTop: s(4),
     paddingHorizontal: s(2),
@@ -1026,7 +1031,7 @@ const styles = StyleSheet.create({
     lineHeight: s(18),
   },
   linkText: {
-    color: theme.colors.primary,
+    color: theme.colors. primaryDark,
     fontFamily: theme.typography.fontFamily.bold,
   },
 

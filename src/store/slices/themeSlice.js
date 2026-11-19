@@ -12,26 +12,56 @@ const getInitialMode = () => {
   } catch (e) {
     // fallback
   }
-  return 'dark';
+  // Nothing chosen yet: follow the phone's light / dark setting
+  return 'system';
 };
 
 export const createThemeSlice = (set, get) => {
   const initialMode = getInitialMode();
-  const systemScheme = Appearance.getColorScheme() || 'dark';
+  const systemScheme = Appearance.getColorScheme();
   const isDark =
     initialMode === 'dark' || (initialMode === 'system' && systemScheme === 'dark');
+
+  // Reactively listen to device system appearance changes when in 'system' mode
+  try {
+    Appearance.addChangeListener?.(({ colorScheme }) => {
+      const state = get?.();
+      if (state?.themeMode === 'system') {
+        set({ isDarkMode: colorScheme === 'dark' });
+      }
+    });
+  } catch (e) {
+    // safely ignore in environments where addChangeListener is not present
+  }
 
   return {
     themeMode: initialMode, // 'light' | 'dark' | 'system'
     isDarkMode: isDark,
     accentColor: '#7C3AED',
 
+    syncSystemTheme: scheme => {
+      const { themeMode } = get();
+      if (themeMode === 'system') {
+        const detected = scheme || Appearance.getColorScheme();
+        if (detected === 'dark' || detected === 'light') {
+          set({ isDarkMode: detected === 'dark' });
+        }
+      }
+    },
+
     setThemeMode: mode => {
       setItem(THEME_STORAGE_KEY, mode);
-      const currentSystem = Appearance.getColorScheme() || 'light';
-      const dark =
-        mode === 'dark' || (mode === 'system' && currentSystem === 'dark');
-      set({ themeMode: mode, isDarkMode: dark });
+      let nextDark;
+      if (mode === 'dark') {
+        nextDark = true;
+      } else if (mode === 'light') {
+        nextDark = false;
+      } else {
+        // 'system' / Auto: query device default theme
+        const currentSystem = Appearance.getColorScheme();
+        nextDark = currentSystem === 'dark';
+      }
+      set({ themeMode: mode, isDarkMode: nextDark });
     },
 
     toggleDarkMode: () => {

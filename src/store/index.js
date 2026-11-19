@@ -3,6 +3,7 @@ import { createAuthSlice } from './slices/authSlice';
 import { createPetSlice } from './slices/petSlice';
 import { createLocationSlice } from './slices/locationSlice';
 import { createThemeSlice } from './slices/themeSlice';
+import { createLockSlice } from './slices/lockSlice';
 
 // Zustand store for UI & client-side state
 export const useStore = create((...a) => ({
@@ -10,5 +11,6 @@ export const useStore = create((...a) => ({
   ...createPetSlice(...a),
   ...createLocationSlice(...a),
   ...createThemeSlice(...a),
+  ...createLockSlice(...a),
 }));
 

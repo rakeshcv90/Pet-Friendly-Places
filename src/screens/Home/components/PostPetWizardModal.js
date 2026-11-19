@@ -15,6 +15,7 @@ import {
   Animated,
   PermissionsAndroid,
 } from 'react-native';
+import FastImage from '../../../components/common/FastImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Feather from 'react-native-vector-icons/Feather';
@@ -24,6 +25,8 @@ import { s, ms } from 'react-native-size-matters';
 import { colors } from '../../../theme';
 import { BouncyPressable } from '../../../components/common/BouncyPressable';
 import { useStore } from '../../../store';
+import { getErrorMessage } from '../../../services/api/apiClient';
+import { useCreateReuniteCase, toApiDate } from '../../../hooks/useReunite';
 
 const TOTAL_STEPS = 8;
 
@@ -106,6 +109,12 @@ export const PostPetWizardModal = ({
   // Form Validation Errors
   const [errors, setErrors] = useState({});
 
+  // Submit to the Reunite API. `submitProgress` outlives a failed attempt so a retry resumes the
+  // same draft case instead of creating another.
+  const createCase = useCreateReuniteCase();
+  const submitProgress = useRef({ caseCode: null, uploaded: 0 });
+  const isSubmitting = createCase.isPending;
+
   const clearError = field => {
     if (errors[field]) {
       setErrors(prev => {
@@ -179,6 +188,7 @@ export const PostPetWizardModal = ({
       setErrors({});
       setCustomAlert(null);
       setPreviewPhotoIndex(0);
+      submitProgress.current = { caseCode: null, uploaded: 0 };
       entranceAnim.setValue(0);
       Animated.spring(entranceAnim, {
         toValue: 1,
@@ -584,6 +594,9 @@ export const PostPetWizardModal = ({
       if (!dateLost.trim()) {
         step5Errors.dateLost = 'Date is required';
         missing.push('Date Lost/Found');
+      } else if (!toApiDate(dateLost)) {
+        step5Errors.dateLost = 'Enter a valid date as DD/MM/YYYY';
+        missing.push('Date Lost/Found (DD/MM/YYYY)');
       }
 
       if (Object.keys(step5Errors).length > 0) {
@@ -661,7 +674,9 @@ export const PostPetWizardModal = ({
       setPreviewPhotoIndex(0);
       setCurrentStep(8);
     } else if (currentStep === 8) {
-      handleSubmitPost();
+      if (!isSubmitting) {
+        handleSubmitPost();
+      }
     }
   };
 
@@ -679,7 +694,7 @@ export const PostPetWizardModal = ({
     }
   };
 
-  const handleSubmitPost = () => {
+  const handleSubmitPost = async () => {
     const displayName = petName.trim();
 
     const areaString = [locality.trim(), city.trim(), stateRegion.trim()]
@@ -707,6 +722,10 @@ export const PostPetWizardModal = ({
       showPhonePublicly,
       privateDetail: privateDetail.trim(),
       dateSeen: dateLost.trim(),
+      eventDate: toApiDate(dateLost),
+      images: photos,
+      story: description.trim(),
+      collar: hasCollar ? 'Yes' : 'No',
       timeAgo: 'Just now',
       image: photos[0] || SAMPLE_PET_PHOTOS[0],
       photos,
@@ -719,10 +738,71 @@ export const PostPetWizardModal = ({
       status: 'active',
     };
 
-    console.log('📦 [PostPetWizard] Verified Post Payload ready for API:', JSON.stringify(newPost, null, 2));
+    // The Reunite API only takes lost and found cases; rehoming stays local for now
+    if (eventType === 'rehome') {
+      onPostCreated?.(newPost);
+      onClose();
+      return;
+    }
 
-    if (onPostCreated) {
-      onPostCreated(newPost);
+    // The API has no fields for the rest of the pet details, so they travel in the description
+    const petDetails = [
+      displayName && `Name: ${displayName}`,
+      breed.trim() && `Breed: ${breed.trim()}`,
+      colour.trim() && `Colour: ${colour.trim()}`,
+      `Sex: ${sex}`,
+      age.trim() && `Age: ${age.trim()}`,
+      `Size: ${size}`,
+      hasCollar && 'Wearing a collar',
+      microchip !== 'Unknown' && `Microchip: ${microchip}`,
+      sterilised !== 'Unknown' && `Sterilised: ${sterilised}`,
+      vaccinated !== 'Unknown' && `Vaccinated: ${vaccinated}`,
+    ]
+      .filter(Boolean)
+      .join('. ');
+
+    const fields = {
+      caseType: eventType === 'found' ? 'FOUND' : 'LOST',
+      species: animal,
+      description: `${description.trim()}\n\n${petDetails}.`,
+      eventDate: toApiDate(dateLost),
+      locality: locality.trim(),
+      city: city.trim(),
+      state: stateRegion.trim(),
+      contactName: contactName.trim(),
+      contactPhone: contactPhone.trim(),
+      identifyingDetail: privateDetail.trim(),
+      phone_display_consent: showPhonePublicly,
+    };
+
+    try {
+      await createCase.mutateAsync({
+        fields,
+        photos,
+        progress: submitProgress.current,
+      });
+    } catch (err) {
+      if (__DEV__) {
+        console.log(
+          '[reunite] submit failed',
+          err?.response?.status,
+          JSON.stringify(err?.response?.data ?? err?.message),
+        );
+      }
+      showCustomAlert({
+        type: 'error',
+        icon: 'alert-circle',
+        iconFamily: 'Ionicons',
+        iconGradient: ['#EF4444', '#DC2626'],
+        badgeText: 'POST NOT SENT',
+        badgeColor: '#FEF2F2',
+        badgeTextColor: '#DC2626',
+        title: 'Could not submit your post',
+        message: err?.isAxiosError ? getErrorMessage(err) : err?.message || getErrorMessage(err),
+        primaryButtonText: 'Try Again',
+        buttonGradient: ['#DC2626', '#EF4444'],
+      });
+      return;
     }
 
     showCustomAlert({
@@ -730,11 +810,11 @@ export const PostPetWizardModal = ({
       icon: 'checkmark-circle',
       iconFamily: 'Ionicons',
       iconGradient: ['#10B981', '#059669'],
-      badgeText: 'READY FOR API SYNC',
+      badgeText: 'POST SUBMITTED',
       badgeColor: '#ECFDF5',
       badgeTextColor: '#059669',
-      title: 'Post Published! 🎉',
-      message: 'All pet details have been verified and saved. Ready to sync with backend API.',
+      title: 'Post Submitted',
+      message: 'Your post has been submitted and will appear once it has been reviewed.',
       primaryButtonText: 'Done',
       buttonGradient: ['#059669', '#10B981'],
       onPrimaryPress: () => {
@@ -1871,7 +1951,7 @@ export const PostPetWizardModal = ({
 
               {/* Cover Photo */}
               <View style={styles.previewHeroImageWrapper}>
-                <Image
+                <FastImage
                   source={{ uri: currentHeroPhoto }}
                   style={styles.previewHeroImage}
                   resizeMode="cover"
@@ -2368,6 +2448,7 @@ export const PostPetWizardModal = ({
                   <BouncyPressable
                     style={styles.continueButtonWrapper}
                     activeScale={0.95}
+                    disabled={isSubmitting}
                     onPress={handleContinue}>
                     <LinearGradient
                       colors={['#2E008B', '#5B21B6', '#7C3AED']}
@@ -2375,7 +2456,11 @@ export const PostPetWizardModal = ({
                       end={{ x: 1, y: 0 }}
                       style={styles.continueButtonGradient}>
                       <Text style={styles.continueButtonText}>
-                        {currentStep === TOTAL_STEPS ? 'Submit post' : 'Continue'}
+                        {currentStep === TOTAL_STEPS
+                          ? isSubmitting
+                            ? 'Submitting...'
+                            : 'Submit post'
+                          : 'Continue'}
                       </Text>
                       <Feather
                         name={currentStep === TOTAL_STEPS ? 'check' : 'arrow-right'}

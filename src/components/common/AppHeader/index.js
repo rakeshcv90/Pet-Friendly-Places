@@ -8,6 +8,7 @@ import { BouncyPressable } from '../BouncyPressable';
 import { CityPickerModal } from '../CityPickerModal';
 import { useUserProfile } from '../../../hooks/useUser';
 import { useStore } from '../../../store';
+import { NotificationBell } from '../../notifications/NotificationBell';
 import { styles } from './styles';
 
 export const getTimeGreeting = () => {
@@ -76,7 +77,7 @@ export const SearchBar = ({
         <TextInput
           style={[styles.searchInput, isDarkMode && styles.searchInputDark, inputStyle]}
           placeholder={searchPlaceholder}
-          placeholderTextColor={isDarkMode ? '#94A3B8' : '#A09AA8'}
+          placeholderTextColor={isDarkMode ? '#94A3B8' : '#A49AAF'}
           value={query}
           onChangeText={setQuery}
           onSubmitEditing={handleSubmit}
@@ -96,9 +97,9 @@ export const SearchBar = ({
         </Pressable>
       )}
 
-      <BouncyPressable style={styles.searchArrowBtn} activeScale={0.88} onPress={handleSubmit}>
+      {/* <BouncyPressable style={styles.searchArrowBtn} activeScale={0.88} onPress={handleSubmit}>
         <Feather name="arrow-right" size={ms(18)} color="#FFFFFF" />
-      </BouncyPressable>
+      </BouncyPressable> */}
     </Animated.View>
   );
 };
@@ -125,7 +126,6 @@ export const AppHeader = ({
 
   // Notification
   showNotification = true,
-  hasNotification = true,
   onNotificationPress,
   rightComponent,
 
@@ -217,21 +217,32 @@ export const AppHeader = ({
             <Animated.View
               style={avatarTransform.length > 0 ? { transform: avatarTransform } : null}>
               {avatarComponent || (
-                <LinearGradient
-                  colors={['#8A2DE2', '#EE2A7B', '#FF7A00']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.avatarBadge}>
-                  <View style={styles.pawGroup}>
-                    <Ionicons name="paw" size={ms(17)} color="#28163D" style={styles.pawTopLeft} />
-                    <Ionicons
-                      name="paw"
-                      size={ms(14)}
-                      color="#28163D"
-                      style={styles.pawBottomRight}
-                    />
+                // The rounded shape comes from plain views (shadow outside, clip inside) so it does
+                // not depend on the gradient applying its own radius on the first draw
+                <View style={styles.avatarBadge} testID="app-header-avatar">
+                  <View style={styles.avatarClip}>
+                    <LinearGradient
+                      colors={['#8A2DE2', '#EE2A7B', '#FF7A00']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.avatarGradient}>
+                      <View style={styles.pawGroup}>
+                        <Ionicons
+                          name="paw"
+                          size={ms(17)}
+                          color="#28163D"
+                          style={styles.pawTopLeft}
+                        />
+                        <Ionicons
+                          name="paw"
+                          size={ms(14)}
+                          color="#28163D"
+                          style={styles.pawBottomRight}
+                        />
+                      </View>
+                    </LinearGradient>
                   </View>
-                </LinearGradient>
+                </View>
               )}
             </Animated.View>
           </BouncyPressable>
@@ -275,13 +286,7 @@ export const AppHeader = ({
         {rightComponent ? (
           rightComponent
         ) : showNotification ? (
-          <BouncyPressable
-            style={[styles.notificationBtn, isDarkMode && styles.notificationBtnDark]}
-            activeScale={0.85}
-            onPress={onNotificationPress || (() => {})}>
-            <Feather name="bell" size={ms(19)} color={isDarkMode ? '#FFFFFF' : '#1D1238'} />
-            {hasNotification && <View style={styles.notificationDot} />}
-          </BouncyPressable>
+          <NotificationBell isDarkMode={isDarkMode} onPress={onNotificationPress} />
         ) : null}
       </View>
 

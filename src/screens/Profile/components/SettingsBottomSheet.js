@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Switch,
   Animated,
   PanResponder,
+  Appearance,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -34,8 +35,46 @@ export const SettingsBottomSheet = ({
   setTravelAlerts,
   publicProfile,
   setPublicProfile,
+  onChangePassword,
+  appLockEnabled = false,
+  onToggleAppLock,
+  onOpenPermissions,
 }) => {
   const insets = useSafeAreaInsets();
+
+  // Switching theme re-renders the whole app in one pass, which can take a moment. The
+  // controls therefore answer from local state first (a controlled Switch snaps back if its
+  // value does not change right away), and taps are ignored while a change is being applied.
+  const [pendingMode, setPendingMode] = useState(null);
+  const activeMode = pendingMode || themeMode;
+  const activeDark = pendingMode
+    ? pendingMode === 'dark' || (pendingMode === 'system' && Appearance.getColorScheme() === 'dark')
+    : isDarkMode;
+
+  const applyTheme = useCallback(
+    mode => {
+      if (pendingMode || mode === themeMode) {
+        return;
+      }
+      setPendingMode(mode);
+      // let the control repaint first, then flip the app-wide theme
+      requestAnimationFrame(() => setThemeMode(mode));
+    },
+    [pendingMode, themeMode, setThemeMode],
+  );
+
+  // the store caught up (or it never will, e.g. the same mode): release the controls
+  useEffect(() => {
+    if (!pendingMode) {
+      return undefined;
+    }
+    if (pendingMode === themeMode) {
+      setPendingMode(null);
+      return undefined;
+    }
+    const timer = setTimeout(() => setPendingMode(null), 1500);
+    return () => clearTimeout(timer);
+  }, [pendingMode, themeMode]);
 
   const settingsSlideAnim = useRef(new Animated.Value(650)).current;
   const settingsFadeAnim = useRef(new Animated.Value(0)).current;
@@ -212,20 +251,33 @@ export const SettingsBottomSheet = ({
                   style={[
                     styles.themeModeCard,
                     isDarkMode && styles.themeModeCardDark,
-                    themeMode === 'light' && styles.themeModeCardActive,
+                    activeMode === 'light' &&
+                      (isDarkMode
+                        ? [styles.themeModeCardActiveDark, { borderColor: accentColor }]
+                        : [styles.themeModeCardActiveLight, { borderColor: accentColor }]),
                   ]}
-                  onPress={() => setThemeMode('light')}>
+                  onPress={() => applyTheme('light')}>
                   <View style={styles.themePreviewLight}>
                     <View style={styles.previewLightBar} />
                     <View style={styles.previewLightCircle} />
                   </View>
                   <View style={styles.themeCardFooter}>
                     <Text style={styles.themeModeEmoji}>☀️</Text>
-                    <Text style={[styles.themeModeTitle, isDarkMode && styles.textWhite]}>
+                    <Text
+                      style={[
+                        styles.themeModeTitle,
+                        isDarkMode
+                          ? styles.themeModeTitleDark
+                          : styles.themeModeTitleLight,
+                        activeMode === 'light' &&
+                          (isDarkMode
+                            ? styles.themeModeTitleActiveDark
+                            : [styles.themeModeTitleActiveLight, { color: accentColor }]),
+                      ]}>
                       Light
                     </Text>
                   </View>
-                  {themeMode === 'light' && (
+                  {activeMode === 'light' && (
                     <View style={[styles.activeCheckBadge, { backgroundColor: accentColor }]}>
                       <Ionicons name="checkmark" size={ms(10)} color="#FFFFFF" />
                     </View>
@@ -237,20 +289,33 @@ export const SettingsBottomSheet = ({
                   style={[
                     styles.themeModeCard,
                     isDarkMode && styles.themeModeCardDark,
-                    themeMode === 'dark' && styles.themeModeCardActive,
+                    activeMode === 'dark' &&
+                      (isDarkMode
+                        ? [styles.themeModeCardActiveDark, { borderColor: accentColor }]
+                        : [styles.themeModeCardActiveLight, { borderColor: accentColor }]),
                   ]}
-                  onPress={() => setThemeMode('dark')}>
+                  onPress={() => applyTheme('dark')}>
                   <View style={styles.themePreviewDark}>
                     <View style={styles.previewDarkBar} />
                     <View style={styles.previewDarkCircle} />
                   </View>
                   <View style={styles.themeCardFooter}>
                     <Text style={styles.themeModeEmoji}>🌙</Text>
-                    <Text style={[styles.themeModeTitle, isDarkMode && styles.textWhite]}>
+                    <Text
+                      style={[
+                        styles.themeModeTitle,
+                        isDarkMode
+                          ? styles.themeModeTitleDark
+                          : styles.themeModeTitleLight,
+                        activeMode === 'dark' &&
+                          (isDarkMode
+                            ? styles.themeModeTitleActiveDark
+                            : [styles.themeModeTitleActiveLight, { color: accentColor }]),
+                      ]}>
                       Dark
                     </Text>
                   </View>
-                  {themeMode === 'dark' && (
+                  {activeMode === 'dark' && (
                     <View style={[styles.activeCheckBadge, { backgroundColor: accentColor }]}>
                       <Ionicons name="checkmark" size={ms(10)} color="#FFFFFF" />
                     </View>
@@ -262,20 +327,33 @@ export const SettingsBottomSheet = ({
                   style={[
                     styles.themeModeCard,
                     isDarkMode && styles.themeModeCardDark,
-                    themeMode === 'system' && styles.themeModeCardActive,
+                    activeMode === 'system' &&
+                      (isDarkMode
+                        ? [styles.themeModeCardActiveDark, { borderColor: accentColor }]
+                        : [styles.themeModeCardActiveLight, { borderColor: accentColor }]),
                   ]}
-                  onPress={() => setThemeMode('system')}>
+                  onPress={() => applyTheme('system')}>
                   <View style={styles.themePreviewSystem}>
                     <View style={styles.previewSystemHalfLight} />
                     <View style={styles.previewSystemHalfDark} />
                   </View>
                   <View style={styles.themeCardFooter}>
                     <Text style={styles.themeModeEmoji}>📱</Text>
-                    <Text style={[styles.themeModeTitle, isDarkMode && styles.textWhite]}>
+                    <Text
+                      style={[
+                        styles.themeModeTitle,
+                        isDarkMode
+                          ? styles.themeModeTitleDark
+                          : styles.themeModeTitleLight,
+                        activeMode === 'system' &&
+                          (isDarkMode
+                            ? styles.themeModeTitleActiveDark
+                            : [styles.themeModeTitleActiveLight, { color: accentColor }]),
+                      ]}>
                       Auto
                     </Text>
                   </View>
-                  {themeMode === 'system' && (
+                  {activeMode === 'system' && (
                     <View style={[styles.activeCheckBadge, { backgroundColor: accentColor }]}>
                       <Ionicons name="checkmark" size={ms(10)} color="#FFFFFF" />
                     </View>
@@ -303,8 +381,8 @@ export const SettingsBottomSheet = ({
                   </View>
                 </View>
                 <Switch
-                  value={isDarkMode}
-                  onValueChange={toggleDarkMode}
+                  value={activeDark}
+                  onValueChange={value => applyTheme(value ? 'dark' : 'light')}
                   trackColor={{ false: '#CBD5E1', true: accentColor }}
                   thumbColor="#FFFFFF"
                 />
@@ -480,6 +558,140 @@ export const SettingsBottomSheet = ({
               </View>
             </View>
 
+            {/* ── ACCOUNT & SECURITY SECTION ── */}
+            <View style={styles.settingsSection}>
+              <View style={styles.settingsSectionHeaderRow}>
+                <Ionicons
+                  name="shield-checkmark-outline"
+                  size={ms(14)}
+                  color={accentColor}
+                  style={styles.sectionHeaderIcon}
+                />
+                <Text
+                  style={[
+                    styles.settingsSectionTitle,
+                    isDarkMode && styles.textSectionTitleDark,
+                  ]}>
+                  ACCOUNT & SECURITY
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.settingRowCard,
+                  isDarkMode && styles.settingRowCardDark,
+                  styles.settingRowCardSpacingBottom,
+                ]}>
+                <View style={styles.settingRowLeft}>
+                  <View
+                    style={[
+                      styles.settingIconBox,
+                      isDarkMode ? styles.settingIconBoxSlateDark : styles.settingIconBoxSlate,
+                    ]}>
+                    <Ionicons
+                      name="finger-print-outline"
+                      size={ms(18)}
+                      color={isDarkMode ? '#C084FC' : '#7C3AED'}
+                    />
+                  </View>
+                  <View style={styles.settingRowTextWrap}>
+                    <Text style={[styles.settingRowTitle, isDarkMode && styles.textWhite]}>
+                      App Lock
+                    </Text>
+                    <Text style={[styles.settingRowSub, isDarkMode && styles.textMutedDark]}>
+                      Fingerprint, face or phone lock
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  testID="app-lock-switch"
+                  value={appLockEnabled}
+                  onValueChange={onToggleAppLock}
+                  trackColor={{ false: '#CBD5E1', true: accentColor }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+
+              <TouchableOpacity
+                testID="open-permissions"
+                style={[
+                  styles.settingRowCard,
+                  isDarkMode && styles.settingRowCardDark,
+                  styles.settingRowCardSpacingBottom,
+                ]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  closeSettingsModal();
+                  setTimeout(() => {
+                    onOpenPermissions?.();
+                  }, 200);
+                }}>
+                <View style={styles.settingRowLeft}>
+                  <View
+                    style={[
+                      styles.settingIconBox,
+                      isDarkMode ? styles.settingIconBoxSlateDark : styles.settingIconBoxSlate,
+                    ]}>
+                    <Ionicons
+                      name="location-outline"
+                      size={ms(18)}
+                      color={isDarkMode ? '#C084FC' : '#7C3AED'}
+                    />
+                  </View>
+                  <View style={styles.settingRowTextWrap}>
+                    <Text style={[styles.settingRowTitle, isDarkMode && styles.textWhite]}>
+                      App Permissions
+                    </Text>
+                    <Text style={[styles.settingRowSub, isDarkMode && styles.textMutedDark]}>
+                      Location and notifications
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={ms(16)}
+                  color={isDarkMode ? '#64748B' : '#94A3B8'}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.settingRowCard, isDarkMode && styles.settingRowCardDark]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  closeSettingsModal();
+                  setTimeout(() => {
+                    onChangePassword?.();
+                  }, 200);
+                }}>
+                <View style={styles.settingRowLeft}>
+                  <View
+                    style={[
+                      styles.settingIconBox,
+                      isDarkMode ? styles.settingIconBoxSlateDark : styles.settingIconBoxSlate,
+                    ]}>
+                    <Ionicons
+                      name="lock-closed-outline"
+                      size={ms(18)}
+                      color={isDarkMode ? '#C084FC' : '#7C3AED'}
+                    />
+                  </View>
+                  <View style={styles.settingRowTextWrap}>
+                    <Text style={[styles.settingRowTitle, isDarkMode && styles.textWhite]}>
+                      Change Password
+                    </Text>
+                    <Text style={[styles.settingRowSub, isDarkMode && styles.textMutedDark]}>
+                      Update security credentials
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={ms(18)}
+                  color={isDarkMode ? '#94A3B8' : '#9CA3AF'}
+                />
+              </TouchableOpacity>
+            </View>
+
             {/* App Version Info */}
             <View style={styles.appVersionRow}>
               <Text style={[styles.appVersionText, isDarkMode && styles.textMutedDark]}>
@@ -635,9 +847,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E0E38',
     borderColor: '#2E1654',
   },
-  themeModeCardActive: {
+  themeModeCardActiveLight: {
     borderColor: '#7C3AED',
     backgroundColor: '#FAF5FF',
+    borderWidth: 2,
+  },
+  themeModeCardActiveDark: {
+    borderColor: '#A855F7',
+    backgroundColor: '#2E1256',
+    borderWidth: 2,
   },
   themePreviewLight: {
     width: '100%',
@@ -714,7 +932,18 @@ const styles = StyleSheet.create({
   themeModeTitle: {
     fontSize: s(11),
     fontFamily: theme.typography.fontFamily.bold,
-    color: '#1E293B',
+  },
+  themeModeTitleLight: {
+    color: '#475569',
+  },
+  themeModeTitleDark: {
+    color: '#CBD5E1',
+  },
+  themeModeTitleActiveLight: {
+    color: '#7C3AED',
+  },
+  themeModeTitleActiveDark: {
+    color: '#FFFFFF',
   },
   activeCheckBadge: {
     position: 'absolute',
@@ -748,6 +977,9 @@ const styles = StyleSheet.create({
   },
   settingRowCardSpacing: {
     marginTop: vs(8),
+  },
+  settingRowCardSpacingBottom: {
+    marginBottom: vs(8),
   },
   settingRowLeft: {
     flexDirection: 'row',

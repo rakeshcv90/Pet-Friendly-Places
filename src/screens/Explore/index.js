@@ -9,7 +9,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FastImage from 'react-native-fast-image';
+import FastImage from '../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { s, vs, ms } from 'react-native-size-matters';
@@ -19,15 +19,10 @@ import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { useStore } from '../../store';
 import { useUserProfile } from '../../hooks/useUser';
 
-// ── 1. Nearby Areas Data ──
-const NEARBY_AREAS = [
-  'Near me',
-  'Dwarka',
-  'Faridabad',
-  'Noida',
-  'South Delhi',
-  'Ghaziabad',
-  'Gurugram',
+// ── 1. Nearby Areas Data (Row 1: 4 items, Row 2: 3 items) ──
+const NEARBY_AREA_ROWS = [
+  ['Near me', 'Dwarka', 'Faridabad', 'Noida'],
+  ['South Delhi', 'Ghaziabad', 'Gurugram'],
 ];
 
 // ── 2. Categories Data matching screenshot exactly ──
@@ -50,7 +45,7 @@ const EXPLORE_CATEGORIES = [
     iconColor: '#7C3AED',
     iconColorDark: '#C084FC',
     iconBg: '#EDE9FE',
-    subcategories: ['Hotels', 'Resorts', 'Homestays', 'Camps'],
+    subcategories: ['Hotels', 'Resorts', 'Homestays', 'Farmstays'],
   },
   {
     id: 'wild',
@@ -247,9 +242,7 @@ const PlaceCard = ({ place, isLiked, onToggleLike }) => {
         </View>
 
         {/* Place Name */}
-        <Text
-          style={[styles.placeName, isDarkMode && styles.placeNameDark]}
-          numberOfLines={1}>
+        <Text style={[styles.placeName, isDarkMode && styles.placeNameDark]} numberOfLines={1}>
           {place.name}
         </Text>
 
@@ -272,11 +265,8 @@ const PlaceCard = ({ place, isLiked, onToggleLike }) => {
         <View style={styles.placeBottomRow}>
           <View style={styles.placeTagsWrap}>
             {place.tags.map((tag, idx) => (
-              <View
-                key={idx}
-                style={[styles.placeTagPill, isDarkMode && styles.placeTagPillDark]}>
-                <Text
-                  style={[styles.placeTagText, isDarkMode && styles.placeTagTextDark]}>
+              <View key={idx} style={[styles.placeTagPill, isDarkMode && styles.placeTagPillDark]}>
+                <Text style={[styles.placeTagText, isDarkMode && styles.placeTagTextDark]}>
                   {tag}
                 </Text>
               </View>
@@ -349,13 +339,22 @@ export const ExploreScreen = ({ navigation }) => {
   // Handle opening CityList screen
   const handleOpenCityList = () => {
     const targetNav =
-      navigation?.getParent?.()?.getParent?.() ||
-      navigation?.getParent?.() ||
-      navigation;
+      navigation?.getParent?.()?.getParent?.() || navigation?.getParent?.() || navigation;
     try {
       targetNav?.navigate?.('CityList');
     } catch {
       navigation?.navigate?.('CityList');
+    }
+  };
+
+  // Handle opening Road Trip Routes screen
+  const handleOpenRoadTripRoutes = params => {
+    const targetNav =
+      navigation?.getParent?.()?.getParent?.() || navigation?.getParent?.() || navigation;
+    try {
+      targetNav?.navigate?.('RoadTripRoutesScreen', params);
+    } catch {
+      navigation?.navigate?.('RoadTripRoutesScreen', params);
     }
   };
 
@@ -365,9 +364,12 @@ export const ExploreScreen = ({ navigation }) => {
       handleOpenCityList();
       return;
     }
+    if (category.id === 'routes' || category.title.toLowerCase().includes('road trip')) {
+      handleOpenRoadTripRoutes();
+      return;
+    }
     navigation?.navigate?.('SearchScreen', {
       category: category.title,
-      subcategory: category.subcategories[0],
     });
   };
 
@@ -375,6 +377,10 @@ export const ExploreScreen = ({ navigation }) => {
   const handleSelectSubcategory = (category, sub) => {
     if (category.id === 'cities' || sub === 'Explore India') {
       handleOpenCityList();
+      return;
+    }
+    if (category.id === 'routes' || category.title.toLowerCase().includes('road trip')) {
+      handleOpenRoadTripRoutes({ subcategory: sub });
       return;
     }
     setSelectedSubcategory(sub);
@@ -517,24 +523,6 @@ export const ExploreScreen = ({ navigation }) => {
     [scrollY],
   );
 
-  const categoryScale = useMemo(
-    () =>
-      scrollY.interpolate({
-        inputRange: [0, 250, 600],
-        outputRange: [0.985, 1, 0.99],
-        extrapolate: 'clamp',
-      }),
-    [scrollY],
-  );
-  const categoryRotateX = useMemo(
-    () =>
-      scrollY.interpolate({
-        inputRange: [0, 250, 600],
-        outputRange: ['-2.5deg', '0deg', '2.5deg'],
-        extrapolate: 'clamp',
-      }),
-    [scrollY],
-  );
   const categorySheenX = useMemo(
     () =>
       scrollY.interpolate({
@@ -723,7 +711,6 @@ export const ExploreScreen = ({ navigation }) => {
           avatarRotate={avatarRotate}
           searchBarScale={searchBarScale}
           searchIconRotate={searchIconRotate}
-          onNotificationPress={() => navigation?.navigate?.('Notifications')}
           enableCityPicker={true}
           onLocationPress={handleOpenCityList}
         />
@@ -753,7 +740,7 @@ export const ExploreScreen = ({ navigation }) => {
         </View>
 
         {/* ── Nearby Areas Card with 3D Tilt & Tactile Bevel ── */}
-        <Animated.View
+        {/* <Animated.View
           style={[
             styles.nearbyCard,
             isDarkMode && styles.nearbyCardDark,
@@ -773,45 +760,54 @@ export const ExploreScreen = ({ navigation }) => {
               style={styles.nearbyLocationBadge}
               activeScale={0.92}
               onPress={handleOpenCityList}>
-              <Ionicons name="location-sharp" size={ms(12)} color="#10B981" />
+              <Ionicons name="location-outline" size={ms(12.5)} color="#00BFA5" />
               <Text style={styles.nearbyLocationText}>{`${currentCity} · Change`}</Text>
             </BouncyPressable>
           </View>
 
           <View style={styles.chipsWrap}>
-            {NEARBY_AREAS.map(area => {
-              const isSelected = selectedArea === area;
-              return (
-                <BouncyPressable
-                  key={area}
-                  activeScale={0.93}
-                  style={[
-                    styles.areaChip,
-                    isDarkMode && styles.areaChipDark,
-                    isSelected && styles.areaChipActive,
-                  ]}
-                  onPress={() => setSelectedArea(area)}>
-                  {area === 'Near me' && (
-                    <Ionicons
-                      name="navigate"
-                      size={ms(11)}
-                      color={isSelected ? '#FFFFFF' : '#7B2CFF'}
-                      style={styles.areaChipIcon}
-                    />
-                  )}
-                  <Text
-                    style={[
-                      styles.areaChipText,
-                      isDarkMode && styles.areaChipTextDark,
-                      isSelected && styles.areaChipTextActive,
-                    ]}>
-                    {area}
-                  </Text>
-                </BouncyPressable>
-              );
-            })}
+            {NEARBY_AREA_ROWS.map((row, rowIndex) => (
+              <View
+                key={rowIndex}
+                style={[
+                  styles.chipsRow,
+                  rowIndex === NEARBY_AREA_ROWS.length - 1 && styles.chipsRowLast,
+                ]}>
+                {row.map(area => {
+                  const isSelected = selectedArea === area;
+                  return (
+                    <BouncyPressable
+                      key={area}
+                      activeScale={0.93}
+                      style={[
+                        styles.areaChip,
+                        isDarkMode && styles.areaChipDark,
+                        isSelected && styles.areaChipActive,
+                      ]}
+                      onPress={() => setSelectedArea(area)}>
+                      {area === 'Near me' && (
+                        <Ionicons
+                          name="location-outline"
+                          size={ms(12)}
+                          color={isSelected ? '#FFFFFF' : '#7B2CFF'}
+                          style={styles.areaChipIcon}
+                        />
+                      )}
+                      <Text
+                        style={[
+                          styles.areaChipText,
+                          isDarkMode && styles.areaChipTextDark,
+                          isSelected && styles.areaChipTextActive,
+                        ]}>
+                        {area}
+                      </Text>
+                    </BouncyPressable>
+                  );
+                })}
+              </View>
+            ))}
           </View>
-        </Animated.View>
+        </Animated.View> */}
 
         {/* ── Categories Section with 3D Perspective & Holographic Sheen ── */}
         <View style={styles.categoriesSection}>
@@ -823,13 +819,6 @@ export const ExploreScreen = ({ navigation }) => {
             style={[
               styles.categoriesCard,
               isDarkMode && styles.categoriesCardDark,
-              {
-                transform: [
-                  { perspective: 1000 },
-                  { scale: categoryScale },
-                  { rotateX: categoryRotateX },
-                ],
-              },
             ]}>
             {/* Holographic light sheen sweeping across card */}
             <Animated.View
@@ -860,7 +849,8 @@ export const ExploreScreen = ({ navigation }) => {
                   key={category.id}
                   style={[
                     styles.categoryItem,
-                    !isLast && (isDarkMode ? styles.categoryItemBorderDark : styles.categoryItemBorder),
+                    !isLast &&
+                      (isDarkMode ? styles.categoryItemBorderDark : styles.categoryItemBorder),
                   ]}>
                   {/* Category Left Icon Squircle */}
                   <BouncyPressable
@@ -872,7 +862,8 @@ export const ExploreScreen = ({ navigation }) => {
                         ? styles[`iconBox_${category.id}_dark`]
                         : styles[`iconBox_${category.id}`],
                     ]}
-                    onPress={() => handleSelectCategory(category)}>
+                    onPress={() => handleSelectCategory(category)}
+                    >
                     <Ionicons
                       name={category.icon}
                       size={ms(20)}
@@ -881,15 +872,16 @@ export const ExploreScreen = ({ navigation }) => {
                   </BouncyPressable>
 
                   {/* Category Info */}
-                  <Pressable
-                    style={styles.categoryInfo}
-                    onPress={() => handleSelectCategory(category)}>
-                    <Text style={[styles.categoryTitle, isDarkMode && styles.categoryTitleDark]}>
-                      {category.title}
-                    </Text>
-                    <Text style={[styles.categorySubtitle, isDarkMode && styles.categorySubtitleDark]}>
-                      {category.subtitle}
-                    </Text>
+                  <View style={styles.categoryInfo}>
+                    <Pressable onPress={() => handleSelectCategory(category)}>
+                      <Text style={[styles.categoryTitle, isDarkMode && styles.categoryTitleDark]}>
+                        {category.title}
+                      </Text>
+                      <Text
+                        style={[styles.categorySubtitle, isDarkMode && styles.categorySubtitleDark]}>
+                        {category.subtitle}
+                      </Text>
+                    </Pressable>
 
                     {/* Subcategories Pills */}
                     <View style={styles.subcategoriesWrap}>
@@ -900,12 +892,14 @@ export const ExploreScreen = ({ navigation }) => {
                           <BouncyPressable
                             key={sub}
                             activeScale={0.91}
+                            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                             style={[
                               styles.subcategoryPill,
                               isDarkMode && styles.subcategoryPillDark,
                               isSubSelected && styles.subcategoryPillActive,
                             ]}
-                            onPress={() => handleSelectSubcategory(category, sub)}>
+                            onPress={() => handleSelectSubcategory(category, sub)}
+                            >
                             <Text
                               style={[
                                 styles.subcategoryPillText,
@@ -918,7 +912,7 @@ export const ExploreScreen = ({ navigation }) => {
                         );
                       })}
                     </View>
-                  </Pressable>
+                  </View>
                 </View>
               );
             })}
@@ -976,7 +970,10 @@ export const ExploreScreen = ({ navigation }) => {
                   style={[
                     styles.usefulFilterPill,
                     isDarkMode && styles.usefulFilterPillDark,
-                    isFilterActive && (isDarkMode ? styles.usefulFilterPillActiveDark : styles.usefulFilterPillActive),
+                    isFilterActive &&
+                      (isDarkMode
+                        ? styles.usefulFilterPillActiveDark
+                        : styles.usefulFilterPillActive),
                   ]}
                   onPress={() => handleToggleFilter(filter)}>
                   {isFilterActive && (
@@ -1154,24 +1151,29 @@ const styles = StyleSheet.create({
   },
   discoverSubtitle: {
     fontSize: ms(10),
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#7B2CFF',
-    letterSpacing: 0.8,
+    fontFamily: theme.typography.fontFamily.extraBold,
+    fontWeight: '800',
+    color: '#9A8BA9',
+    lineHeight: ms(14),
+    letterSpacing: 0.72,
     textTransform: 'uppercase',
   },
   discoverTitle: {
-    fontSize: ms(23),
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#1D1238',
-    letterSpacing: -0.4,
+    fontSize: ms(28),
+    fontFamily: theme.typography.fontFamily.extraBold,
+    fontWeight: '800',
+    color: '#3B108F',
+    letterSpacing: -1.54,
     marginTop: vs(4),
-    lineHeight: ms(28),
+    lineHeight: ms(30.24),
   },
   discoverDescription: {
-    fontSize: ms(12.5),
-    fontFamily: theme.typography.fontFamily.medium,
-    color: '#635E70',
-    lineHeight: ms(18),
+    fontSize: ms(14),
+    fontFamily: theme.typography.fontFamily.regular,
+    fontWeight: '400',
+    color: '#7C7188',
+    lineHeight: ms(20),
+    letterSpacing: 0,
     marginTop: vs(6),
   },
 
@@ -1180,7 +1182,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     marginHorizontal: s(15),
     borderRadius: s(24),
-    padding: s(16),
+    paddingHorizontal: s(12),
+    paddingTop: vs(14),
+    paddingBottom: vs(13),
     borderTopWidth: 1.5,
     borderTopColor: '#FFFFFF',
     borderLeftWidth: 1.2,
@@ -1203,24 +1207,36 @@ const styles = StyleSheet.create({
     marginBottom: vs(12),
   },
   nearbyCardTitle: {
-    fontSize: ms(14),
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#1D1238',
+    fontSize: ms(15),
+    fontFamily: theme.typography.fontFamily.semiBold,
+
+    color: '#352641',
+    lineHeight: ms(22.5),
+    letterSpacing: -0.38,
   },
   nearbyLocationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   nearbyLocationText: {
-    fontSize: ms(11),
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: '#10B981',
+    fontSize: ms(12),
+    fontFamily: theme.typography.fontFamily.bold,
+
+    color: '#90859A',
+    lineHeight: ms(12),
+    letterSpacing: 0,
     marginLeft: s(3),
   },
   chipsWrap: {
+    width: '100%',
+  },
+  chipsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -s(3),
+    alignItems: 'center',
+    marginBottom: vs(8),
+  },
+  chipsRowLast: {
+    marginBottom: 0,
   },
   areaChip: {
     flexDirection: 'row',
@@ -1232,13 +1248,12 @@ const styles = StyleSheet.create({
     borderLeftColor: '#F5F1E9',
     borderRightWidth: 1,
     borderRightColor: '#E8E1D5',
-    borderBottomWidth: 2.8,
+    borderBottomWidth: 2.5,
     borderBottomColor: '#DCD4C6',
-    paddingHorizontal: s(13),
-    paddingVertical: vs(7),
-    borderRadius: s(18),
-    marginHorizontal: s(3),
-    marginBottom: vs(8),
+    paddingHorizontal: s(8),
+    paddingVertical: vs(5.5),
+    borderRadius: s(15),
+    marginRight: s(6),
     shadowColor: '#1D1238',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -1253,7 +1268,7 @@ const styles = StyleSheet.create({
     borderLeftColor: '#9354FF',
     borderRightWidth: 1,
     borderRightColor: '#6B1CDD',
-    borderBottomWidth: 3.2,
+    borderBottomWidth: 3,
     borderBottomColor: '#5313BA',
     shadowColor: '#7B2CFF',
     shadowOffset: { width: 0, height: 4 },
@@ -1262,12 +1277,15 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   areaChipIcon: {
-    marginRight: s(4),
+    marginRight: s(3.5),
   },
   areaChipText: {
     fontSize: ms(12),
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: '#374151',
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#6E627A',
+    lineHeight: ms(14),
+    letterSpacing: 0,
+    textAlign: 'center',
   },
   areaChipTextActive: {
     color: '#FFFFFF',
@@ -1279,8 +1297,10 @@ const styles = StyleSheet.create({
   },
   sectionHeading: {
     fontSize: ms(15),
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#1D1238',
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#352641',
+    lineHeight: ms(22.5),
+    letterSpacing: -0.38,
     marginHorizontal: s(16),
     marginBottom: vs(10),
   },
@@ -1337,14 +1357,17 @@ const styles = StyleSheet.create({
   categoryTitle: {
     fontSize: ms(14),
     fontFamily: theme.typography.fontFamily.bold,
-    color: '#1D1238',
+    color: '#2D2336',
+    lineHeight: ms(18.2),
+    letterSpacing: -0.28,
   },
   categorySubtitle: {
-    fontSize: ms(11.5),
-    fontFamily: theme.typography.fontFamily.medium,
-    color: '#7E7889',
+    fontSize: ms(12),
+    fontFamily: theme.typography.fontFamily.regular,
+    color: '#807487',
     marginTop: vs(2),
-    lineHeight: ms(16),
+    lineHeight: ms(14.5),
+    letterSpacing: 0,
   },
   subcategoriesWrap: {
     flexDirection: 'row',
@@ -1374,10 +1397,13 @@ const styles = StyleSheet.create({
     borderBottomColor: '#5313BA',
   },
   subcategoryPillText: {
-    fontSize: ms(10.5),
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: '#7C3AED',
+    fontSize: ms(12),
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#7B2CFF',
+    lineHeight: ms(12),
+    letterSpacing: 0,
   },
+
   subcategoryPillTextActive: {
     color: '#FFFFFF',
   },
@@ -1395,8 +1421,10 @@ const styles = StyleSheet.create({
   },
   sectionHeadingNoMargin: {
     fontSize: ms(15),
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#1D1238',
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#352641',
+    lineHeight: ms(22.5),
+    letterSpacing: -0.38,
   },
   openFilterBtn: {
     flexDirection: 'row',
@@ -1467,9 +1495,12 @@ const styles = StyleSheet.create({
     marginRight: s(4),
   },
   usefulFilterText: {
-    fontSize: ms(11.5),
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: '#374151',
+    fontSize: ms(12),
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#6E627A',
+    lineHeight: ms(14),
+    letterSpacing: 0,
+    textAlign: 'center',
   },
   usefulFilterTextActive: {
     color: '#7B2CFF',
@@ -1489,15 +1520,19 @@ const styles = StyleSheet.create({
   },
   placesTopSubtitle: {
     fontSize: ms(10),
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#7E7889',
-    letterSpacing: 0.8,
+    fontFamily: theme.typography.fontFamily.extraBold,
+    fontWeight: '800',
+    color: '#9A8BA9',
+    lineHeight: ms(14),
+    letterSpacing: 0.72,
+    textTransform: 'uppercase',
   },
   placesMainTitle: {
-    fontSize: ms(19),
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#1D1238',
-    letterSpacing: -0.3,
+    fontSize: ms(20),
+    fontFamily: theme.typography.fontFamily.regular,
+    color: '#3B108F',
+    lineHeight: ms(30),
+    letterSpacing: -0.8,
     marginTop: vs(2),
   },
   mapBtn: {
@@ -1525,9 +1560,13 @@ const styles = StyleSheet.create({
     marginRight: s(4),
   },
   mapBtnText: {
-    fontSize: ms(12),
-    fontFamily: theme.typography.fontFamily.bold,
+    fontSize: ms(9),
+    fontFamily: theme.typography.fontFamily.extraBold,
+    fontWeight: '800',
     color: '#7B2CFF',
+    lineHeight: ms(13.5),
+    letterSpacing: 0,
+    textAlign: 'center',
   },
 
   /* ── 3D Tactile Place Card ── */
@@ -1572,10 +1611,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   placeVerifiedBadge: {
-    fontSize: ms(9.5),
-    fontFamily: theme.typography.fontFamily.bold,
-    letterSpacing: 0.4,
+    fontSize: ms(10),
+    fontFamily: theme.typography.fontFamily.extraBold,
+    fontWeight: '800',
+    lineHeight: ms(12),
+    letterSpacing: 0,
+    textTransform: 'uppercase',
   },
+
   placeRatingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1597,9 +1640,11 @@ const styles = StyleSheet.create({
     color: '#B45309',
   },
   placeName: {
-    fontSize: ms(13.5),
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#1D1238',
+    fontSize: ms(14),
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#2B2034',
+    lineHeight: ms(20),
+    letterSpacing: -0.32,
     marginTop: vs(2),
   },
   placeLocationRow: {
@@ -1898,3 +1943,4 @@ export default ExploreScreen;
 export { SearchScreen } from './SearchScreen';
 export { FilterScreen } from './FilterScreen';
 export { CityList, CityList as CityListScreen } from './CityList';
+export { CityDetail, CityDetail as CityDetailScreen } from './CityDetail';

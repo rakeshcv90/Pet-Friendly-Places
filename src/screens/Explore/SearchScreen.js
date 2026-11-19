@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,115 +8,152 @@ import {
   RefreshControl,
   Animated,
   Pressable,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FastImage from 'react-native-fast-image';
+import FastImage, { prefetchImages } from '../../components/common/FastImage';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { s, vs, ms } from 'react-native-size-matters';
-import { theme } from '../../theme';
+import { theme, images } from '../../theme';
+import { LoaderCard } from '../../components/common/Loader';
 import { AppHeader } from '../../components/common/AppHeader';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { useStore } from '../../store';
 import { useUserProfile } from '../../hooks/useUser';
+import { useInfiniteListings, resolveImageUrl } from '../../hooks/useDiscovery';
+import { useSavePlace } from '../../hooks/useUser';
+import {
+  DEFAULT_FILTERS,
+  SORT_OPTIONS,
+  STAY_SUBCATEGORIES,
+  categoryLabel,
+  filtersToChips,
+  filtersToParams,
+  removeFilter,
+  resolveApiCategory,
+} from './listingFilters';
 
-// ── 1. Subcategories Data ──
-const SUBCATEGORIES = [
-  'All stays',
-  'Hotels',
-  'Resorts',
-  'Homestays',
-  'Camps',
-];
+// ── Subcategory chips (Stays only) ──
+const SUBCATEGORIES = Object.keys(STAY_SUBCATEGORIES);
 
-// ── 2. Initial Active Filter Tags ──
-const INITIAL_ACTIVE_FILTERS = ['Verified', 'All breeds', 'Open lawn'];
+const PET_TAGS = {
+  pet_first: { tag: 'Pet First', tagColor: '#FFFFFF', tagBg: '#34B38A' },
+  pet_friendly: { tag: 'Pet Friendly', tagColor: '#FFFFFF', tagBg: '#7B2CFF' },
+  pet_tolerant: { tag: 'Pet Tolerant', tagColor: '#3B2A00', tagBg: '#F8B84E' },
+};
 
-// ── 3. Stays / Places Data matching screenshot ──
-const STAYS_DATA = [
-  {
-    id: 'stay-1',
-    name: 'Aravali Pet Retreat',
-    verificationType: 'Tails Verified',
-    verificationVariant: 'tails', // purple badge with paw
-    rating: '4.9',
-    location: 'Gurugram, Haryana • 18 km away',
-    tag: 'Pet First',
-    tagColor: '#059669',
-    tagBg: '#ECFDF5',
-    category: 'Resorts',
-    filters: ['Verified', 'All breeds', 'Open lawn'],
-    image:
-      'https://images.unsplash.com/photo-1542314831-c53cd3816002?w=800&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'stay-2',
-    name: 'The Orchard Homestay',
-    verificationType: 'Team Verified',
-    verificationVariant: 'team', // mint badge with check
-    rating: '4.7',
-    location: 'Sohna, Haryana • 31 km away',
-    tag: 'Pet Friendly',
-    tagColor: '#7C3AED',
-    tagBg: '#F5F3FF',
-    category: 'Homestays',
-    filters: ['Verified', 'Open lawn'],
-    image:
-      'https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=800&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'stay-3',
-    name: 'Hillside Camp & Cottages',
-    verificationType: 'Owner Verified',
-    verificationVariant: 'owner', // dark charcoal badge
-    rating: '4.8',
-    location: 'Faridabad, Haryana • 26 km away',
-    tag: 'Pet Friendly',
-    tagColor: '#7C3AED',
-    tagBg: '#F5F3FF',
-    category: 'Camps',
-    filters: ['Verified', 'All breeds'],
-    image:
-      'https://images.unsplash.com/photo-1544568100-847a948585b9?w=800&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'stay-4',
-    name: 'Kikar Lodge Forest Resort',
-    verificationType: 'Tails Verified',
-    verificationVariant: 'tails',
-    rating: '4.9',
-    location: 'Rupnagar, Punjab • 45 km away',
-    tag: 'Pet First',
-    tagColor: '#059669',
-    tagBg: '#ECFDF5',
-    category: 'Resorts',
-    filters: ['Verified', 'All breeds', 'Open lawn'],
-    image:
-      'https://images.unsplash.com/photo-1541599540903-216a46ca1dc0?w=800&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'stay-5',
-    name: 'Cyberfarm Farmhouse Villa',
-    verificationType: 'Team Verified',
-    verificationVariant: 'team',
-    rating: '4.8',
-    location: 'Sector 135, Noida • 14 km away',
-    tag: 'Pet Friendly',
-    tagColor: '#7C3AED',
-    tagBg: '#F5F3FF',
-    category: 'Hotels',
-    filters: ['Verified', 'Open lawn'],
-    image:
-      'https://images.unsplash.com/photo-1510798831971-661eb04b3739?w=800&auto=format&fit=crop&q=80',
-  },
-];
+// Short category names shown above the title (same wording as the website cards)
+const CATEGORY_CARD_LABELS = {
+  vet: 'Vet',
+  'Pet Clinic': 'Vet',
+  PET_BOARDING: 'Boarding',
+  'Pet Food Shop': 'Pet Store',
+  Stays: 'Stays',
+  Cafe: 'Cafe',
+  Restaurant: 'Restaurant',
+  Resort: 'Resort',
+  'Pet Store': 'Pet Store',
+  'Nature & Water': 'Nature & Water',
+  PET_RELOCATION: 'Pet Relocation',
+  'Pet Experience': 'Pet Experience',
+  Outdoor: 'Outdoor',
+  'Pet Welfare & Rescue': 'Pet Welfare & Rescue',
+  TAXI_SERVICE: 'Pet Taxi',
+  CARAVAN: 'Caravan',
+  Transport: 'Transport',
+  'Travel & Transport': 'Transport',
+};
+
+// Stays show their type (Hotel, Homestay...) above the title, like the website
+const STAY_TYPE_LABELS = {
+  hotel: 'Hotel',
+  hostel: 'Hostel',
+  resort: 'Resort',
+  resort_hotel: 'Resort',
+  airbnb: 'Airbnb',
+  oyo: 'OYO',
+  homestay: 'Homestay',
+  private_guest_room: 'Homestay',
+  farmstay: 'Farmstay',
+  guest_house: 'Guest House',
+  bed_and_breakfast: 'Bed & Breakfast',
+  campground: 'Campground',
+};
+
+const cardCategoryName = item =>
+  (item.category === 'Stays' && STAY_TYPE_LABELS[String(item.specific_type || '').toLowerCase()]) ||
+  CATEGORY_CARD_LABELS[item.category] ||
+  item.category ||
+  '';
+
+const formatViews = n => (n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k` : `${n}`);
+
+// Excerpt with the highlighted phrase emphasised, like the website
+const renderExcerpt = (excerpt, highlight, isDarkMode) => {
+  const at = highlight ? excerpt.indexOf(highlight) : -1;
+  if (at === -1) {
+    return excerpt;
+  }
+  return [
+    excerpt.slice(0, at),
+    <Text key="hl" style={[styles.excerptHighlight, isDarkMode && styles.excerptHighlightDark]}>
+      {highlight}
+    </Text>,
+    excerpt.slice(at + highlight.length),
+  ];
+};
+
+// Listings API item -> what the card renders
+const toPlace = item => {
+  const rating = item.user_average_rating || item.google_rating;
+  let verificationVariant = null;
+  if (item.tails_verified || item.verification_tier === 'TAILS_VERIFIED') {
+    verificationVariant = 'tails';
+  } else if (item.owner_claimed) {
+    verificationVariant = 'owner';
+  } else if (item.verification_status === 'verified') {
+    verificationVariant = 'team';
+  }
+  return {
+    id: item.id,
+    slug: item.slug,
+    name: item.name,
+    verificationVariant,
+    rating: rating ? Number(rating).toFixed(1) : null,
+    reviews: item.review_count || item.google_review_count || null,
+    categoryName: cardCategoryName(item),
+    excerpt: item.excerpt || item.excerpt_highlight || '',
+    highlight: item.excerpt_highlight || '',
+    // Call is only offered for vets
+    phone: item.category === 'vet' ? item.booking_phone || item.phone || '' : '',
+    famousArea: item.famous_area || '',
+    petsInPool: Boolean(item.pets_in_pool),
+    views: item.view_count || 0,
+    location: [
+      ...new Set([item.local_area, item.city, item.state].filter(Boolean)),
+    ].join(', '),
+    image: item.main_image_url ? resolveImageUrl(item.main_image_url) : null,
+    ...(PET_TAGS[item.pet_friendliness_level] || {}),
+  };
+};
 
 // ── 4. Place Card Component ──
-const SearchPlaceCard = ({ place, isLiked, onToggleLike }) => {
+const SearchPlaceCard = ({ place, onPress }) => {
   const heartScale = useRef(new Animated.Value(1)).current;
+  // The heart saves the place to the account (POST / DELETE /accounts/me/saved/{id})
+  const { saved: isLiked, toggle } = useSavePlace(place.id, {
+    id: place.id,
+    slug: place.slug,
+    name: place.name,
+    main_image_url: place.image,
+    city: place.location,
+  });
 
   const handleHeartPress = () => {
-    onToggleLike(place.id);
+    if (!toggle()) {
+      return;
+    }
     heartScale.setValue(0.65);
     Animated.spring(heartScale, {
       toValue: 1,
@@ -145,27 +182,41 @@ const SearchPlaceCard = ({ place, isLiked, onToggleLike }) => {
         </View>
       );
     }
-    return (
+    if (place.verificationVariant === 'owner') {
+      return (
       <View style={styles.badgeOwner}>
         <Ionicons name="checkmark" size={ms(12)} color="#FFFFFF" style={styles.badgeIcon} />
         <Text style={styles.badgeOwnerText}>Owner Verified</Text>
       </View>
-    );
+      );
+    }
+    return null;
   };
 
   return (
-    <BouncyPressable activeScale={0.98} style={[styles.cardContainer, isDarkMode && styles.cardContainerDark]}>
+    <BouncyPressable
+      activeScale={0.98}
+      onPress={onPress}
+      testID={`search-place-${place.slug}`}
+      style={[styles.cardContainer, isDarkMode && styles.cardContainerDark]}>
       {/* Top Image Container */}
       <View style={[styles.imageWrapper, isDarkMode && styles.imageWrapperDark]}>
         <FastImage
-          source={{ uri: place.image, priority: FastImage.priority.normal }}
+          source={place.image ? { uri: place.image, priority: FastImage.priority.normal } : images.noimage}
           style={styles.cardImage}
           resizeMode={FastImage.resizeMode.cover}
         />
 
         {/* Top Badges Row over image */}
         <View style={styles.imageOverlayTop}>
-          {renderBadge()}
+          <View style={styles.badgeColumn}>
+            {renderBadge()}
+            {place.tag ? (
+              <View style={[styles.petLevelBadge, { backgroundColor: place.tagBg }]}>
+                <Text style={[styles.petLevelText, { color: place.tagColor }]}>{place.tag}</Text>
+              </View>
+            ) : null}
+          </View>
 
           {/* Heart button */}
           <Pressable hitSlop={10} onPress={handleHeartPress} style={[styles.heartButtonCircle, isDarkMode && styles.heartButtonCircleDark]}>
@@ -178,21 +229,24 @@ const SearchPlaceCard = ({ place, isLiked, onToggleLike }) => {
             </Animated.View>
           </Pressable>
         </View>
+        {place.petsInPool ? (
+          <View style={styles.poolBadge}>
+            <Text style={styles.poolBadgeText}>Pets Allowed in Pool</Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Bottom Content Area */}
       <View style={styles.cardContent}>
-        {/* Title and Rating Row */}
-        <View style={styles.cardTitleRow}>
-          <Text style={[styles.cardTitle, isDarkMode && styles.cardTitleDark]} numberOfLines={1}>
-            {place.name}
+        {place.categoryName ? (
+          <Text style={[styles.cardCategory, isDarkMode && styles.cardCategoryDark]} numberOfLines={1}>
+            {place.categoryName}
           </Text>
+        ) : null}
 
-          <View style={[styles.ratingBadge, isDarkMode && styles.ratingBadgeDark]}>
-            <Ionicons name="star" size={ms(10)} color="#F59E0B" style={styles.starIcon} />
-            <Text style={[styles.ratingText, isDarkMode && styles.ratingTextDark]}>{place.rating}</Text>
-          </View>
-        </View>
+        <Text style={[styles.cardTitle, isDarkMode && styles.cardTitleDark]} numberOfLines={2}>
+          {place.name}
+        </Text>
 
         {/* Location Row */}
         <View style={styles.cardLocationRow}>
@@ -202,14 +256,43 @@ const SearchPlaceCard = ({ place, isLiked, onToggleLike }) => {
             color={isDarkMode ? '#64748B' : '#9CA3AF'}
             style={styles.locationPinIcon}
           />
-          <Text style={[styles.cardLocationText, isDarkMode && styles.cardLocationTextDark]} numberOfLines={1}>
+          <Text style={[styles.cardLocationText, isDarkMode && styles.cardLocationTextDark]} numberOfLines={2}>
             {place.location}
           </Text>
         </View>
 
-        {/* Tag Pill */}
-        <View style={[styles.featureTagPill, isDarkMode ? styles.featureTagPillDark : { backgroundColor: place.tagBg }]}>
-          <Text style={[styles.featureTagText, isDarkMode ? styles.featureTagTextDark : { color: place.tagColor }]}>{place.tag}</Text>
+        {place.famousArea ? (
+          <Text style={[styles.famousAreaText, isDarkMode && styles.cardLocationTextDark]} numberOfLines={1}>
+            Famous area: {place.famousArea}
+          </Text>
+        ) : null}
+
+        {place.excerpt ? (
+          <Text style={[styles.cardSummary, isDarkMode && styles.cardLocationTextDark]} numberOfLines={5}>
+            {renderExcerpt(place.excerpt, place.highlight, isDarkMode)}
+          </Text>
+        ) : null}
+
+        {/* Footer: call, views, open */}
+        <View style={styles.cardFooter}>
+          {place.phone ? (
+            <Pressable
+              hitSlop={8}
+              onPress={() => Linking.openURL(`tel:${place.phone.replace(/\s+/g, '')}`)}
+              style={styles.callButton}>
+              <Ionicons name="call" size={ms(12)} color="#FFFFFF" />
+              <Text style={styles.callButtonText}>Call</Text>
+            </Pressable>
+          ) : (
+            <View />
+          )}
+          <View style={styles.cardFooterRight}>
+            <Ionicons name="eye-outline" size={ms(13)} color="#A09AA8" />
+            <Text style={styles.viewsText}>{formatViews(place.views)}</Text>
+            <View style={styles.openCircle}>
+              <Ionicons name="arrow-forward" size={ms(14)} color="#92700C" />
+            </View>
+          </View>
         </View>
       </View>
     </BouncyPressable>
@@ -221,18 +304,101 @@ export const SearchScreen = ({ navigation, route }) => {
   const scrollY = useRef(new Animated.Value(0)).current;
   const isDarkMode = useStore(state => state.isDarkMode);
 
-  // Route params for dynamic category / title
-  const initialCategory = route?.params?.category || 'Pet Friendly Stays';
+  // Route params: `apiCategory` is the listings API category id; `category` is a display title
+  const initialApiCategory = resolveApiCategory(route?.params?.apiCategory, route?.params?.category);
+  const tailsVerifiedOnly = Boolean(route?.params?.tailsVerified);
+  const verifiedOnly = Boolean(route?.params?.verifiedOnly);
   const initialQuery = route?.params?.query || '';
-  const initialSubcategory = route?.params?.subcategory || 'All stays';
+  const routeSubcategory = route?.params?.subcategory;
+  const initialSubcategory = SUBCATEGORIES.includes(routeSubcategory) ? routeSubcategory : 'All stays';
 
-  const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [apiCategory, setApiCategory] = useState(initialApiCategory);
+  const [searchText, setSearchText] = useState(initialQuery);
+  const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
   const [selectedSubcategory, setSelectedSubcategory] = useState(initialSubcategory);
-  const [activeFilterTags, setActiveFilterTags] = useState(INITIAL_ACTIVE_FILTERS);
-  const [sortOrder, setSortOrder] = useState('Recommended');
-  const [favorites, setFavorites] = useState({});
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(3);
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [sortKey, setSortKey] = useState('relevance');
+  const [sortOpen, setSortOpen] = useState(false);
+  const sortOption = SORT_OPTIONS.find(o => o.key === sortKey) || SORT_OPTIONS[0];
+
+  const categoryTitle =
+    (apiCategory && categoryLabel(apiCategory)) || route?.params?.category || 'All places';
+  const isStays = apiCategory === 'Stays';
+  const filterChips = useMemo(() => filtersToChips(filters), [filters]);
+
+  const queryParams = useMemo(
+    () => ({
+      ...filtersToParams(filters),
+      q: submittedQuery.trim() || undefined,
+      tails_verified: tailsVerifiedOnly ? 'true' : undefined,
+      verified_only: verifiedOnly ? 'true' : undefined,
+      sort: sortOption.param,
+      specific_type: isStays ? STAY_SUBCATEGORIES[selectedSubcategory] || undefined : undefined,
+    }),
+    [
+      filters,
+      submittedQuery,
+      isStays,
+      selectedSubcategory,
+      tailsVerifiedOnly,
+      verifiedOnly,
+      sortOption.param,
+    ],
+  );
+
+  // "Paws in the Wild": the API's `Outdoor` group already includes `Nature & Water`,
+  // so one request returns the full set (a second request would only duplicate rows).
+  const listingsCategory = apiCategory === 'Nature & Water' ? 'Outdoor' : apiCategory;
+
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+    isRefetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteListings({ category: listingsCategory || undefined, filters: queryParams });
+
+  const total = data?.pages?.[0]?.total ?? 0;
+  const places = useMemo(() => {
+    const seen = new Set();
+    return (data?.pages ?? [])
+      .flatMap(page => page?.items ?? [])
+      .filter(item => {
+        if (seen.has(item.id)) {
+          return false;
+        }
+        seen.add(item.id);
+        return true;
+      })
+      .map(toPlace);
+  }, [data?.pages]);
+
+  React.useEffect(() => {
+    prefetchImages(places.map(place => place.image));
+  }, [places]);
+
+  const loadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const handleScroll = Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+    useNativeDriver: true,
+  });
+
+  const renderPlace = useCallback(
+    ({ item }) => (
+      <SearchPlaceCard
+        place={item}
+        onPress={() => navigation?.navigate?.('ListingDetailScreen', { slug: item.slug })}
+      />
+    ),
+    [navigation],
+  );
 
   // User & location
   const { data: userProfile } = useUserProfile();
@@ -253,27 +419,6 @@ export const SearchScreen = ({ navigation, route }) => {
     'Pet Parent';
 
   const currentCity = globalLocation || activeUser?.location || activeUser?.city || 'Delhi NCR';
-
-  // Toggle favorite
-  const toggleFavorite = placeId => {
-    setFavorites(prev => ({
-      ...prev,
-      [placeId]: !prev[placeId],
-    }));
-  };
-
-  // Remove active filter tag
-  const removeFilterTag = tag => {
-    setActiveFilterTags(prev => prev.filter(t => t !== tag));
-  };
-
-  // Pull to refresh simulation
-  const onRefresh = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 700);
-  };
 
   // ── Parallax Ambient Glow & Watermark Animations ──
   const orbTopRightY = useMemo(
@@ -380,40 +525,6 @@ export const SearchScreen = ({ navigation, route }) => {
     [scrollY],
   );
 
-  // Filter places
-  const filteredPlaces = useMemo(() => {
-    return STAYS_DATA.filter(place => {
-      // Search query filter
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase().trim();
-        const matchesName = place.name.toLowerCase().includes(query);
-        const matchesLoc = place.location.toLowerCase().includes(query);
-        if (!matchesName && !matchesLoc) {
-          return false;
-        }
-      }
-
-      // Subcategory filter
-      if (selectedSubcategory && selectedSubcategory !== 'All stays') {
-        if (place.category?.toLowerCase() !== selectedSubcategory.toLowerCase()) {
-          return false;
-        }
-      }
-
-      // Active filter tags
-      if (activeFilterTags.length > 0) {
-        const matchesAll = activeFilterTags.every(tag => place.filters.includes(tag));
-        if (!matchesAll) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [searchQuery, selectedSubcategory, activeFilterTags]);
-
-  const displayedPlaces = filteredPlaces.slice(0, visibleCount);
-
   return (
     <View style={[styles.container, isDarkMode && styles.containerDark, { paddingTop: Math.max(insets.top, s(12)) }]}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={isDarkMode ? '#0F071D' : '#FAF7F2'} translucent={false} />
@@ -486,16 +597,23 @@ export const SearchScreen = ({ navigation, route }) => {
         />
       </Animated.View>
 
-      <Animated.ScrollView
+      <Animated.FlatList
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-          useNativeDriver: true,
-        })}
+        onScroll={handleScroll}
+        data={isLoading ? [] : places}
+        keyExtractor={item => String(item.id)}
+        renderItem={renderPlace}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        initialNumToRender={6}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews
         refreshControl={
           <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={onRefresh}
+            refreshing={isRefetching && !isFetchingNextPage}
+            onRefresh={refetch}
             tintColor="#7B2CFF"
             colors={['#7B2CFF', '#EE2A7B']}
           />
@@ -503,18 +621,19 @@ export const SearchScreen = ({ navigation, route }) => {
         contentContainerStyle={[
           styles.scrollContent,
           { paddingBottom: Math.max(insets.bottom, s(20)) + s(95) },
-        ]}>
+        ]}
+        ListHeaderComponent={
+          <>
         {/* ── AppHeader ── */}
         <AppHeader
           userName={userName}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          onSearchSubmit={query => setSearchQuery(query !== undefined ? query : searchQuery)}
+          searchQuery={searchText}
+          onSearchChange={setSearchText}
+          onSearchSubmit={query => setSubmittedQuery(query !== undefined ? query : searchText)}
           avatarScale={avatarScale}
           avatarRotate={avatarRotate}
           searchBarScale={searchBarScale}
           searchIconRotate={searchIconRotate}
-          onNotificationPress={() => navigation?.navigate?.('Notifications')}
           enableCityPicker={true}
         />
 
@@ -532,7 +651,7 @@ export const SearchScreen = ({ navigation, route }) => {
           <View style={styles.navTitleCenter}>
             <Text style={[styles.navSubtitle, isDarkMode && styles.navSubtitleDark]}>EXPLORE</Text>
             <Text style={[styles.navTitle, isDarkMode && styles.navTitleDark]} numberOfLines={1}>
-              {initialCategory}
+              {categoryTitle}
             </Text>
           </View>
 
@@ -558,11 +677,11 @@ export const SearchScreen = ({ navigation, route }) => {
             {/* Top Tag */}
             <View style={styles.heroTopTagRow}>
               <Ionicons name="bed-outline" size={ms(12)} color="#DDD6FE" />
-              <Text style={styles.heroTopTagText}>STAYS AROUND YOU</Text>
+              <Text style={styles.heroTopTagText}>{isStays ? 'STAYS AROUND YOU' : 'PLACES AROUND YOU'}</Text>
             </View>
 
             {/* Headline */}
-            <Text style={styles.heroTitle}>{initialCategory}</Text>
+            <Text style={styles.heroTitle}>{categoryTitle}</Text>
 
             {/* Subtitle */}
             <Text style={styles.heroDescription}>
@@ -573,7 +692,7 @@ export const SearchScreen = ({ navigation, route }) => {
             <View style={styles.heroBadgesRow}>
               <View style={styles.heroBadgePill}>
                 <Ionicons name="checkmark" size={ms(12)} color="#FFFFFF" style={styles.pillIcon} />
-                <Text style={styles.heroBadgeText}>120+ verified</Text>
+                <Text style={styles.heroBadgeText}>{`${total} places`}</Text>
               </View>
 
               <View style={styles.heroBadgePill}>
@@ -589,7 +708,8 @@ export const SearchScreen = ({ navigation, route }) => {
           </LinearGradient>
         </View>
 
-        {/* ── Subcategories Horizontal Pills ── */}
+        {/* ── Subcategories Horizontal Pills (Stays only) ── */}
+        {isStays ? (
         <View style={styles.subcategoriesSection}>
           <ScrollView
             horizontal
@@ -623,6 +743,7 @@ export const SearchScreen = ({ navigation, route }) => {
             })}
           </ScrollView>
         </View>
+        ) : null}
 
         {/* ── Filters & Sorting Row ── */}
         <View style={styles.filterSortRow}>
@@ -636,17 +757,20 @@ export const SearchScreen = ({ navigation, route }) => {
                 navigation?.getParent?.() ||
                 navigation;
               rootNav?.navigate?.('FilterScreen', {
-                category: initialCategory,
+                category: apiCategory,
+                filters,
                 onApplyFilters: applied => {
-                  if (applied.tags) {
-                    setActiveFilterTags(applied.tags);
+                  setFilters(applied.filters);
+                  if (applied.category !== apiCategory) {
+                    setApiCategory(applied.category);
+                    setSelectedSubcategory('All stays');
                   }
                 },
               });
             }}>
             <Text style={[styles.filtersBtnText, isDarkMode && styles.filtersBtnTextDark]}>Filters</Text>
             <View style={styles.filterCountBadge}>
-              <Text style={styles.filterCountText}>{activeFilterTags.length}</Text>
+              <Text style={styles.filterCountText}>{filterChips.length}</Text>
             </View>
           </BouncyPressable>
 
@@ -654,27 +778,52 @@ export const SearchScreen = ({ navigation, route }) => {
           <BouncyPressable
             activeScale={0.94}
             style={[styles.sortBtn, isDarkMode && styles.sortBtnDark]}
-            onPress={() => {
-              setSortOrder(prev => (prev === 'Recommended' ? 'Top Rated' : 'Recommended'));
-            }}>
+            onPress={() => setSortOpen(open => !open)}>
             <View style={styles.sortLeftGroup}>
               <Text style={[styles.sortLabel, isDarkMode && styles.sortLabelDark]}>SORT</Text>
-              <Text style={[styles.sortValue, isDarkMode && styles.sortValueDark]}>{sortOrder}</Text>
+              <Text style={[styles.sortValue, isDarkMode && styles.sortValueDark]}>{sortOption.label}</Text>
             </View>
-            <Ionicons name="chevron-down" size={ms(15)} color={isDarkMode ? '#94A3B8' : '#6B7280'} />
+            <Ionicons name={sortOpen ? 'chevron-up' : 'chevron-down'} size={ms(15)} color={isDarkMode ? '#94A3B8' : '#6B7280'} />
           </BouncyPressable>
         </View>
 
+        {sortOpen ? (
+          <View style={[styles.sortMenu, isDarkMode && styles.sortMenuDark]}>
+            {SORT_OPTIONS.map(option => {
+              const selected = option.key === sortKey;
+              return (
+                <Pressable
+                  key={option.key}
+                  style={[styles.sortMenuItem, selected && styles.sortMenuItemActive]}
+                  onPress={() => {
+                    setSortKey(option.key);
+                    setSortOpen(false);
+                  }}>
+                  <Text
+                    style={[
+                      styles.sortMenuText,
+                      isDarkMode && styles.sortMenuTextDark,
+                      selected && styles.sortMenuTextActive,
+                    ]}>
+                    {option.label}
+                  </Text>
+                  {selected ? <Ionicons name="checkmark" size={ms(16)} color="#7B2CFF" /> : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+
         {/* ── Active Filter Tags Row with close buttons ── */}
-        {activeFilterTags.length > 0 && (
+        {filterChips.length > 0 && (
           <View style={styles.activeTagsRow}>
-            {activeFilterTags.map(tag => (
+            {filterChips.map(chip => (
               <BouncyPressable
-                key={tag}
+                key={chip.key}
                 activeScale={0.92}
                 style={[styles.activeTagPill, isDarkMode && styles.activeTagPillDark]}
-                onPress={() => removeFilterTag(tag)}>
-                <Text style={[styles.activeTagText, isDarkMode && styles.activeTagTextDark]}>{tag}</Text>
+                onPress={() => setFilters(prev => removeFilter(prev, chip.key))}>
+                <Text style={[styles.activeTagText, isDarkMode && styles.activeTagTextDark]}>{chip.label}</Text>
                 <Ionicons name="close" size={ms(12)} color={isDarkMode ? '#C4B5FD' : '#6B21A8'} style={styles.closeTagIcon} />
               </BouncyPressable>
             ))}
@@ -684,57 +833,89 @@ export const SearchScreen = ({ navigation, route }) => {
         {/* ── Results Header ── */}
         <View style={styles.resultsHeader}>
           <Text style={[styles.resultsCountText, isDarkMode && styles.resultsCountTextDark]}>
-            {`${filteredPlaces.length > 0 ? '24' : '0'} stays nearby`}
+            {`${total} ${isStays ? 'stays' : 'places'} ${filterChips.length > 0 ? 'found' : 'nearby'}`}
           </Text>
           <Text style={[styles.resultsSortSubtext, isDarkMode && styles.resultsSortSubtextDark]}>
-            {`Sorted by ${sortOrder.toLowerCase()}`}
+            {`Sorted by ${sortOption.label.toLowerCase()}`}
           </Text>
         </View>
 
-        {/* ── Places Cards List ── */}
-        {displayedPlaces.length === 0 ? (
-          <View style={[styles.noResultsCard, isDarkMode && styles.noResultsCardDark]}>
-            <Ionicons name="search-outline" size={ms(32)} color={isDarkMode ? '#64748B' : '#A09AA8'} />
-            <Text style={[styles.noResultsTitle, isDarkMode && styles.noResultsTitleDark]}>No stays match your filters</Text>
-            <Text style={[styles.noResultsSubtitle, isDarkMode && styles.noResultsSubtitleDark]}>
-              Try clearing active filters or selecting another category.
-            </Text>
-            <BouncyPressable
-              style={styles.resetFiltersBtn}
-              onPress={() => {
-                setActiveFilterTags(INITIAL_ACTIVE_FILTERS);
-                setSelectedSubcategory('All stays');
-                setSearchQuery('');
-              }}>
-              <Text style={styles.resetFiltersBtnText}>Reset Filters</Text>
-            </BouncyPressable>
-          </View>
-        ) : (
-          displayedPlaces.map(place => (
-            <SearchPlaceCard
-              key={place.id}
-              place={place}
-              isLiked={!!favorites[place.id]}
-              onToggleLike={toggleFavorite}
-            />
-          ))
-        )}
-
-        {/* ── "Show more stays" Button ── */}
-        {displayedPlaces.length < filteredPlaces.length && (
-          <BouncyPressable
-            activeScale={0.94}
-            style={[styles.showMoreBtn, isDarkMode && styles.showMoreBtnDark]}
-            onPress={() => setVisibleCount(prev => prev + 3)}>
-            <Text style={[styles.showMoreBtnText, isDarkMode && styles.showMoreBtnTextDark]}>Show more stays</Text>
-          </BouncyPressable>
-        )}
-      </Animated.ScrollView>
+          </>
+        }
+        ListEmptyComponent={
+          isLoading ? (
+            <LoaderCard label="Loading…" isDarkMode={isDarkMode} style={styles.listLoader} />
+          ) : (
+            <View style={[styles.noResultsCard, isDarkMode && styles.noResultsCardDark]}>
+              <Ionicons
+                name={isError ? 'cloud-offline-outline' : 'search-outline'}
+                size={ms(32)}
+                color={isDarkMode ? '#64748B' : '#A09AA8'}
+              />
+              <Text style={[styles.noResultsTitle, isDarkMode && styles.noResultsTitleDark]}>
+                {isError ? 'Could not load places' : 'No places match your filters'}
+              </Text>
+              <Text style={[styles.noResultsSubtitle, isDarkMode && styles.noResultsSubtitleDark]}>
+                {isError
+                  ? 'Pull down to retry.'
+                  : 'Try clearing active filters or selecting another category.'}
+              </Text>
+              {!isError ? (
+                <BouncyPressable
+                  style={styles.resetFiltersBtn}
+                  onPress={() => {
+                    setFilters(DEFAULT_FILTERS);
+                    setSelectedSubcategory('All stays');
+                    setSearchText('');
+                    setSubmittedQuery('');
+                  }}>
+                  <Text style={styles.resetFiltersBtnText}>Reset Filters</Text>
+                </BouncyPressable>
+              ) : null}
+            </View>
+          )
+        }
+        ListFooterComponent={
+          isFetchingNextPage ? (
+            <LoaderCard label="Loading more…" isDarkMode={isDarkMode} style={styles.listLoader} />
+          ) : null
+        }
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  sortMenu: {
+    marginHorizontal: s(15),
+    marginBottom: vs(10),
+    backgroundColor: '#FFFFFF',
+    borderRadius: s(16),
+    paddingVertical: vs(6),
+    borderWidth: 1,
+    borderColor: '#E8E1D5',
+    shadowColor: '#361466',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  sortMenuDark: { backgroundColor: '#1A0B30', borderColor: '#4C1D95' },
+  sortMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: s(16),
+    paddingVertical: vs(11),
+  },
+  sortMenuItemActive: { backgroundColor: 'rgba(123,44,255,0.08)' },
+  sortMenuText: { fontSize: ms(13.5), color: '#1D1238', fontFamily: theme.typography.fontFamily.medium },
+  sortMenuTextDark: { color: '#E2E8F0' },
+  sortMenuTextActive: { color: '#7B2CFF', fontFamily: theme.typography.fontFamily.bold },
+  listLoader: {
+    marginHorizontal: s(15),
+    marginVertical: s(16),
+  },
   container: {
     flex: 1,
     backgroundColor: '#FAF7F2',
@@ -1131,7 +1312,7 @@ const styles = StyleSheet.create({
   },
   imageWrapper: {
     width: '100%',
-    height: vs(175),
+    height: vs(120),
     position: 'relative',
     backgroundColor: '#EBE8E1',
   },
@@ -1146,7 +1327,7 @@ const styles = StyleSheet.create({
     right: s(12),
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   badgeTails: {
     flexDirection: 'row',
@@ -1221,7 +1402,16 @@ const styles = StyleSheet.create({
 
   /* ── Content Below Image ── */
   cardContent: {
-    padding: s(14),
+    paddingHorizontal: s(14),
+    paddingTop: s(10),
+    paddingBottom: s(12),
+  },
+  cardSummary: {
+    fontSize: ms(11.5),
+    lineHeight: ms(16),
+    color: '#6B6480',
+    marginTop: vs(5),
+    fontFamily: theme.typography.fontFamily.regular,
   },
   cardTitleRow: {
     flexDirection: 'row',
@@ -1232,8 +1422,81 @@ const styles = StyleSheet.create({
     fontSize: ms(15.5),
     fontFamily: theme.typography.fontFamily.bold,
     color: '#1D1238',
-    flex: 1,
-    marginRight: s(8),
+  },
+  cardCategory: {
+    fontSize: ms(10.5),
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: '#7B2CFF',
+    marginBottom: vs(3),
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  badgeColumn: { alignItems: 'flex-start', flex: 1 },
+  petLevelBadge: {
+    borderRadius: s(14),
+    paddingHorizontal: s(12),
+    paddingVertical: vs(5),
+    marginTop: vs(6),
+  },
+  petLevelText: { fontSize: ms(11), fontFamily: theme.typography.fontFamily.bold },
+  poolBadge: {
+    position: 'absolute',
+    left: s(12),
+    bottom: s(12),
+    backgroundColor: 'rgba(15,118,110,0.92)',
+    borderRadius: s(12),
+    paddingHorizontal: s(10),
+    paddingVertical: vs(4),
+  },
+  poolBadgeText: { fontSize: ms(10), color: '#FFFFFF', fontFamily: theme.typography.fontFamily.bold },
+  famousAreaText: {
+    fontSize: ms(11),
+    color: '#6B6480',
+    marginTop: vs(3),
+    fontFamily: theme.typography.fontFamily.regular,
+  },
+  cardCategoryDark: { color: '#A855F7' },
+  excerptHighlight: {
+    backgroundColor: '#FDF0B8',
+    color: '#4A3A06',
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  excerptHighlightDark: { backgroundColor: '#5B4A10', color: '#FDF0B8' },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: vs(10),
+  },
+  cardFooterRight: { flexDirection: 'row', alignItems: 'center' },
+  callButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2E6B4A',
+    borderRadius: s(20),
+    paddingHorizontal: s(14),
+    paddingVertical: vs(6),
+  },
+  callButtonText: {
+    color: '#FFFFFF',
+    fontSize: ms(12),
+    marginLeft: s(5),
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  viewsText: {
+    fontSize: ms(11),
+    color: '#A09AA8',
+    marginLeft: s(4),
+    marginRight: s(10),
+    fontFamily: theme.typography.fontFamily.regular,
+  },
+  openCircle: {
+    width: s(28),
+    height: s(28),
+    borderRadius: s(14),
+    backgroundColor: '#FDF0B8',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   ratingBadge: {
     flexDirection: 'row',
@@ -1246,6 +1509,13 @@ const styles = StyleSheet.create({
     borderTopColor: '#FFFBEB',
     borderBottomWidth: 1.6,
     borderBottomColor: '#FDE68A',
+  },
+  ratingBadgeEmpty: {
+    backgroundColor: '#F3F0EA',
+    borderBottomColor: '#E4DED2',
+  },
+  ratingTextEmpty: {
+    color: '#8A8496',
   },
   starIcon: {
     marginRight: s(2.5),
@@ -1274,7 +1544,7 @@ const styles = StyleSheet.create({
     borderRadius: s(8),
     paddingHorizontal: s(8),
     paddingVertical: vs(3),
-    marginTop: vs(8),
+    marginTop: vs(7),
   },
   featureTagText: {
     fontSize: ms(10),

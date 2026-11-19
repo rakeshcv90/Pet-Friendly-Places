@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { View, StyleSheet, Pressable, Animated, Platform, Easing } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,12 +7,11 @@ import LinearGradient from 'react-native-linear-gradient';
 import { s, ms } from 'react-native-size-matters';
 import { HomeScreen } from '../screens/Home';
 import { ExploreScreen } from '../screens/Explore';
-import { MapScreen } from '../screens/Map';
-import { SavedScreen } from '../screens/Saved';
 import { ProfileScreen } from '../screens/Profile';
 import { theme } from '../theme';
-
 import { useStore } from '../store';
+import { StoryGuidesScreen } from '../screens/StoryGuides';
+import { SavedScreen } from '../screens/Saved';
 
 const TAB_CONFIG = {
   Home: {
@@ -20,53 +19,55 @@ const TAB_CONFIG = {
     activeIcon: 'home',
     label: 'Home',
   },
-  Map: {
-    icon: 'map-outline',
-    activeIcon: 'map',
-    label: 'Map',
+  'Story & Guides': {
+    icon: 'book-outline',
+    activeIcon: 'book',
+    label: 'Story & Guides',
   },
   Explore: {
     icon: 'search',
     activeIcon: 'search',
     label: 'Explore',
   },
-  Saved: {
-    icon: 'heart-outline',
-    activeIcon: 'heart',
-    label: 'Saved',
+  Community: {
+    icon: 'chatbubbles-outline',
+    activeIcon: 'chatbubbles',
+    label: 'Community',
   },
   Profile: {
     icon: 'person-outline',
     activeIcon: 'person',
     label: 'Profile',
   },
+  Map: {
+    icon: 'book-outline',
+    activeIcon: 'book',
+    label: 'Story & Guides',
+  },
+  Saved: {
+    icon: 'chatbubbles-outline',
+    activeIcon: 'chatbubbles',
+    label: 'Community',
+  },
 };
 
 /* ── Compact Animated Tab Button ───────────────────────── */
 const TabButton = ({ route, isFocused, onPress, onLongPress, isDarkMode, accentColor }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const focusScale = useRef(new Animated.Value(isFocused ? 1.04 : 1)).current;
-  const labelOpacity = useRef(new Animated.Value(isFocused ? 1 : 0.65)).current;
+  const activeAnim = useRef(new Animated.Value(isFocused ? 1 : 0)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.spring(focusScale, {
-        toValue: isFocused ? 1.04 : 1,
-        tension: 260,
-        friction: 14,
-        useNativeDriver: true,
-      }),
-      Animated.timing(labelOpacity, {
-        toValue: isFocused ? 1 : 0.65,
-        duration: 160,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [isFocused, focusScale, labelOpacity]);
+    Animated.timing(activeAnim, {
+      toValue: isFocused ? 1 : 0,
+      duration: 140,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [isFocused, activeAnim]);
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
-      toValue: 0.92,
+      toValue: 0.94,
       tension: 300,
       friction: 10,
       useNativeDriver: true,
@@ -76,8 +77,8 @@ const TabButton = ({ route, isFocused, onPress, onLongPress, isDarkMode, accentC
   const handlePressOut = () => {
     Animated.spring(scaleAnim, {
       toValue: 1,
-      tension: 220,
-      friction: 8,
+      tension: 240,
+      friction: 9,
       useNativeDriver: true,
     }).start();
   };
@@ -90,6 +91,40 @@ const TabButton = ({ route, isFocused, onPress, onLongPress, isDarkMode, accentC
   };
 
   const primaryAccent = accentColor || '#7C3AED';
+
+  // Smooth background color interpolation (no sudden pop)
+  const squircleBg = activeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [
+      isDarkMode ? 'rgba(30, 16, 53, 0)' : 'rgba(124, 58, 237, 0)',
+      primaryAccent,
+    ],
+  });
+
+  const squircleScale = activeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.04],
+  });
+
+  const labelColor = activeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [isDarkMode ? '#94A3B8' : '#8E8E93', primaryAccent],
+  });
+
+  const labelOpacity = activeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.65, 1],
+  });
+
+  const indicatorWidth = activeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, s(16)],
+  });
+
+  const indicatorOpacity = activeAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0, 0.5, 1],
+  });
 
   if (isExplore) {
     return (
@@ -111,6 +146,7 @@ const TabButton = ({ route, isFocused, onPress, onLongPress, isDarkMode, accentC
             </LinearGradient>
           </View>
           <Animated.Text
+            numberOfLines={1}
             style={[
               styles.tabLabel,
               isDarkMode && styles.tabLabelDark,
@@ -121,6 +157,16 @@ const TabButton = ({ route, isFocused, onPress, onLongPress, isDarkMode, accentC
             ]}>
             Explore
           </Animated.Text>
+          <Animated.View
+            style={[
+              styles.activeTabIndicatorPill,
+              {
+                width: indicatorWidth,
+                opacity: indicatorOpacity,
+                backgroundColor: primaryAccent,
+              },
+            ]}
+          />
         </Animated.View>
       </Pressable>
     );
@@ -137,8 +183,11 @@ const TabButton = ({ route, isFocused, onPress, onLongPress, isDarkMode, accentC
       <Animated.View style={[styles.tabContent, { transform: [{ scale: scaleAnim }] }]}>
         <Animated.View
           style={[
-            isFocused ? [styles.activeIconSquircle, { backgroundColor: primaryAccent, shadowColor: primaryAccent }] : styles.inactiveIconWrap,
-            { transform: [{ scale: focusScale }] },
+            styles.iconSquircleBase,
+            {
+              backgroundColor: squircleBg,
+              transform: [{ scale: squircleScale }],
+            },
           ]}>
           <Ionicons
             name={isFocused ? config.activeIcon : config.icon}
@@ -147,14 +196,25 @@ const TabButton = ({ route, isFocused, onPress, onLongPress, isDarkMode, accentC
           />
         </Animated.View>
         <Animated.Text
+          numberOfLines={1}
           style={[
             styles.tabLabel,
             isDarkMode && styles.tabLabelDark,
-            isFocused && [styles.activeTabLabel, { color: primaryAccent }],
-            { opacity: labelOpacity },
+            isFocused && styles.activeTabLabelFont,
+            { color: labelColor, opacity: labelOpacity },
           ]}>
           {config.label}
         </Animated.Text>
+        <Animated.View
+          style={[
+            styles.activeTabIndicatorPill,
+            {
+              width: indicatorWidth,
+              opacity: indicatorOpacity,
+              backgroundColor: primaryAccent,
+            },
+          ]}
+        />
       </Animated.View>
     </Pressable>
   );
@@ -165,6 +225,11 @@ const CustomTabBar = ({ state, navigation }) => {
   const insets = useSafeAreaInsets();
   const isDarkMode = useStore(st => st.isDarkMode);
   const accentColor = useStore(st => st.accentColor);
+  const [optimisticIndex, setOptimisticIndex] = useState(state.index);
+
+  useEffect(() => {
+    setOptimisticIndex(state.index);
+  }, [state.index]);
 
   return (
     <View
@@ -175,16 +240,19 @@ const CustomTabBar = ({ state, navigation }) => {
       ]}>
       <View style={styles.tabButtonsRow}>
         {state.routes.map((route, index) => {
-          const isFocused = state.index === index;
+          const isFocused = optimisticIndex === index;
 
           const onPress = () => {
+            if (state.index !== index) {
+              setOptimisticIndex(index);
+            }
             const event = navigation.emit({
               type: 'tabPress',
               target: route.key,
               canPreventDefault: true,
             });
 
-            if (!isFocused && !event.defaultPrevented) {
+            if (state.index !== index && !event.defaultPrevented) {
               navigation.navigate(route.name);
             }
           };
@@ -215,51 +283,40 @@ const CustomTabBar = ({ state, navigation }) => {
 
 const renderCustomTabBar = props => <CustomTabBar {...props} />;
 
-/* ── Premium Parallax Shift & Fade Scene Transition ────── */
-const tabSceneStyleInterpolator = ({ current }) => ({
-  sceneStyle: {
-    opacity: current.progress.interpolate({
-      inputRange: [-1, -0.2, 0, 0.2, 1],
-      outputRange: [0, 0.75, 1, 0.75, 0],
-    }),
-    transform: [
-      {
-        translateX: current.progress.interpolate({
-          inputRange: [-1, 0, 1],
-          outputRange: [-24, 0, 24],
-        }),
-      },
-    ],
-  },
-});
-
 const Tab = createBottomTabNavigator();
 
 export const MainTabNavigator = () => {
+  const isDarkMode = useStore(st => st.isDarkMode);
+
   return (
     <Tab.Navigator
       tabBar={renderCustomTabBar}
+      sceneContainerStyle={isDarkMode ? styles.sceneDark : styles.sceneLight}
       screenOptions={{
         headerShown: false,
-        sceneStyleInterpolator: tabSceneStyleInterpolator,
-        transitionSpec: {
-          animation: 'timing',
-          config: {
-            duration: 220,
-            easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-          },
-        },
+        freezeOnBlur: false,
+        animation: 'fade',
       }}>
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Map" component={MapScreen} />
+      <Tab.Screen
+        name="Story & Guides"
+        component={StoryGuidesScreen}
+        options={{ lazy: false }}
+      />
       <Tab.Screen name="Explore" component={ExploreScreen} />
-      <Tab.Screen name="Saved" component={SavedScreen} />
+      <Tab.Screen name="Community" component={SavedScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 };
 
 const styles = StyleSheet.create({
+  sceneLight: {
+    backgroundColor: '#FAF7F2',
+  },
+  sceneDark: {
+    backgroundColor: '#0F071D',
+  },
   tabBarContainer: {
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
@@ -292,28 +349,10 @@ const styles = StyleSheet.create({
   },
 
   /* Compact Active / Inactive icon containers */
-  activeIconSquircle: {
+  iconSquircleBase: {
     width: s(34),
     height: s(32),
     borderRadius: s(11),
-    backgroundColor: '#8233FE',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#8233FE',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
-  inactiveIconWrap: {
-    width: s(34),
-    height: s(32),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -360,14 +399,19 @@ const styles = StyleSheet.create({
 
   /* Compact Labels */
   tabLabel: {
-    fontSize: s(10),
+    fontSize: s(9.5),
     fontFamily: theme.typography.fontFamily.medium,
     color: '#8E8E93',
     marginTop: s(2),
+    textAlign: 'center',
   },
-  activeTabLabel: {
-    color: '#8233FE',
+  activeTabLabelFont: {
     fontFamily: theme.typography.fontFamily.bold,
+  },
+  activeTabIndicatorPill: {
+    height: s(2.5),
+    borderRadius: s(1.5),
+    marginTop: s(2),
   },
   exploreLabel: {
     fontFamily: theme.typography.fontFamily.bold,

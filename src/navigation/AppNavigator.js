@@ -39,6 +39,7 @@ import { SavedScreen } from '../screens/Saved';
 import { InAppBrowserScreen } from '../screens/Web/InAppBrowserScreen';
 import { LeaderboardScreen } from '../screens/Leaderboard/LeaderboardScreen';
 import { PublicPetProfileScreen } from '../screens/Leaderboard/PublicPetProfileScreen';
+import { FollowingScreen } from '../screens/Profile/FollowingScreen';
 import { NotificationsScreen } from '../screens/Notifications';
 import { CommunityDetailScreen, PostDetailScreen, NewPostScreen } from '../screens/Community';
 
@@ -374,6 +375,15 @@ export const AppNavigator = () => {
       <Stack.Screen
         name="LeaderboardScreen"
         component={LeaderboardScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="FollowingScreen"
+        component={FollowingScreen}
         options={{
           animation: 'ios_from_right',
           gestureEnabled: true,

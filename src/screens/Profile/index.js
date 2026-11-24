@@ -314,19 +314,8 @@ export const ProfileScreen = ({ navigation, route }) => {
   }, [runSignOut]);
 
   const handleOpenFollowing = useCallback(() => {
-    setConfirmModalConfig({
-      visible: true,
-      title: 'Pack Following 🐾',
-      subtitle:
-        'You are following verified pet parents, pack explorers, and trainers across India. Stay tuned for their latest road trips, pet cafe reviews, and trail tips!',
-      badge: 'COMMUNITY PACK',
-      type: 'info',
-      confirmText: 'Explore Pack',
-      cancelText: 'Close',
-      singleButton: false,
-      onConfirm: () => handleSelectTab('community_posts'),
-    });
-  }, [handleSelectTab]);
+    navigation?.navigate?.('FollowingScreen');
+  }, [navigation]);
 
   const handleOpenSavedPlaces = useCallback(() => {
     navigation?.navigate?.('SavedPlacesScreen');

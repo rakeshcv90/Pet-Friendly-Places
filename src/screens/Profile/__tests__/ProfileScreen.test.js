@@ -80,6 +80,14 @@ describe('ProfileScreen menu', () => {
     expect(mockNavigation.setParams).not.toHaveBeenCalled();
   });
 
+  it('opens the Following screen from the Following row', () => {
+    const { getByText } = render(<ProfileScreen navigation={mockNavigation} />);
+
+    fireEvent.press(getByText('Following'));
+
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('FollowingScreen');
+  });
+
   describe('Update rows', () => {
     it('has two separate rows in the main Profile menu: the store update and the OTA update', () => {
       const { getByText } = render(<ProfileScreen navigation={mockNavigation} />);

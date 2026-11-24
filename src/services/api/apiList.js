@@ -113,6 +113,9 @@ export const API_ENDPOINTS = {
   // token and answer { following, followerCount }
   PET_FOLLOWERS: petId => `/pets/${petId}/followers`,
   PET_FOLLOW: petId => `/pets/${petId}/follow`,
+  // GET { following: [{ id, petName, slug, species, breed, photo, level, followerCount, followedAt }] }:
+  // the pets the signed-in user follows (Bearer token). Unfollow is DELETE PET_FOLLOW(id).
+  ME_FOLLOWING: '/me/following',
   // GET the comments visible to the viewer; POST { body } adds one (sign-in needed)
   PET_MEDIA_COMMENTS: mediaId => `/pets/media/${mediaId}/comments`,
   // GET { likeCount, viewerLiked }; POST toggles the viewer's like and answers the new state

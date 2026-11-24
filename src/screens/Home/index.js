@@ -32,10 +32,20 @@ import {
   StoryOverlay,
   styles,
   UrbaniaBanner,
+  PopularDestinations,
+  NatureAccess,
 } from './components';
+import { NATURE_SEARCH_PARAMS } from './components/NatureAccess';
+import { prefetchGallery } from './components/UrbaniaSections';
 import { LoaderCard } from '../../components/common/Loader';
+import { storyCoverUrl } from './storyCover';
 
 export const HomeScreen = ({ navigation }) => {
+  // Start loading the Urbania photos now, so the booking screen opens with them ready
+  useEffect(() => {
+    prefetchGallery();
+  }, []);
+
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -134,7 +144,7 @@ export const HomeScreen = ({ navigation }) => {
       slug: item.slug,
       title: item.title,
       excerpt: item.excerpt,
-      imageUri: resolveImageUrl(item.cover_image_url),
+      imageUri: resolveImageUrl(storyCoverUrl(item)),
       pillText: item.destination
         ? `${(item.story_type || 'Travel Story').toUpperCase()} • ${item.destination.toUpperCase()}`
         : (item.story_type || 'Travel Story').toUpperCase(),
@@ -195,12 +205,7 @@ export const HomeScreen = ({ navigation }) => {
     avatarRotate,
     searchBarScale,
     searchIconRotate,
-    heroScale,
-    heroRotateX,
-    heroImageParallax,
-    heroSheenX,
-    heroPillScale,
-    heroBtnScale,
+
     categoryScale,
     categoryRotateX,
     catRow2Scale,
@@ -433,89 +438,9 @@ export const HomeScreen = ({ navigation }) => {
         />
 
         <UrbaniaBanner onBookNow={() => navigation.navigate('UrbaniaBookingScreen')} />
-{/* 
-        <Animated.View
-          style={[
-            styles.heroCard,
-            {
-              transform: [{ perspective: 1000 }, { scale: heroScale }, { rotateX: heroRotateX }],
-            },
-          ]}>
-          <Animated.View
-            style={[
-              StyleSheet.absoluteFillObject,
-              { transform: [{ translateY: heroImageParallax }, { scale: 1.12 }] },
-            ]}>
-            <FastImage
-              source={theme.images.home}
-              style={{ width: '100%', height: '100%' }}
-              resizeMode={FastImage.resizeMode.cover}
-            />
-          </Animated.View>
+        
 
-          <LinearGradient
-            colors={['rgba(25, 10, 45, 0.88)', 'rgba(25, 10, 45, 0.65)', 'transparent']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0.85, y: 0 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-
-          
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.glassSheenOverlay,
-              {
-                transform: [{ translateX: heroSheenX }, { rotate: '25deg' }],
-              },
-            ]}>
-            <LinearGradient
-              colors={[
-                'rgba(255, 255, 255, 0)',
-                'rgba(255, 255, 255, 0.22)',
-                'rgba(255, 255, 255, 0)',
-              ]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-          </Animated.View>
-
-          <View style={styles.heroContent}>
-            <View style={styles.heroTopGroup}>
-              <Animated.View
-                style={[styles.alignSelfStart, { transform: [{ scale: heroPillScale }] }]}>
-                <View style={styles.heroPillBadge}>
-                  <Ionicons name="home-sharp" size={ms(10)} color="#FFFFFF" />
-                  <Text style={styles.heroPillText}>MADE FOR PET PARENTS</Text>
-                </View>
-              </Animated.View>
-
-              <Text style={styles.heroTitle}>Traveling is better{'\n'}with your pet.</Text>
-              <Text style={styles.heroSubtitle}>
-                Verified stays, cafes and trails—without the guesswork.
-              </Text>
-            </View>
-
-            <Animated.View
-              style={[styles.alignSelfStart, { transform: [{ scale: heroBtnScale }] }]}>
-              <BouncyPressable
-                style={styles.heroCtaBtn}
-                activeScale={0.92}
-                onPress={() => navigation.navigate('Explore')}>
-                <Text style={styles.heroCtaText}>Explore nearby</Text>
-                <Feather
-                  name="arrow-right"
-                  size={ms(16)}
-                  color="#3B108F"
-                  style={styles.btnArrowMargin}
-                />
-              </BouncyPressable>
-            </Animated.View>
-          </View>
-        </Animated.View> */}
-
-        {/* Loading Indicator when initial home data is in-flight */}
+  
         {isHomeLoading && !homeData && (
           <View style={{ paddingVertical: s(40), alignItems: 'center', justifyContent: 'center' }}>
             <LoaderCard label="Finding pet-friendly places..." isDarkMode={isDarkMode} />
@@ -687,7 +612,8 @@ export const HomeScreen = ({ navigation }) => {
                       activeScale={0.97}
                       onPress={() =>
                         navigation.navigate('TravelStoryScreen', { initialStoryId: item.id })
-                      }>
+                      }
+                      >
                       <StoryCoverImage uri={item.imageUri} />
                       <StoryOverlay />
 
@@ -745,8 +671,7 @@ export const HomeScreen = ({ navigation }) => {
                       tailsVerified: true,
                       category: 'Tails Verified',
                     })
-                  }
-                  >
+                  }>
                   <Feather
                     name="arrow-right"
                     size={ms(18)}
@@ -790,7 +715,6 @@ export const HomeScreen = ({ navigation }) => {
                     />
                   </Animated.View>
 
-                  {/* Tails Verified Badge with Gradient & Glow */}
                   <Animated.View
                     style={[styles.tailsBadgeOverlay, { transform: [{ scale: tailsBadgeScale }] }]}>
                     <LinearGradient
@@ -803,7 +727,6 @@ export const HomeScreen = ({ navigation }) => {
                     <Text style={styles.tailsBadgeText}>Tails Verified</Text>
                   </Animated.View>
 
-                  {/* Favorite Button with Heart Burst Pop */}
                   <Animated.View
                     style={[
                       styles.favoriteBtn,
@@ -892,10 +815,9 @@ export const HomeScreen = ({ navigation }) => {
           </>
         ) : null}
 
-        {/* ── 7. Recently verified near you ── */}
+
         {recentListing ? (
           <>
-
             <Animated.View style={{ opacity: recentHeaderOpacity }}>
               <View style={styles.sectionHeaderRow}>
                 <View>
@@ -903,7 +825,7 @@ export const HomeScreen = ({ navigation }) => {
                     FRESHLY CHECKED AROUND DELHI NCR
                   </Text>
                   <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
-                    Recently verified 
+                    Recently verified
                   </Text>
                 </View>
                 <BouncyPressable
@@ -1036,7 +958,7 @@ export const HomeScreen = ({ navigation }) => {
           </>
         ) : null}
 
-        {/* ── 8. Help a pet find their way (Reunite & Rehome) ── */}
+
         <Animated.View
           style={[
             styles.rehomeCardWrapper,
@@ -1257,7 +1179,21 @@ export const HomeScreen = ({ navigation }) => {
           </>
         ) : null}
 
-        {/* ── 10. Quick Actions: Add place + Transport with Dogs ── */}
+       
+        <PopularDestinations
+          cities={homeData?.top_cities}
+          isDarkMode={isDarkMode}
+          onOpenCity={item =>
+            navigation.navigate('CityDetail', { city: item.city, state: item.state })
+          }
+        />
+
+        
+        <NatureAccess
+          isDarkMode={isDarkMode}
+          onExplore={() => navigation.navigate('SearchScreen', NATURE_SEARCH_PARAMS)}
+        />
+
         <Animated.View
           style={{
             opacity: quickHeaderAnim,
@@ -1373,3 +1309,4 @@ export { RoadTripRoutesScreen } from './RoadTripRoutesScreen';
 export { RoadTripDetailScreen } from './RoadTripDetailScreen';
 export { RoadTripStopDetailScreen } from './RoadTripStopDetailScreen';
 export { UrbaniaBookingScreen } from './UrbaniaBookingScreen';
+export { UrbaniaBookingsScreen } from './UrbaniaBookingsScreen';

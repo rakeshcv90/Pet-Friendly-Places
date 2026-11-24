@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, StatusBar, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, StatusBar, Alert, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -10,19 +10,33 @@ import { useStore } from '../../store';
 import { Enter } from '../Community/Motion';
 import { PetHero, DEEP_PURPLE } from './components/PetHero';
 import { petName } from './petUtils';
+import { groupHealthRecords, healthRecordMeta } from './petProfileModel';
+import { useHealthManager } from './useHealthManager';
+import { fileIdOf } from './healthModel';
+import {
+  HealthHistoryCard,
+  AddVaccinationCard,
+  HealthFilesCard,
+  ArchivedRecordsCard,
+} from './components/HealthSections';
 import { HealthBook } from './components/HealthBook';
 import { ActionTile } from './components/ActionTile';
 import {
   HealthPhotoCard,
+  HealthReminderCard,
   HealthRecordForm,
   PrimaryButton,
   OutlineButton,
 } from './components/HealthRecordAdd';
 import { SuccessToast } from '../../components/common/SuccessToast';
+import { ModernConfirmModal } from '../Profile/components/ModernConfirmModal';
 import { requestCamera, openPhoneSettings } from '../../services/permissions/permissions';
 import {
   useHealthRecords,
   useCreateHealthRecord,
+  useDeleteHealthRecordFile,
+  useHealthSettings,
+  useUpdateHealthSettings,
   documentTypeLabel,
   toIsoDate,
 } from '../../hooks/usePetHealth';
@@ -45,7 +59,6 @@ const comingSoon = feature =>
     'This will be available in the app soon. You can use it on the website for now.',
   );
 
-// A pet's private health records (opened from the My Pets card)
 export const PetHealthRecordsScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const isDarkMode = useStore(state => state.isDarkMode) || false;
@@ -54,15 +67,47 @@ export const PetHealthRecordsScreen = ({ navigation, route }) => {
 
   const { data: records = [] } = useHealthRecords(pet.id);
   const createRecord = useCreateHealthRecord(pet.id);
+  const deleteFile = useDeleteHealthRecordFile(pet.id);
+  const healthSettings = useHealthSettings(pet.id);
+  const updateSettings = useUpdateHealthSettings(pet.id);
+  const [reminderError, setReminderError] = useState('');
 
-  // Three views, like the website: the records book first; "Add photos" opens the add area with
-  // the photo card; "Add record" (or a picked photo) adds the form; "Open health records book"
-  // goes back to the book
-  const [view, setView] = useState('book'); // 'book' | 'add' | 'form'
+  
+  const [view, setView] = useState(route?.params?.initialView === 'form' ? 'form' : 'book'); // 'book' | 'add' | 'form' | 'edit'
   const [photos, setPhotos] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
+  const [savingPhotos, setSavingPhotos] = useState(false);
+  const manager = useHealthManager({ pet, records, setToast, setView });
+  const toggleReminders = useCallback(async () => {
+    try {
+      await updateSettings.mutateAsync({
+        notifyHealthRemindersEmail: !healthSettings.emailReminders,
+      });
+    } catch (e) {
+      setReminderError(e?.response?.data?.error || e?.message || 'Please try again.');
+    }
+  }, [updateSettings, healthSettings.emailReminders]);
+
+  // Asks first (in the app's own popup), then removes the one photo from its record
+  const [pageToRemove, setPageToRemove] = useState(null);
+  const [removeError, setRemoveError] = useState('');
+
+  const handleRemovePage = useCallback(page => setPageToRemove(page), []);
+
+  const confirmRemovePage = useCallback(async () => {
+    const page = pageToRemove;
+    if (!page) {
+      return;
+    }
+    try {
+      await deleteFile.mutateAsync({ recordId: page.recordId, fileId: page.fileId });
+      setToast('Page removed');
+    } catch (e) {
+      setRemoveError(e?.response?.data?.error || e?.message || 'Please try again.');
+    }
+  }, [pageToRemove, deleteFile]);
 
   const openBook = useCallback(() => setView('book'), []);
   const openAdd = useCallback(() => setView(current => (current === 'book' ? 'add' : current)), []);
@@ -74,7 +119,8 @@ export const PetHealthRecordsScreen = ({ navigation, route }) => {
       return;
     }
     setPhotos(current => [...current, ...picked].slice(0, MAX_PHOTOS));
-    setView('form');
+   
+    setView(current => (current === 'book' ? 'add' : current));
   }, []);
 
   const handlePhotoResult = useCallback(
@@ -152,6 +198,34 @@ export const PetHealthRecordsScreen = ({ navigation, route }) => {
     }
   }, [form, photos, createRecord]);
 
+  const handleSavePhotos = useCallback(async () => {
+    if (photos.length === 0 || savingPhotos) {
+      return;
+    }
+    setSavingPhotos(true);
+    try {
+      const { failedPhotos } = await createRecord.mutateAsync({
+        form: { documentType: 'vaccination' },
+        photos,
+      });
+      const saved = photos.length - failedPhotos;
+      setPhotos([]);
+      setView('book');
+      setToast(
+        failedPhotos > 0
+          ? `${saved} photo${saved === 1 ? '' : 's'} saved, ${failedPhotos} could not be uploaded.`
+          : `${saved} photo${saved === 1 ? '' : 's'} saved`,
+      );
+    } catch (e) {
+      Alert.alert(
+        'Could not save photos',
+        e?.response?.data?.error || e?.message || 'Please try again.',
+      );
+    } finally {
+      setSavingPhotos(false);
+    }
+  }, [photos, savingPhotos, createRecord]);
+
   const actions = [
     {
       id: 'download',
@@ -209,7 +283,13 @@ export const PetHealthRecordsScreen = ({ navigation, route }) => {
             </View>
 
             <Enter index={1}>
-              <HealthBook records={records} isDarkMode={isDarkMode} onAddPhotos={openAdd} />
+              <HealthBook
+                records={records}
+                petId={pet.id}
+                isDarkMode={isDarkMode}
+                onAddPhotos={openAdd}
+                onRemovePage={handleRemovePage}
+              />
             </Enter>
           </>
         ) : (
@@ -222,6 +302,27 @@ export const PetHealthRecordsScreen = ({ navigation, route }) => {
                   profile.
                 </Text>
               </View>
+            </Enter>
+
+            <Enter index={2}>
+              {manager.groups.length > 0 ? (
+                <HealthHistoryCard
+                  groups={manager.groups}
+                  onConfirmDue={manager.confirmDueDate}
+                  onFindVet={manager.findVets}
+                  onPickVet={manager.pickVet}
+                  busy={manager.historyBusy}
+                  isDarkMode={isDarkMode}
+                />
+              ) : null}
+              <AddVaccinationCard
+                form={manager.vaccination}
+                onChange={manager.changeVaccination}
+                onSave={manager.saveVaccination}
+                saving={manager.vaccinationSaving}
+                error={manager.vaccinationError}
+                isDarkMode={isDarkMode}
+              />
             </Enter>
 
             <Enter index={2}>
@@ -245,6 +346,12 @@ export const PetHealthRecordsScreen = ({ navigation, route }) => {
                     onPress={openForm}
                     isDarkMode={isDarkMode}
                   />
+                  <OutlineButton
+                    testID="health-archived-toggle"
+                    label={manager.showArchived ? 'Hide archived' : 'Archived records'}
+                    onPress={manager.toggleArchived}
+                    isDarkMode={isDarkMode}
+                  />
                 </View>
 
                 {records.length === 0 ? (
@@ -255,42 +362,95 @@ export const PetHealthRecordsScreen = ({ navigation, route }) => {
                   </Text>
                 ) : (
                   <View style={styles.recordList}>
-                    {records.map((record, index) => (
-                      <View
-                        key={record.id ?? index}
-                        style={[styles.recordRow, isDarkMode && styles.recordRowDark]}>
-                        <View
-                          style={[
-                            styles.emptyIcon,
-                            styles.recordIcon,
-                            isDarkMode && styles.emptyIconDark,
-                          ]}>
-                          <Ionicons name="document-text-outline" size={ms(18)} color="#7C3AED" />
-                        </View>
-                        <View style={styles.recordText}>
-                          <Text
-                            style={[styles.recordName, isDarkMode && styles.textWhite]}
-                            numberOfLines={1}>
-                            {record.recordName ||
-                              record.name ||
-                              documentTypeLabel(record.documentType)}
-                          </Text>
-                          <Text
-                            style={[styles.recordMeta, isDarkMode && styles.mutedDark]}
-                            numberOfLines={1}>
-                            {[
-                              documentTypeLabel(record.documentType),
-                              record.dateIssued && String(record.dateIssued).slice(0, 10),
-                            ]
-                              .filter(Boolean)
-                              .join(' · ')}
-                          </Text>
+                    {groupHealthRecords(records).map(group => (
+                      <View key={group.type} testID={`health-group-${group.type}`}>
+                        <Text style={[styles.groupLabel, isDarkMode && styles.groupLabelDark]}>
+                          {documentTypeLabel(group.type).toUpperCase()}
+                        </Text>
+                        <View style={styles.groupRows}>
+                          {group.entries.map(({ record, index }) => (
+                            <Pressable
+                              key={record.id ?? index}
+                              testID={`health-record-${index}`}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected: manager.selected?.id === record.id }}
+                              onPress={() => manager.select(record.id)}
+                              style={[
+                                styles.recordRow,
+                                isDarkMode && styles.recordRowDark,
+                                manager.selected?.id === record.id && styles.recordRowOn,
+                              ]}>
+                              <View
+                                style={[
+                                  styles.emptyIcon,
+                                  styles.recordIcon,
+                                  isDarkMode && styles.emptyIconDark,
+                                ]}>
+                                <Ionicons
+                                  name="document-text-outline"
+                                  size={ms(18)}
+                                  color="#7C3AED"
+                                />
+                              </View>
+                              <View style={styles.recordText}>
+                                <Text
+                                  style={[styles.recordName, isDarkMode && styles.textWhite]}
+                                  numberOfLines={1}>
+                                  {record.recordName ||
+                                    record.name ||
+                                    documentTypeLabel(record.documentType)}
+                                </Text>
+                                <Text
+                                  testID={`health-record-meta-${index}`}
+                                  style={[styles.recordMeta, isDarkMode && styles.mutedDark]}>
+                                  {healthRecordMeta(record)}
+                                </Text>
+                              </View>
+                            </Pressable>
+                          ))}
                         </View>
                       </View>
                     ))}
                   </View>
                 )}
               </View>
+            </Enter>
+
+            <Enter index={3}>
+              <HealthFilesCard
+                record={manager.selected}
+                busy={manager.busy}
+                onChooseFiles={manager.chooseFiles}
+                onReplace={manager.replacePage}
+                onRemove={file =>
+                  handleRemovePage({ recordId: manager.selected.id, fileId: fileIdOf(file) })
+                }
+                onRemoveAll={manager.removeAllPages}
+                onExtract={manager.extractOne}
+                onExtractAll={manager.extractEverything}
+                onApprove={manager.approveDetails}
+                onEdit={manager.startEdit}
+                onArchive={manager.archive}
+                isDarkMode={isDarkMode}
+              />
+              {manager.showArchived ? (
+                <ArchivedRecordsCard
+                  records={manager.archivedRecords}
+                  loading={manager.archivedLoading}
+                  onRestore={manager.restore}
+                  busy={manager.busy}
+                  isDarkMode={isDarkMode}
+                />
+              ) : null}
+            </Enter>
+
+            <Enter index={3}>
+              <HealthReminderCard
+                checked={healthSettings.emailReminders}
+                onToggle={toggleReminders}
+                disabled={healthSettings.isLoading || updateSettings.isPending}
+                isDarkMode={isDarkMode}
+              />
             </Enter>
 
             <HealthPhotoCard
@@ -300,6 +460,8 @@ export const PetHealthRecordsScreen = ({ navigation, route }) => {
               onChoosePhotos={handleChoosePhotos}
               onRemovePhoto={index => setPhotos(current => current.filter((_, i) => i !== index))}
               onEnterByHand={openForm}
+              onSavePhotos={handleSavePhotos}
+              savingPhotos={savingPhotos}
               isDarkMode={isDarkMode}
             />
             {view === 'form' ? (
@@ -312,9 +474,81 @@ export const PetHealthRecordsScreen = ({ navigation, route }) => {
                 isDarkMode={isDarkMode}
               />
             ) : null}
+            {view === 'edit' && manager.editForm ? (
+              <>
+                <HealthRecordForm
+                  title="Edit record details"
+                  saveLabel="Save changes"
+                  form={manager.editForm}
+                  onChange={manager.changeEdit}
+                  onSave={manager.saveEdit}
+                  saving={manager.editSaving}
+                  error={manager.editError}
+                  isDarkMode={isDarkMode}
+                />
+                <View style={styles.cancelEdit}>
+                  <OutlineButton
+                    testID="health-edit-cancel"
+                    label="Cancel"
+                    onPress={manager.cancelEdit}
+                    isDarkMode={isDarkMode}
+                  />
+                </View>
+              </>
+            ) : null}
           </>
         )}
       </ScrollView>
+
+      <ModernConfirmModal
+        visible={!!manager.dialog}
+        type={manager.dialog?.kind === 'error' ? 'error' : 'danger'}
+        singleButton={manager.dialog?.kind === 'error'}
+        badge={manager.dialog?.kind === 'error' ? 'SOMETHING WENT WRONG' : manager.dialog?.badge}
+        title={manager.dialog?.title}
+        subtitle={manager.dialog?.subtitle}
+        confirmText={manager.dialog?.kind === 'error' ? 'OK' : manager.dialog?.confirmText}
+        cancelText={manager.dialog?.cancelText}
+        isDarkMode={isDarkMode}
+        onClose={manager.closeDialog}
+        onConfirm={manager.dialog?.onConfirm}
+      />
+
+      <ModernConfirmModal
+        visible={!!pageToRemove}
+        type="danger"
+        badge="REMOVE PAGE"
+        title="Remove this page?"
+        subtitle="The photo will be deleted from this health record. This can't be undone."
+        confirmText="Remove"
+        cancelText="Keep it"
+        isDarkMode={isDarkMode}
+        onClose={() => setPageToRemove(null)}
+        onConfirm={confirmRemovePage}
+      />
+      <ModernConfirmModal
+        visible={!!removeError}
+        type="error"
+        singleButton
+        badge="SOMETHING WENT WRONG"
+        title="Could not remove page"
+        subtitle={removeError}
+        confirmText="OK"
+        isDarkMode={isDarkMode}
+        onClose={() => setRemoveError('')}
+      />
+
+      <ModernConfirmModal
+        visible={!!reminderError}
+        type="error"
+        singleButton
+        badge="SOMETHING WENT WRONG"
+        title="Could not update reminders"
+        subtitle={reminderError}
+        confirmText="OK"
+        isDarkMode={isDarkMode}
+        onClose={() => setReminderError('')}
+      />
 
       <SuccessToast message={toast} onHide={() => setToast('')} />
     </View>
@@ -422,7 +656,17 @@ const styles = StyleSheet.create({
   },
   recordsButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: s(10), marginTop: vs(14) },
   recordsEmpty: { textAlign: 'left', marginTop: vs(16) },
-  recordList: { marginTop: vs(14), gap: s(10) },
+  recordList: { marginTop: vs(14), gap: vs(14) },
+  groupLabel: {
+    marginBottom: vs(8),
+    fontSize: s(12),
+    letterSpacing: 0.8,
+    color: '#7B2CFF',
+    fontFamily: theme.typography.fontFamily.extraBold,
+  },
+  groupLabelDark: { color: '#C4B5FD' },
+  groupRows: { gap: s(10) },
+  cancelEdit: { alignItems: 'center', marginTop: vs(10), marginBottom: vs(10) },
   recordRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -431,12 +675,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F5FF',
   },
   recordRowDark: { backgroundColor: 'rgba(255,255,255,0.06)' },
+  recordRowOn: { borderWidth: 1.5, borderColor: '#A78BFA' },
   recordIcon: { width: s(40), height: s(40), borderRadius: s(14) },
   recordText: { flex: 1, marginLeft: s(12) },
   recordName: { fontSize: s(14), color: '#1E1B4B', fontFamily: theme.typography.fontFamily.bold },
   recordMeta: {
     marginTop: 2,
     fontSize: s(11.5),
+    lineHeight: s(16),
     color: '#6B5C85',
     fontFamily: theme.typography.fontFamily.medium,
   },

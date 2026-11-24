@@ -2,7 +2,6 @@ import React from 'react';
 import { Linking } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import { LeaderboardScreen, rankFor } from '../LeaderboardScreen';
-import { WEB_BASE_URL } from '../../../services/api/apiList';
 
 const mockNavigation = { navigate: jest.fn(), goBack: jest.fn() };
 const mockLeaderboard = jest.fn();
@@ -72,15 +71,14 @@ describe('LeaderboardScreen', () => {
     expect(getByText('🥉')).toBeTruthy();
   });
 
-  it("opens a pet's traveller page inside the app without the website chrome", () => {
+  it("opens a pet's profile screen inside the app instead of the website", () => {
     const { getAllByText } = renderScreen();
 
     fireEvent.press(getAllByText('Rustie')[0]);
 
-    expect(mockNavigation.navigate).toHaveBeenCalledWith('InAppBrowserScreen', {
-      url: `${WEB_BASE_URL}/traveller/rustie-sikarwar`,
-      title: 'Rustie',
-      hideSelectors: expect.arrayContaining(['header', '.pfp-chat-wrapper']),
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('PublicPetProfileScreen', {
+      slug: 'rustie-sikarwar',
+      entry: ENTRIES[3],
     });
   });
 

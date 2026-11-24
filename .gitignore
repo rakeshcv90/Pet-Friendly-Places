@@ -80,3 +80,6 @@ yarn-error.log
 .env.development
 .env.test
 .env.production
+
+# Google Places key (see src/config/googleKeys.example.js)
+src/config/googleKeys.js

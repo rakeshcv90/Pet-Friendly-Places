@@ -24,7 +24,10 @@ import { useStore } from '../../store';
 import { theme, images } from '../../theme';
 import FastImage from '../../components/common/FastImage';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
+import { Bob } from '../Community/Motion';
 import { useTravelStory, resolveImageUrl } from '../../hooks/useDiscovery';
+
+import { storyCoverUrl } from './storyCover';
 
 const PURPLE = '#7B2CFF';
 const DEEP = '#3B108F';
@@ -42,11 +45,46 @@ const decode = text =>
     .replace(/&gt;/g, '>')
     .trim();
 
-// The story body is HTML. Turn it into headings and paragraphs, in order.
-const toBlocks = html => {
+const attrOf = (tag, name) => {
+  const match = new RegExp(`${name}="([^"]*)"`, 'i').exec(tag);
+  return match ? match[1] : '';
+};
+
+// An <iframe> in the story: a YouTube video or an Instagram post. They cannot play inside the
+// app, so each becomes a card that opens the original.
+const embedOf = tag => {
+  const src = attrOf(tag, 'src');
+  const title = decode(attrOf(tag, 'title'));
+  const youtube = /youtube(?:-nocookie)?\.com\/embed\/([\w-]+)/i.exec(src);
+  if (youtube) {
+    return {
+      type: 'embed',
+      provider: 'youtube',
+      id: youtube[1],
+      url: `https://www.youtube.com/watch?v=${youtube[1]}`,
+      title,
+    };
+  }
+  const instagram = /instagram\.com\/(p|reel|tv)\/([\w-]+)/i.exec(src);
+  if (instagram) {
+    return {
+      type: 'embed',
+      provider: 'instagram',
+      id: instagram[2],
+      url: `https://www.instagram.com/${instagram[1]}/${instagram[2]}/`,
+      title,
+    };
+  }
+  return src ? { type: 'embed', provider: 'link', id: src, url: src, title } : null;
+};
+
+// The story body is HTML. Turn it into headings, paragraphs, callout boxes and embedded videos or
+// posts, in the order they appear.
+export const toBlocks = html => {
   const source = String(html || '');
   const blocks = [];
-  const re = /<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>|<p[^>]*>([\s\S]*?)<\/p>/gi;
+  const re =
+    /<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>|<p[^>]*>([\s\S]*?)<\/p>|<div[^>]*brush-callout([^>]*)>([\s\S]*?)<\/div>\s*<\/div>|(<iframe[^>]*>)/gi;
   let match = re.exec(source);
   while (match) {
     if (match[1] !== undefined) {
@@ -54,10 +92,28 @@ const toBlocks = html => {
       if (text) {
         blocks.push({ type: 'heading', text });
       }
-    } else {
+    } else if (match[2] !== undefined) {
       const text = decode(match[2]);
       if (text) {
         blocks.push({ type: 'paragraph', text });
+      }
+    } else if (match[4] !== undefined) {
+      const inner = match[4];
+      const title = /brush-title[^>]*>([\s\S]*?)<\/div>/i.exec(inner);
+      const text = /brush-body[^>]*>([\s\S]*)$/i.exec(inner);
+      const callout = {
+        type: 'callout',
+        tone: (/brush-callout\s+(\w+)/i.exec(match[0]) || [])[1] || 'purple',
+        title: title ? decode(title[1]) : '',
+        text: text ? decode(text[1]) : decode(inner),
+      };
+      if (callout.title || callout.text) {
+        blocks.push(callout);
+      }
+    } else if (match[5] !== undefined) {
+      const embed = embedOf(match[5]);
+      if (embed) {
+        blocks.push(embed);
       }
     }
     match = re.exec(source);
@@ -71,7 +127,49 @@ const toBlocks = html => {
   return blocks;
 };
 
+// The text of a list item. A story may send plain strings or small objects ({ label } or { text }),
+// and an object must never be printed as "[object Object]".
+export const textOf = item => {
+  if (item === null || item === undefined) {
+    return '';
+  }
+  if (typeof item === 'object') {
+    return String(item.label || item.text || item.title || item.name || '');
+  }
+  return String(item);
+};
+
 const asArray = value => (Array.isArray(value) ? value : []);
+
+// A tip, whichever names the story used: newer ones send heading + text, older ones title + description
+export const tipParts = tip => {
+  if (!tip || typeof tip !== 'object') {
+    return { icon: null, heading: '', text: String(tip || '') };
+  }
+  return {
+    icon: tip.icon || null,
+    heading: tip.heading || tip.title || '',
+    text: tip.text || tip.tip || tip.description || tip.body || '',
+  };
+};
+
+// The dogs of the story for "Meet the travellers": the website uses the dog profiles, and the dog
+// cards when a story has no profiles
+export const travellersOf = story => {
+  const profiles = Array.isArray(story?.dog_profiles) ? story.dog_profiles : [];
+  const cards = Array.isArray(story?.dog_cards) ? story.dog_cards : [];
+  return (profiles.length > 0 ? profiles : cards)
+    .map(dog => ({
+      key: String(dog?.id || dog?.name || ''),
+      name: String(dog?.name || ''),
+      emoji: dog?.emoji || '🐾',
+      lead: !!dog?.isLead,
+      detail: [dog?.breed, dog?.age].filter(Boolean).join(' · '),
+      personality: String(dog?.personality || dog?.mood || ''),
+      moment: String(dog?.highlight || dog?.funny_moment || ''),
+    }))
+    .filter(dog => dog.name);
+};
 
 // Every story fills a different set of fields, so each piece is read defensively
 const dogNotesOf = stop => {
@@ -89,6 +187,23 @@ const dogNotesOf = stop => {
     }
   });
   return notes;
+};
+
+// The photos and videos of one stop, in the same shape as the gallery so they open in the same viewer
+const photosOf = stop =>
+  asArray(stop.photos)
+    .filter(photo => photo?.url)
+    .map((photo, index) => ({
+      id: photo.id || `${stop.id || 'stop'}-photo-${index}`,
+      url: photo.url,
+      kind: photo.kind === 'video' ? 'video' : 'image',
+      caption: photo.caption || '',
+    }));
+
+// A pull quote on a stop; the API sends an empty one when there is none
+const quoteOf = stop => {
+  const text = decode(stop?.quote?.text);
+  return text ? { text, source: decode(stop.quote.source) } : null;
 };
 
 // Newer stories use `timeline_stops`; older ones only have `timeline_blocks`
@@ -109,6 +224,8 @@ const stopsOf = story => {
       notes: dogNotesOf(stop),
       listingSlug: stop.linkedListingSlug || stop.listing_slug || '',
       emoji: stop.emoji,
+      photos: photosOf(stop),
+      quote: quoteOf(stop),
     }));
   }
   return asArray(story.timeline_blocks).map(block => ({
@@ -124,6 +241,8 @@ const stopsOf = story => {
     notes: dogNotesOf(block),
     listingSlug: block.listing_slug || '',
     emoji: block.emoji,
+    photos: photosOf(block),
+    quote: quoteOf(block),
   }));
 };
 
@@ -147,6 +266,35 @@ const SCORE_LABELS = {
   luxury_score: ['✨', 'Luxury Score'],
 };
 
+// "12 photos & videos", or just photos / just videos
+const galleryCountLabel = items => {
+  const videos = items.filter(item => item.kind === 'video').length;
+  const photos = items.length - videos;
+  const parts = [];
+  if (photos) {
+    parts.push(`${photos} ${photos === 1 ? 'photo' : 'photos'}`);
+  }
+  if (videos) {
+    parts.push(`${videos} ${videos === 1 ? 'video' : 'videos'}`);
+  }
+  return parts.join(' & ');
+};
+
+// Each score has its own colour on the website: green for happiness, orange for adventure and crowds,
+// purple for photos, teal for water, and so on
+export const SCORE_COLORS = {
+  dog_happiness: '#4FAF72',
+  adventure_score: '#F2A340',
+  photo_worthy: '#7B2CFF',
+  water_safety: '#4DBBA5',
+  large_dog_friendly: '#3B108F',
+  crowd_level: '#F2A340',
+  road_quality: '#6B7280',
+  puppy_friendly: '#EE2A7B',
+  luxury_score: '#D69E2E',
+};
+const SCORE_COLOR_FALLBACK = PURPLE;
+
 const humanize = key =>
   key
     .replace(/_/g, ' ')
@@ -163,6 +311,19 @@ const formatDate = value => {
   return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
+// "Apple (Golden Retriever), Captain (Indie)" -> { apple: 'Golden Retriever', captain: 'Indie' }
+export const breedsFromFacts = facts => {
+  const fact = asArray(facts).find(item => /dogs/i.test(String(item?.label || '')));
+  const breeds = {};
+  const re = /([^,()]+?)\s*\(([^)]+)\)/g;
+  let match = re.exec(String(fact?.value || ''));
+  while (match) {
+    breeds[match[1].trim().toLowerCase()] = match[2].trim();
+    match = re.exec(String(fact?.value || ''));
+  }
+  return breeds;
+};
+
 // ── Small pieces ───────────────────────────────────────────────────────────
 
 const SectionTitle = ({ icon, children, isDarkMode }) => (
@@ -177,8 +338,9 @@ const Card = ({ children, style, isDarkMode }) => (
   <View style={[styles.card, isDarkMode && styles.cardDark, style]}>{children}</View>
 );
 
-const BulletList = ({ items, kind, isDarkMode }) =>
-  items.length === 0 ? null : (
+const BulletList = ({ items: rawItems, kind, isDarkMode }) => {
+  const items = rawItems.map(textOf).filter(Boolean);
+  return items.length === 0 ? null : (
     <View style={styles.bulletList}>
       {items.map((item, index) => (
         <View key={`${kind}-${index}`} style={styles.bulletRow}>
@@ -188,11 +350,252 @@ const BulletList = ({ items, kind, isDarkMode }) =>
             color={kind === 'pro' ? '#15803D' : '#DC2626'}
             style={styles.bulletIcon}
           />
-          <Text style={[styles.bulletText, isDarkMode && styles.textMuted]}>{String(item)}</Text>
+          <Text style={[styles.bulletText, isDarkMode && styles.textMuted]}>{item}</Text>
         </View>
       ))}
     </View>
   );
+};
+
+const NOTE_COLORS = {
+  amber: '#FEF3C7',
+  blue: '#DBEAFE',
+  green: '#DCFCE7',
+  purple: '#EDE9FE',
+  gray: '#F1F5F9',
+  pink: '#FCE7F3',
+};
+// The darker edge under each note, which is what makes it look raised
+export const NOTE_LIPS = {
+  amber: '#EAC25A',
+  blue: '#93BDF0',
+  green: '#7FD39A',
+  purple: '#BFAEF5',
+  gray: '#CBD5E1',
+  pink: '#F2A3C8',
+};
+const NOTE_CYCLE = ['amber', 'blue', 'green', 'purple'];
+
+// One raised note: a coloured card with a darker edge and a shadow, tilted a hair like a sticky note
+// and floating gently, each at its own pace
+const Note = ({ testID, color, lip, index, isDarkMode, children }) => (
+  <Bob distance={s(2.5)} duration={2400 + (index % 3) * 350} delay={index * 160}>
+    <View
+      testID={testID}
+      style={[
+        styles.note,
+        {
+          backgroundColor: isDarkMode ? '#27104B' : color,
+          borderBottomColor: isDarkMode ? '#4C1D95' : lip,
+          transform: [{ rotate: index % 2 === 0 ? '-0.5deg' : '0.5deg' }],
+        },
+      ]}>
+      {children}
+    </View>
+  </Bob>
+);
+
+// "The little details that stay with you": the story in short notes, the facts worth pinning and
+// the tips, laid out like the website's collage
+const LittleDetails = ({ excerpt, stops, facts, tips, isDarkMode }) => {
+  const notes = stops.filter(stop => stop.body);
+  const pinned = facts.slice(0, 4);
+  if (!excerpt && notes.length === 0 && pinned.length === 0 && tips.length === 0) {
+    return null;
+  }
+  const dark = isDarkMode;
+  return (
+    <View testID="story-details">
+      <Text style={[styles.detailsTitle, dark && styles.textLight]}>
+        The little details that stay with you
+      </Text>
+      <Text style={[styles.detailsSub, dark && styles.textMuted]}>
+        A few recorded details from this journey, kept close to the original account and the moments
+        the traveller chose to share.
+      </Text>
+
+      {excerpt ? (
+        <Note
+          testID="story-short-version"
+          color={NOTE_COLORS.pink}
+          lip={NOTE_LIPS.pink}
+          index={0}
+          isDarkMode={dark}>
+          <Text style={styles.noteLabel}>THE SHORT VERSION</Text>
+          <Text style={[styles.noteBody, dark && styles.textBody]}>{excerpt}</Text>
+        </Note>
+      ) : null}
+
+      {notes.map((stop, index) => {
+        const tone = NOTE_COLORS[stop.badgeColor] ? stop.badgeColor : NOTE_CYCLE[index % NOTE_CYCLE.length];
+        return (
+          <Note
+            key={stop.id || index}
+            testID={`story-note-${index}`}
+            color={NOTE_COLORS[tone]}
+            lip={NOTE_LIPS[tone]}
+            index={index + 1}
+            isDarkMode={dark}>
+            <Text style={styles.noteLabel}>
+              {[stop.time, stop.title].filter(Boolean).join(' · ').toUpperCase()}
+            </Text>
+            <Text style={[styles.noteBody, dark && styles.textBody]}>{stop.body}</Text>
+          </Note>
+        );
+      })}
+
+      {pinned.length > 0 ? (
+        <View style={[styles.pinCard, dark && styles.pinCardDark]} testID="story-pinned">
+          <Text style={styles.noteLabel}>PIN THIS PAGE</Text>
+          {pinned.map((fact, index) => (
+            <View
+              key={fact.id || index}
+              style={[styles.pinRow, index > 0 && styles.glanceRowBorder, index > 0 && dark && styles.glanceRowBorderDark]}>
+              <Text style={styles.pinIcon}>{fact.icon || '•'}</Text>
+              <View style={styles.factText}>
+                <Text style={styles.pinLabel}>{fact.label}</Text>
+                <Text style={[styles.pinValue, dark && styles.textLight]}>{fact.value}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {tips.length > 0 ? (
+        <View style={[styles.pinCard, dark && styles.pinCardDark]} testID="story-parent-notes">
+          <Text style={styles.noteLabel}>DOG-PARENT NOTES</Text>
+          {tips.map((tip, index) => {
+            const { heading, text } = tipParts(tip);
+            return (
+              <View
+                key={tip?.id || index}
+                style={[styles.pinRow, index > 0 && styles.glanceRowBorder, index > 0 && dark && styles.glanceRowBorderDark]}>
+                <Text style={styles.tipSpark}>✦</Text>
+                <View style={styles.factText}>
+                  {heading ? <Text style={[styles.pinValue, dark && styles.textLight]}>{heading}</Text> : null}
+                  {text ? <Text style={[styles.tipBody, dark && styles.textBody]}>{text}</Text> : null}
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+};
+
+// "Meet the travellers": each dog with its breed and age, what it is like and its moment of the trip
+const MeetTravellers = ({ travellers, isDarkMode }) => (
+  <View testID="story-travellers">
+    <SectionTitle icon="🐾" isDarkMode={isDarkMode}>
+      Meet the travellers
+    </SectionTitle>
+    {travellers.map(dog => (
+      <Card key={dog.key} isDarkMode={isDarkMode} style={styles.travellerCard}>
+        <View style={styles.travellerTop}>
+          <Text style={styles.travellerEmoji}>{dog.emoji}</Text>
+          <View style={styles.travellerHead}>
+            <View style={styles.travellerNameRow}>
+              <Text style={[styles.travellerName, isDarkMode && styles.textLight]}>{dog.name}</Text>
+              {dog.lead ? (
+                <View style={styles.leadPill} testID={`story-lead-${dog.key}`}>
+                  <Text style={styles.leadPillText}>Lead dog</Text>
+                </View>
+              ) : null}
+            </View>
+            {dog.detail ? (
+              <Text style={[styles.travellerDetail, isDarkMode && styles.textMuted]}>{dog.detail}</Text>
+            ) : null}
+          </View>
+        </View>
+        {dog.personality ? (
+          <Text style={[styles.travellerText, isDarkMode && styles.textBody]}>{dog.personality}</Text>
+        ) : null}
+        {dog.moment ? (
+          <View style={[styles.travellerMoment, isDarkMode && styles.noteBoxDark]}>
+            <Text style={[styles.travellerMomentText, isDarkMode && styles.textMuted]}>{dog.moment}</Text>
+          </View>
+        ) : null}
+      </Card>
+    ))}
+  </View>
+);
+
+const CALLOUT_TONES = {
+  coral: { bg: '#FFF1F2', border: '#FDA4AF', title: '#BE123C', bgDark: '#3A1220' },
+  amber: { bg: '#FFFBEB', border: '#FCD34D', title: '#B45309', bgDark: '#3A2A0B' },
+  teal: { bg: '#F0FDFA', border: '#5EEAD4', title: '#0F766E', bgDark: '#0B3B35' },
+  purple: { bg: '#F5F3FF', border: '#C4B5FD', title: '#6D28D9', bgDark: '#27104B' },
+};
+
+// A highlighted box inside the story, like "One waterfall to skip with dogs"
+const Callout = ({ block, isDarkMode }) => {
+  const tone = CALLOUT_TONES[block.tone] || CALLOUT_TONES.purple;
+  return (
+    <View
+      testID="story-callout"
+      style={[
+        styles.callout,
+        { backgroundColor: isDarkMode ? tone.bgDark : tone.bg, borderColor: tone.border },
+      ]}>
+      {block.title ? <Text style={[styles.calloutTitle, { color: tone.title }]}>{block.title}</Text> : null}
+      {block.text ? (
+        <Text style={[styles.calloutText, isDarkMode && styles.textBody]}>{block.text}</Text>
+      ) : null}
+    </View>
+  );
+};
+
+// A YouTube video or an Instagram post from the story. It opens in the YouTube or Instagram app.
+const EmbedCard = ({ block, isDarkMode }) => {
+  const open = () => Linking.openURL(block.url).catch(() => {});
+  if (block.provider === 'youtube') {
+    return (
+      <BouncyPressable
+        testID={`story-embed-${block.id}`}
+        accessibilityRole="button"
+        accessibilityLabel={`Watch on YouTube${block.title ? `: ${block.title}` : ''}`}
+        activeScale={0.98}
+        onPress={open}
+        style={[styles.embedVideo, isDarkMode && styles.cardDark]}>
+        <View style={styles.embedThumbWrap}>
+          <FastImage
+            source={{ uri: `https://img.youtube.com/vi/${block.id}/hqdefault.jpg` }}
+            style={styles.embedThumb}
+            resizeMode={FastImage.resizeMode.cover}
+          />
+          <View style={styles.playOverlay} pointerEvents="none">
+            <View style={styles.playCircle}>
+              <Feather name="play" size={ms(22)} color="#FFFFFF" style={styles.playIcon} />
+            </View>
+          </View>
+        </View>
+        <Text style={[styles.embedTitle, isDarkMode && styles.textLight]} numberOfLines={2}>
+          {block.title || 'Watch on YouTube'}
+        </Text>
+      </BouncyPressable>
+    );
+  }
+  const instagram = block.provider === 'instagram';
+  return (
+    <BouncyPressable
+      testID={`story-embed-${block.id}`}
+      accessibilityRole="button"
+      accessibilityLabel={instagram ? 'View on Instagram' : 'Open link'}
+      activeScale={0.98}
+      onPress={open}>
+      <LinearGradient
+        colors={instagram ? ['#F58529', '#DD2A7B', '#8134AF'] : ['#3B108F', '#7B2CFF']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.embedPost}>
+        <Feather name={instagram ? 'instagram' : 'external-link'} size={ms(22)} color="#FFFFFF" />
+        <Text style={styles.embedPostText}>{instagram ? 'View on Instagram' : 'Open link'}</Text>
+        <Feather name="arrow-up-right" size={ms(18)} color="#FFFFFF" />
+      </LinearGradient>
+    </BouncyPressable>
+  );
+};
 
 // A paused video that shows its first frame, with a play button on top, like a photo with a play mark
 const GalleryVideoThumb = ({ uri, testID }) => {
@@ -403,8 +806,8 @@ export const StoryDetailScreen = ({ navigation, route }) => {
     extrapolate: 'clamp',
   });
 
-  // Index of the gallery item open in full screen, or null
-  const [viewerIndex, setViewerIndex] = useState(null);
+  // What is open in full screen: the gallery or one stop's photos, and which one; or null
+  const [viewer, setViewer] = useState(null);
 
   const bodyBlocks = useMemo(() => toBlocks(story?.body || story?.content), [story]);
   const stops = useMemo(() => (story ? stopsOf(story) : []), [story]);
@@ -416,6 +819,11 @@ export const StoryDetailScreen = ({ navigation, route }) => {
     [story],
   );
   const dogs = useMemo(() => asArray(story?.dog_cards), [story]);
+  const travellers = useMemo(() => travellersOf(story), [story]);
+  // Breeds named in the "Dogs on this trip" fact, to go next to the names
+  const breeds = useMemo(() => breedsFromFacts(quickFacts), [quickFacts]);
+  // The dogs on the trip, by name, for stories that have no dog cards yet
+  const crew = useMemo(() => asArray(story?.dogs_involved).map(String).filter(Boolean), [story]);
   const scores = useMemo(
     () =>
       Object.entries(story?.reality_scores || {}).filter(
@@ -433,7 +841,7 @@ export const StoryDetailScreen = ({ navigation, route }) => {
       });
   }, [gallery]);
 
-  const cover = resolveImageUrl(story?.cover_image_url || story?.og_image_url);
+  const cover = resolveImageUrl(storyCoverUrl(story));
   const title = story?.title || '';
   const destination = story?.destination || story?.location || '';
   const storyType = story?.story_type || 'Travel Story';
@@ -460,7 +868,7 @@ export const StoryDetailScreen = ({ navigation, route }) => {
     ['Road stops', story?.road_stops ? String(story.road_stops) : ''],
   ].filter(([, value]) => value);
 
-  // Up to three headline numbers shown on the gradient bar under the hero
+  // Up to four headline numbers shown on the gradient bar under the hero
   const stats = [
     story?.trip_cost ? { label: 'TRIP COST', value: String(story.trip_cost).replace(/INR/i, '').trim() } : null,
     story?.km_one_way ? { label: 'DISTANCE', value: `${story.km_one_way} km` } : null,
@@ -470,7 +878,7 @@ export const StoryDetailScreen = ({ navigation, route }) => {
       : null,
   ]
     .filter(Boolean)
-    .slice(0, 3);
+    .slice(0, 4);
 
   const watchLinks = [
     story?.watch_youtube_url ? { label: 'Watch on YouTube', url: story.watch_youtube_url } : null,
@@ -730,6 +1138,13 @@ export const StoryDetailScreen = ({ navigation, route }) => {
                       <Text style={[styles.placeSub, isDarkMode && styles.textMuted]} numberOfLines={1}>
                         {[place.city, place.state].filter(Boolean).join(', ')}
                       </Text>
+                      {place.excerpt ? (
+                        <Text
+                          style={[styles.placeExcerpt, isDarkMode && styles.textMuted]}
+                          numberOfLines={3}>
+                          {place.excerpt}
+                        </Text>
+                      ) : null}
                       {place.tails_verified ? (
                         <View style={styles.verifiedPill}>
                           <Feather name="check-circle" size={ms(10)} color="#15803D" />
@@ -744,18 +1159,36 @@ export const StoryDetailScreen = ({ navigation, route }) => {
             </>
           ) : null}
 
+          {/* ── The little details ── */}
+          <LittleDetails
+            excerpt={story.excerpt}
+            stops={stops}
+            facts={quickFacts}
+            tips={tips}
+            isDarkMode={isDarkMode}
+          />
+
           {/* ── The story ── */}
           {bodyBlocks.length > 0 ? (
             <View style={styles.storyWrap}>
-              {bodyBlocks.map((block, index) =>
-                block.type === 'heading' ? (
-                  <View key={index} style={styles.storyHeadingRow}>
-                    <View style={styles.storyHeadingBar} />
-                    <Text style={[styles.storyHeading, isDarkMode && styles.textLight]}>
-                      {block.text}
-                    </Text>
-                  </View>
-                ) : (
+              {bodyBlocks.map((block, index) => {
+                if (block.type === 'heading') {
+                  return (
+                    <View key={index} style={styles.storyHeadingRow}>
+                      <View style={styles.storyHeadingBar} />
+                      <Text style={[styles.storyHeading, isDarkMode && styles.textLight]}>
+                        {block.text}
+                      </Text>
+                    </View>
+                  );
+                }
+                if (block.type === 'callout') {
+                  return <Callout key={index} block={block} isDarkMode={isDarkMode} />;
+                }
+                if (block.type === 'embed') {
+                  return <EmbedCard key={index} block={block} isDarkMode={isDarkMode} />;
+                }
+                return (
                   <Text
                     key={index}
                     style={[
@@ -765,8 +1198,8 @@ export const StoryDetailScreen = ({ navigation, route }) => {
                     ]}>
                     {block.text}
                   </Text>
-                ),
-              )}
+                );
+              })}
             </View>
           ) : null}
 
@@ -776,6 +1209,25 @@ export const StoryDetailScreen = ({ navigation, route }) => {
               <SectionTitle icon="🗺" isDarkMode={isDarkMode}>
                 Journey Timeline
               </SectionTitle>
+
+              {dogs.length === 0 && crew.length > 0 ? (
+                <>
+                  <View style={styles.dogChipRow} testID="story-crew">
+                    {crew.map(name => (
+                      <View key={name} style={[styles.dogChip, isDarkMode && styles.chipDark]}>
+                        <Text style={styles.dogChipEmoji}>🐕</Text>
+                        <Text style={[styles.dogChipText, isDarkMode && styles.textLight]}>
+                          {breeds[name.toLowerCase()] ? `${name} · ${breeds[name.toLowerCase()]}` : name}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                  <Text style={[styles.crewNote, isDarkMode && styles.textMuted]} testID="story-crew-note">
+                    Dog details for this story are still being verified. We will add the traveller
+                    card when the source information is confirmed.
+                  </Text>
+                </>
+              ) : null}
 
               {dogs.length > 0 ? (
                 <View style={styles.dogChipRow}>
@@ -839,14 +1291,53 @@ export const StoryDetailScreen = ({ navigation, route }) => {
                       </View>
                     ) : null}
 
+                    {stop.quote ? (
+                      <View style={styles.stopQuote} testID={`story-stop-quote-${index}`}>
+                        <Text style={[styles.stopQuoteText, isDarkMode && styles.textBody]}>
+                          “{stop.quote.text}”
+                        </Text>
+                        {stop.quote.source ? (
+                          <Text style={styles.stopQuoteSource}>{`— ${stop.quote.source}`}</Text>
+                        ) : null}
+                      </View>
+                    ) : null}
+
                     <BulletList items={stop.pros} kind="pro" isDarkMode={isDarkMode} />
                     <BulletList items={stop.cons} kind="con" isDarkMode={isDarkMode} />
 
+                    {stop.photos.length > 0 ? (
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.stopPhotos}
+                        testID={`story-stop-photos-${index}`}>
+                        {stop.photos.map((photo, photoIndex) => (
+                          <BouncyPressable
+                            key={photo.id}
+                            testID={`story-stop-photo-${photo.id}`}
+                            activeScale={0.97}
+                            onPress={() => setViewer({ items: stop.photos, index: photoIndex })}>
+                            {photo.kind === 'video' ? (
+                              <View style={styles.stopPhoto}>
+                                <GalleryVideoThumb uri={resolveImageUrl(photo.url)} />
+                              </View>
+                            ) : (
+                              <FastImage
+                                source={{ uri: resolveImageUrl(photo.url) }}
+                                style={styles.stopPhoto}
+                                resizeMode={FastImage.resizeMode.cover}
+                              />
+                            )}
+                          </BouncyPressable>
+                        ))}
+                      </ScrollView>
+                    ) : null}
+
                     {stop.tags.length > 0 ? (
                       <View style={styles.tagWrap}>
-                        {stop.tags.map(tag => (
-                          <View key={String(tag)} style={styles.smallTag}>
-                            <Text style={styles.smallTagText}>{String(tag)}</Text>
+                        {stop.tags.map(textOf).filter(Boolean).map(tag => (
+                          <View key={tag} style={styles.smallTag}>
+                            <Text style={styles.smallTagText}>{tag}</Text>
                           </View>
                         ))}
                       </View>
@@ -867,12 +1358,20 @@ export const StoryDetailScreen = ({ navigation, route }) => {
             </>
           ) : null}
 
+          {/* ── Meet the travellers ── */}
+          {travellers.length > 0 ? (
+            <MeetTravellers travellers={travellers} isDarkMode={isDarkMode} />
+          ) : null}
+
           {/* ── Photo gallery ── */}
           {gallery.length > 0 ? (
             <>
               <SectionTitle icon="📸" isDarkMode={isDarkMode}>
                 Photo Gallery
               </SectionTitle>
+              <Text style={[styles.galleryCount, isDarkMode && styles.textMuted]} testID="story-gallery-count">
+                {galleryCountLabel(gallery)}
+              </Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -887,7 +1386,7 @@ export const StoryDetailScreen = ({ navigation, route }) => {
                       style={[styles.galleryItem, isVideo ? styles.galleryItemVideo : null]}>
                       <BouncyPressable
                         activeScale={0.97}
-                        onPress={() => setViewerIndex(itemIndex)}
+                        onPress={() => setViewer({ items: gallery, index: itemIndex })}
                         testID={`gallery-item-${itemId}`}>
                         {isVideo ? (
                           <GalleryVideoThumb uri={uri} testID={`gallery-thumb-${itemId}`} />
@@ -951,20 +1450,21 @@ export const StoryDetailScreen = ({ navigation, route }) => {
                 {scores.map(([key, value]) => {
                   const [emoji, label] = SCORE_LABELS[key] || ['•', humanize(key)];
                   const pct = Math.max(0, Math.min(10, value)) * 10;
+                  const color = SCORE_COLORS[key] || SCORE_COLOR_FALLBACK;
                   return (
                     <View key={key} style={styles.scoreRow}>
                       <View style={styles.scoreTop}>
                         <Text style={[styles.scoreLabel, isDarkMode && styles.textLight]}>
                           {emoji} {label}
                         </Text>
-                        <Text style={styles.scoreValue}>{value}/10</Text>
+                        <Text style={[styles.scoreValue, { color }]} testID={`score-value-${key}`}>
+                          {value}/10
+                        </Text>
                       </View>
                       <View style={[styles.scoreTrack, isDarkMode && styles.scoreTrackDark]}>
-                        <LinearGradient
-                          colors={['#8B5CF6', PURPLE]}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 0 }}
-                          style={[styles.scoreFill, { width: `${pct}%` }]}
+                        <View
+                          testID={`score-fill-${key}`}
+                          style={[styles.scoreFill, { width: `${pct}%`, backgroundColor: color }]}
                         />
                       </View>
                     </View>
@@ -981,11 +1481,10 @@ export const StoryDetailScreen = ({ navigation, route }) => {
                 Pet Parent Tips
               </SectionTitle>
               {tips.map((tip, index) => {
-                const heading = typeof tip === 'object' ? tip.heading : null;
-                const text = typeof tip === 'object' ? tip.text || tip.tip || '' : String(tip);
+                const { icon, heading, text } = tipParts(tip);
                 return (
                   <Card key={tip?.id || index} isDarkMode={isDarkMode} style={styles.tipCard}>
-                    <Text style={styles.tipIcon}>{(typeof tip === 'object' && tip.icon) || '🐾'}</Text>
+                    <Text style={styles.tipIcon}>{icon || '🐾'}</Text>
                     <View style={styles.tipText}>
                       {heading ? (
                         <Text style={[styles.tipHeading, isDarkMode && styles.textLight]}>
@@ -1024,11 +1523,11 @@ export const StoryDetailScreen = ({ navigation, route }) => {
         </View>
       </Animated.ScrollView>
 
-      {viewerIndex !== null ? (
+      {viewer !== null ? (
         <GalleryViewer
-          items={gallery}
-          startIndex={viewerIndex}
-          onClose={() => setViewerIndex(null)}
+          items={viewer.items}
+          startIndex={viewer.index}
+          onClose={() => setViewer(null)}
           topInset={topInset}
           bottomInset={insets.bottom}
         />
@@ -1062,6 +1561,114 @@ export default StoryDetailScreen;
 const font = theme.typography.fontFamily;
 
 const styles = StyleSheet.create({
+  travellerCard: { marginBottom: s(12) },
+  travellerTop: { flexDirection: 'row', alignItems: 'center' },
+  travellerEmoji: { width: s(40), height: s(40), fontSize: s(22), textAlign: 'center', lineHeight: s(40) },
+  travellerHead: { flex: 1, marginLeft: s(8) },
+  travellerNameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: s(8) },
+  travellerName: { flexShrink: 1, fontSize: s(15), color: '#1E1B4B', fontFamily: font.extraBold },
+  leadPill: { paddingHorizontal: s(8), paddingVertical: 2, borderRadius: s(10), backgroundColor: '#EDE9FE' },
+  leadPillText: { fontSize: s(10.5), color: '#6D28D9', fontFamily: font.bold },
+  travellerDetail: { marginTop: 2, fontSize: s(12), color: '#64748B', fontFamily: font.medium },
+  travellerText: { marginTop: s(10), fontSize: s(13.5), lineHeight: s(21), color: '#334155', fontFamily: font.medium },
+  travellerMoment: { marginTop: s(10), padding: s(10), borderRadius: s(12), backgroundColor: '#F8F5FF' },
+  travellerMomentText: { fontSize: s(12.5), lineHeight: s(19), color: '#475569', fontFamily: font.medium },
+  detailsTitle: {
+    marginTop: s(20),
+    fontSize: s(21),
+    lineHeight: s(27),
+    color: '#1E1B4B',
+    fontFamily: font.extraBold,
+  },
+  detailsSub: { marginTop: s(6), marginBottom: s(12), fontSize: s(12.5), lineHeight: s(19), color: '#64748B', fontFamily: font.medium },
+  note: {
+    marginBottom: s(14),
+    padding: s(16),
+    borderRadius: s(18),
+    borderBottomWidth: 4,
+    shadowColor: '#4C1D95',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  noteLabel: { fontSize: s(10.5), letterSpacing: 1, color: '#6D28D9', fontFamily: font.extraBold },
+  noteBody: { marginTop: s(8), fontSize: s(14), lineHeight: s(22), color: '#1E293B', fontFamily: font.medium },
+  pinCard: {
+    marginBottom: s(12),
+    padding: s(16),
+    borderRadius: s(16),
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#C4B5FD',
+    backgroundColor: '#FFFFFF',
+  },
+  pinCardDark: { backgroundColor: '#1A0B30', borderColor: '#4C1D95' },
+  pinRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: s(10) },
+  pinIcon: { width: s(30), fontSize: s(18) },
+  pinLabel: { fontSize: s(10), letterSpacing: 0.8, color: '#64748B', fontFamily: font.bold },
+  pinValue: { marginTop: 2, fontSize: s(14), lineHeight: s(20), color: '#3B108F', fontFamily: font.extraBold },
+  tipSpark: { width: s(28), fontSize: s(16), color: '#1E1B4B' },
+  callout: {
+    marginVertical: s(12),
+    padding: s(14),
+    borderRadius: s(16),
+    borderWidth: 1.2,
+    borderLeftWidth: 4,
+  },
+  calloutTitle: { fontSize: s(14), fontFamily: font.extraBold },
+  calloutText: {
+    marginTop: s(6),
+    fontSize: s(13.5),
+    lineHeight: s(21),
+    color: '#334155',
+    fontFamily: font.medium,
+  },
+  embedVideo: {
+    marginVertical: s(12),
+    borderRadius: s(16),
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EDE9FE',
+  },
+  embedThumbWrap: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#1E1B4B' },
+  embedThumb: { width: '100%', height: '100%' },
+  embedTitle: {
+    padding: s(12),
+    fontSize: s(13),
+    color: '#1E1B4B',
+    fontFamily: font.bold,
+  },
+  embedPost: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: s(6),
+    paddingHorizontal: s(16),
+    paddingVertical: s(14),
+    borderRadius: s(16),
+  },
+  embedPostText: { flex: 1, marginLeft: s(12), fontSize: s(14), color: '#FFFFFF', fontFamily: font.bold },
+  placeExcerpt: { marginTop: 4, fontSize: s(12), lineHeight: s(17), color: '#64748B', fontFamily: font.medium },
+  crewNote: {
+    marginBottom: s(10),
+    fontSize: s(12),
+    lineHeight: s(18),
+    color: '#64748B',
+    fontFamily: font.medium,
+  },
+  stopQuote: {
+    marginTop: s(10),
+    paddingLeft: s(12),
+    borderLeftWidth: 3,
+    borderLeftColor: '#C4B5FD',
+  },
+  stopQuoteText: { fontSize: s(13.5), lineHeight: s(20), fontStyle: 'italic', color: '#334155', fontFamily: font.medium },
+  stopQuoteSource: { marginTop: 4, fontSize: s(12), color: '#64748B', fontFamily: font.bold },
+  stopPhotos: { gap: s(8), paddingTop: s(10) },
+  stopPhoto: { width: s(120), height: s(120), borderRadius: s(12), overflow: 'hidden', backgroundColor: '#EDE9FE' },
+  galleryCount: { marginTop: -s(4), marginBottom: s(8), fontSize: s(12), color: '#64748B', fontFamily: font.medium },
   container: { flex: 1, backgroundColor: '#FAF8FF' },
   containerDark: { backgroundColor: '#0F071D' },
   centered: { alignItems: 'center', justifyContent: 'center', padding: s(24) },

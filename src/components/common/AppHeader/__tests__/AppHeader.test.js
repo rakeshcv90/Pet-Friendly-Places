@@ -45,3 +45,49 @@ describe('AppHeader paw badge', () => {
     expect(queryByTestId('app-header-avatar')).toBeNull();
   });
 });
+
+describe('AppHeader title and tagline', () => {
+  it('shows the title and the tagline, with no greeting or location row', () => {
+    const { getByTestId, queryByText, queryByTestId } = render(<AppHeader showSearch={false} />);
+
+    expect(getByTestId('app-header-title').props.children).toBe('Pet Friendly Places');
+    expect(getByTestId('app-header-tagline')).toBeTruthy();
+    expect(getByTestId('app-header-paws')).toBeTruthy();
+    expect(queryByText(/GOOD (MORNING|AFTERNOON|EVENING|NIGHT)/)).toBeNull();
+    expect(queryByText('Change')).toBeNull();
+    expect(queryByTestId('app-header-greeting')).toBeNull();
+  });
+
+  it('writes the tagline in two colours, split after the comma', () => {
+    const { getByText } = render(<AppHeader showSearch={false} />);
+
+    expect(getByText('Explore karo,')).toBeTruthy();
+    expect(getByText(' Sath Travel Karo!')).toBeTruthy();
+  });
+
+  it('fits the tagline on one line, and animates the paw prints', () => {
+    const { getByTestId } = render(<AppHeader showSearch={false} />);
+
+    const tagline = getByTestId('app-header-tagline');
+    expect(tagline.props.numberOfLines).toBe(1);
+    expect(tagline.props.adjustsFontSizeToFit).toBe(true);
+    [0, 1, 2].forEach(index => {
+      const paw = StyleSheet.flatten(getByTestId(`app-header-paw-${index}`).props.style);
+      expect(paw.opacity).toBeDefined();
+      expect(paw.transform.some(item => item.scale !== undefined)).toBe(true);
+    });
+  });
+
+  it('takes another tagline', () => {
+    const { getByText } = render(<AppHeader showSearch={false} tagline="Go far, stay close" />);
+
+    expect(getByText('Go far,')).toBeTruthy();
+  });
+
+  it('can still show the city row when asked to', () => {
+    const { getByText, queryByTestId } = render(<AppHeader showSearch={false} showLocation />);
+
+    expect(getByText('Change')).toBeTruthy();
+    expect(queryByTestId('app-header-tagline')).toBeNull();
+  });
+});

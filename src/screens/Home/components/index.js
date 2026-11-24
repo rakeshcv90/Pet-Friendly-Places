@@ -8,4 +8,6 @@ export { AmbientBackground } from './AmbientBackground';
 export { StoryCoverImage, StoryOverlay } from './StoryCover';
 export { ReunitePostCard } from './ReunitePostCard';
 export { ReuniteSafetyModal } from './ReuniteSafetyModal';
-export { UrbaniaBanner } from './UrbaniaBanner';
+export { UrbaniaBanner, UrbaniaVanScene } from './UrbaniaBanner';
+export { PopularDestinations } from './PopularDestinations';
+export { NatureAccess } from './NatureAccess';

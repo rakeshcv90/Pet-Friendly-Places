@@ -121,10 +121,14 @@ const FloatingGlyph = ({ name, size, style, delay = 0 }) => {
   );
 };
 
-const FavouriteCard = ({ item, index, saved, onToggleSave, onPress }) => (
+const FavouriteCard = ({ item, index, saved, onToggleSave, onPress, isDarkMode }) => (
   <Reveal delay={index * 90}>
-    <BouncyPressable style={styles.placeCard} activeScale={0.97} onPress={onPress}>
-      <View style={styles.placeImage}>
+    <BouncyPressable
+      testID={`city-place-${index}`}
+      style={[styles.placeCard, isDarkMode && dark.card]}
+      activeScale={0.97}
+      onPress={onPress}>
+      <View style={[styles.placeImage, isDarkMode && dark.imageBox]}>
         {!!item.imageUri && (
           <FastImage
             source={{ uri: item.imageUri }}
@@ -148,16 +152,16 @@ const FavouriteCard = ({ item, index, saved, onToggleSave, onPress }) => (
       </View>
 
       <View style={styles.placeInfo}>
-        <Text style={styles.placeType}>{item.type}</Text>
-        <Text style={styles.placeName} numberOfLines={2}>
+        <Text style={[styles.placeType, isDarkMode && dark.accentText]}>{item.type}</Text>
+        <Text style={[styles.placeName, isDarkMode && dark.title]} numberOfLines={2}>
           {item.name}
         </Text>
         <View style={styles.placeAreaRow}>
           <Ionicons name="location-outline" size={ms(11)} color="#8E8A9F" />
-          <Text style={styles.placeArea}>{item.area}</Text>
+          <Text style={[styles.placeArea, isDarkMode && dark.muted]}>{item.area}</Text>
         </View>
         <View style={styles.placeFooter}>
-          <Text style={styles.placeNote} numberOfLines={2}>
+          <Text style={[styles.placeNote, isDarkMode && dark.note]} numberOfLines={2}>
             {item.note}
           </Text>
           <View style={styles.goBtn}>
@@ -172,6 +176,7 @@ const FavouriteCard = ({ item, index, saved, onToggleSave, onPress }) => (
 export const CityDetail = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const setCurrentLocation = useStore(state => state.setCurrentLocation);
+  const isDarkMode = useStore(state => state.isDarkMode) || false;
   const { data: knownCities } = useDiscoveryCities();
   const paramSlug = route?.params?.citySlug;
 
@@ -208,7 +213,10 @@ export const CityDetail = ({ navigation, route }) => {
   // header matches the city instead of showing one fixed picture everywhere
   const listingCoverUri = useMemo(() => {
     const withPhoto = listings
-      .map(l => ({ ...l, coverPhoto: resolveImageUrl(l.main_image_url || l.images?.[0]?.image_url) }))
+      .map(l => ({
+        ...l,
+        coverPhoto: resolveImageUrl(l.main_image_url || l.images?.[0]?.image_url),
+      }))
       .filter(l => l.coverPhoto);
     return sortListings(withPhoto)[0]?.coverPhoto || null;
   }, [listings]);
@@ -284,7 +292,7 @@ export const CityDetail = ({ navigation, route }) => {
   };
 
   const handleBrowseAll = () => {
-    console.log("XCvcxvcxvcxvcxvcxcx",city)
+    console.log('XCvcxvcxvcxvcxvcxcx', city);
     if (setCurrentLocation) {
       setCurrentLocation(city);
     }
@@ -298,7 +306,7 @@ export const CityDetail = ({ navigation, route }) => {
   const toggleSave = id => setSavedIds(prev => ({ ...prev, [id]: !prev[id] }));
 
   return (
-    <View style={styles.container}>
+    <View testID="city-container" style={[styles.container, isDarkMode && dark.container]}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       <Animated.ScrollView
@@ -364,7 +372,7 @@ export const CityDetail = ({ navigation, route }) => {
         {/* ── Local guide card ── */}
         {intro.sections.length > 0 && (
           <Reveal delay={120}>
-            <View style={styles.guideCard}>
+            <View testID="city-guide" style={[styles.guideCard, isDarkMode && dark.card]}>
               <LinearGradient
                 colors={['#7C3AED', '#C026D3']}
                 start={{ x: 0, y: 0 }}
@@ -373,9 +381,13 @@ export const CityDetail = ({ navigation, route }) => {
                 <Ionicons name="paw" size={ms(20)} color="#FFFFFF" />
               </LinearGradient>
               <View style={styles.guideText}>
-                <Text style={styles.guideOverline}>LOCAL GUIDE</Text>
-                <Text style={styles.guideTitle}>{`Plan ${city} with your pet`}</Text>
-                <Text style={styles.guideDesc} numberOfLines={5}>
+                <Text style={[styles.guideOverline, isDarkMode && dark.muted]}>LOCAL GUIDE</Text>
+                <Text
+                  style={[
+                    styles.guideTitle,
+                    isDarkMode && dark.accentText,
+                  ]}>{`Plan ${city} with your pet`}</Text>
+                <Text style={[styles.guideDesc, isDarkMode && dark.body]} numberOfLines={5}>
                   {intro.sections[0].body[0]}
                 </Text>
               </View>
@@ -386,8 +398,12 @@ export const CityDetail = ({ navigation, route }) => {
         {/* ── Categories ── */}
         <Reveal delay={200}>
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionOverline}>FIND YOUR KIND OF PLACE</Text>
-            <Text style={styles.sectionTitle}>{`Explore ${city}`}</Text>
+            <Text style={[styles.sectionOverline, isDarkMode && dark.overline]}>
+              FIND YOUR KIND OF PLACE
+            </Text>
+            <Text
+              testID="city-section-title"
+              style={[styles.sectionTitle, isDarkMode && dark.title]}>{`Explore ${city}`}</Text>
           </View>
         </Reveal>
         <ScrollView
@@ -399,31 +415,56 @@ export const CityDetail = ({ navigation, route }) => {
             return (
               <BouncyPressable
                 key={cat.key}
-                style={[styles.categoryCard, active && styles.categoryCardActive]}
+                testID={`city-category-${cat.key}`}
+                style={[
+                  styles.categoryCard,
+                  isDarkMode && !active && dark.card,
+                  active && styles.categoryCardActive,
+                ]}
                 activeScale={0.94}
                 onPress={() => selectCategory(cat.key)}>
-                <View style={[styles.categoryIcon, active && styles.categoryIconActive]}>
+                <View
+                  style={[
+                    styles.categoryIcon,
+                    isDarkMode && !active && dark.iconBox,
+                    active && styles.categoryIconActive,
+                  ]}>
                   <Ionicons name={cat.icon} size={ms(18)} color={active ? '#FFFFFF' : '#A78BFA'} />
                 </View>
                 <Text
-                  style={[styles.categoryLabel, active && styles.categoryLabelActive]}
+                  style={[
+                    styles.categoryLabel,
+                    isDarkMode && !active && dark.title,
+                    active && styles.categoryLabelActive,
+                  ]}
                   numberOfLines={1}>
                   {cat.label}
                 </Text>
-                <Text style={[styles.categoryCount, active && styles.categoryCountActive]}>
+                <Text
+                  style={[
+                    styles.categoryCount,
+                    isDarkMode && !active && dark.muted,
+                    active && styles.categoryCountActive,
+                  ]}>
                   {`${cat.count} ${cat.count === 1 ? 'place' : 'places'}`}
                 </Text>
               </BouncyPressable>
             );
           })}
         </ScrollView>
-        {!!activeTagline && <Text style={styles.categoryTagline}>{activeTagline}</Text>}
+        {!!activeTagline && (
+          <Text style={[styles.categoryTagline, isDarkMode && dark.body]}>{activeTagline}</Text>
+        )}
 
         {/* ── Places ── */}
         <View style={styles.favHeadRow}>
           <View style={styles.favHeadText}>
-            <Text style={styles.sectionOverline}>PERSONALLY CHECKED BY THE PACK</Text>
-            <Text style={styles.sectionTitle}>
+            <Text style={[styles.sectionOverline, isDarkMode && dark.overline]}>
+              PERSONALLY CHECKED BY THE PACK
+            </Text>
+            <Text
+              testID="city-section-title"
+              style={[styles.sectionTitle, isDarkMode && dark.title]}>
               {activeCategory === 'all' ? `${city} favourites` : activeCategory}
             </Text>
           </View>
@@ -432,22 +473,36 @@ export const CityDetail = ({ navigation, route }) => {
               style={styles.viewAllBtn}
               activeScale={0.94}
               onPress={() => setExpanded(v => !v)}>
-              <Text style={styles.viewAllText}>{expanded ? 'Show less' : 'View all'}</Text>
-              <Feather name={expanded ? 'arrow-up' : 'arrow-right'} size={ms(13)} color="#7C3AED" />
+              <Text style={[styles.viewAllText, isDarkMode && dark.accentText]}>
+                {expanded ? 'Show less' : 'View all'}
+              </Text>
+              <Feather
+                name={expanded ? 'arrow-up' : 'arrow-right'}
+                size={ms(13)}
+                color={isDarkMode ? '#C4B5FD' : '#7C3AED'}
+              />
             </BouncyPressable>
           )}
         </View>
 
         {listingsLoading && listings.length === 0 && (
           <View style={styles.stateBox}>
-            <LoaderCard label={`Loading places in ${city}...`} />
+            <LoaderCard label={`Loading places in ${city}...`} isDarkMode={isDarkMode} />
           </View>
         )}
 
         {!listingsLoading && visibleCards.length === 0 && (
           <View style={styles.stateBox}>
-            <Ionicons name="search-outline" size={ms(34)} color="#CBD5E1" />
-            <Text style={styles.stateText}>{`No places listed in ${city} yet.`}</Text>
+            <Ionicons
+              name="search-outline"
+              size={ms(34)}
+              color={isDarkMode ? '#64748B' : '#CBD5E1'}
+            />
+            <Text
+              style={[
+                styles.stateText,
+                isDarkMode && dark.muted,
+              ]}>{`No places listed in ${city} yet.`}</Text>
           </View>
         )}
 
@@ -456,6 +511,7 @@ export const CityDetail = ({ navigation, route }) => {
             key={`${activeCategory}-${item.id}`}
             index={Math.min(index, 4)}
             item={item}
+            isDarkMode={isDarkMode}
             saved={!!savedIds[item.id]}
             onToggleSave={() => toggleSave(item.id)}
             onPress={() => navigation?.navigate?.('ListingDetailScreen', { slug: item.slug })}
@@ -465,20 +521,28 @@ export const CityDetail = ({ navigation, route }) => {
         {/* ── Editorial sections ── */}
         {intro.sections.length > 0 && (
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionOverline}>KNOW BEFORE YOU GO</Text>
-            <Text style={styles.sectionTitle}>{`About ${city}`}</Text>
+            <Text style={[styles.sectionOverline, isDarkMode && dark.overline]}>
+              KNOW BEFORE YOU GO
+            </Text>
+            <Text
+              testID="city-section-title"
+              style={[styles.sectionTitle, isDarkMode && dark.title]}>{`About ${city}`}</Text>
           </View>
         )}
         {intro.sections.map((section, i) => (
           <Reveal key={section.key} delay={i * 90}>
-            <View style={styles.noteCard}>
-              <View style={styles.noteIcon}>
-                <Ionicons name={section.icon} size={ms(18)} color="#7C3AED" />
+            <View style={[styles.noteCard, isDarkMode && dark.card]}>
+              <View style={[styles.noteIcon, isDarkMode && dark.iconBox]}>
+                <Ionicons
+                  name={section.icon}
+                  size={ms(18)}
+                  color={isDarkMode ? '#C4B5FD' : '#7C3AED'}
+                />
               </View>
               <View style={styles.noteText}>
-                <Text style={styles.noteTitle}>{section.title}</Text>
+                <Text style={[styles.noteTitle, isDarkMode && dark.title]}>{section.title}</Text>
                 {section.body.map(line => (
-                  <Text key={line} style={styles.noteDesc}>
+                  <Text key={line} style={[styles.noteDesc, isDarkMode && dark.muted]}>
                     {line}
                   </Text>
                 ))}
@@ -491,24 +555,30 @@ export const CityDetail = ({ navigation, route }) => {
         {roadTrips.length > 0 && (
           <>
             <View style={styles.sectionHead}>
-              <Text style={styles.sectionOverline}>ROAD TRIPS</Text>
-              <Text style={styles.sectionTitle}>{`Drive to ${city}`}</Text>
+              <Text style={[styles.sectionOverline, isDarkMode && dark.overline]}>ROAD TRIPS</Text>
+              <Text
+                testID="city-section-title"
+                style={[styles.sectionTitle, isDarkMode && dark.title]}>{`Drive to ${city}`}</Text>
             </View>
             {roadTrips.map(trip => (
               <BouncyPressable
                 key={trip.slug}
-                style={styles.noteCard}
+                style={[styles.noteCard, isDarkMode && dark.card]}
                 activeScale={0.97}
                 onPress={() => navigation?.navigate?.('RoadTripDetailScreen', { slug: trip.slug })}>
-                <View style={styles.noteIcon}>
-                  <Ionicons name="car-outline" size={ms(18)} color="#7C3AED" />
+                <View style={[styles.noteIcon, isDarkMode && dark.iconBox]}>
+                  <Ionicons
+                    name="car-outline"
+                    size={ms(18)}
+                    color={isDarkMode ? '#C4B5FD' : '#7C3AED'}
+                  />
                 </View>
                 <View style={styles.noteText}>
-                  <Text style={styles.noteTitle} numberOfLines={2}>
+                  <Text style={[styles.noteTitle, isDarkMode && dark.title]} numberOfLines={2}>
                     {trip.title}
                   </Text>
                   {!!(trip.subtitle || trip.meta) && (
-                    <Text style={styles.noteDesc}>
+                    <Text style={[styles.noteDesc, isDarkMode && dark.muted]}>
                       {[trip.subtitle, trip.meta].filter(Boolean).join(' · ')}
                     </Text>
                   )}
@@ -523,8 +593,16 @@ export const CityDetail = ({ navigation, route }) => {
         {nearbyCities.length > 0 && (
           <>
             <View style={styles.sectionHead}>
-              <Text style={styles.sectionOverline}>{`ELSEWHERE IN ${state.toUpperCase()}`}</Text>
-              <Text style={styles.sectionTitle}>Nearby cities</Text>
+              <Text
+                style={[
+                  styles.sectionOverline,
+                  isDarkMode && dark.overline,
+                ]}>{`ELSEWHERE IN ${state.toUpperCase()}`}</Text>
+              <Text
+                testID="city-section-title"
+                style={[styles.sectionTitle, isDarkMode && dark.title]}>
+                Nearby cities
+              </Text>
             </View>
             <ScrollView
               horizontal
@@ -533,7 +611,7 @@ export const CityDetail = ({ navigation, route }) => {
               {nearbyCities.map(c => (
                 <BouncyPressable
                   key={c.city}
-                  style={styles.nearbyCard}
+                  style={[styles.nearbyCard, isDarkMode && dark.card]}
                   activeScale={0.94}
                   onPress={() =>
                     navigation?.push?.('CityDetail', {
@@ -542,10 +620,14 @@ export const CityDetail = ({ navigation, route }) => {
                       onSelectCity: route?.params?.onSelectCity,
                     })
                   }>
-                  <Text style={styles.nearbyName} numberOfLines={1}>
+                  <Text style={[styles.nearbyName, isDarkMode && dark.title]} numberOfLines={1}>
                     {c.city}
                   </Text>
-                  <Text style={styles.categoryCount}>{`${c.verified} verified`}</Text>
+                  <Text
+                    style={[
+                      styles.categoryCount,
+                      isDarkMode && dark.muted,
+                    ]}>{`${c.verified} verified`}</Text>
                 </BouncyPressable>
               ))}
             </ScrollView>
@@ -569,6 +651,27 @@ export const CityDetail = ({ navigation, route }) => {
 };
 
 export default CityDetail;
+
+// The dark versions of the colours above, in the same dark palette as the Home screen
+const dark = StyleSheet.create({
+  container: { backgroundColor: '#0F071D' },
+  // Cards: deep purple with a raised bottom edge
+  card: {
+    backgroundColor: '#1A0B30',
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    borderLeftColor: '#2E1654',
+    borderRightColor: '#2E1654',
+    borderBottomColor: '#4C1D95',
+  },
+  iconBox: { backgroundColor: '#27104B' },
+  imageBox: { backgroundColor: '#27104B' },
+  title: { color: '#FFFFFF' },
+  body: { color: '#CBD5E1' },
+  muted: { color: '#94A3B8' },
+  overline: { color: '#A855F7' },
+  accentText: { color: '#C4B5FD' },
+  note: { color: '#34D399' },
+});
 
 const styles = StyleSheet.create({
   container: {

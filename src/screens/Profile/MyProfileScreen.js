@@ -26,6 +26,20 @@ import { patchCachedProfile } from '../../hooks/useUser';
 import { ScreenHeader } from '../../components/common/AppHeader/ScreenHeader';
 import { AmbientBackground } from '../Home/components';
 
+// Section heading with a small gradient icon tile
+const SectionTitle = ({ icon, title, isDarkMode }) => (
+  <View style={styles.sectionTitleRow}>
+    <LinearGradient
+      colors={['#7B2CFF', '#FF4FB8']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.sectionIcon}>
+      <Feather name={icon} size={ms(14)} color="#FFFFFF" />
+    </LinearGradient>
+    <Text style={[styles.sectionTitleText, isDarkMode && styles.textWhite]}>{title}</Text>
+  </View>
+);
+
 export const MyProfileScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const isDarkMode = useStore(state => state.isDarkMode) || false;
@@ -155,6 +169,28 @@ export const MyProfileScreen = ({ navigation }) => {
     }
   };
 
+  // Profile strength: how many of the profile fields are filled in
+  const strengthFields = [
+    { value: displayName, hint: 'Add your display name' },
+    { value: profileSlug, hint: 'Pick a profile URL' },
+    { value: bio, hint: 'Add a short bio' },
+    { value: location, hint: 'Add your location' },
+    { value: instagramHandle, hint: 'Add your Instagram' },
+    { value: youtubeHandle, hint: 'Add your YouTube channel' },
+    { value: website, hint: 'Add your website' },
+  ];
+  const filledCount = strengthFields.filter(field => field.value.trim().length > 0).length;
+  const strength = Math.round((filledCount / strengthFields.length) * 100);
+  const nextHint = strengthFields.find(field => field.value.trim().length === 0)?.hint;
+  const strengthAnim = useRef(new Animated.Value(strength)).current;
+  useEffect(() => {
+    Animated.timing(strengthAnim, {
+      toValue: strength,
+      duration: 500,
+      useNativeDriver: false,
+    }).start();
+  }, [strength, strengthAnim]);
+
   return (
     <View style={[styles.container, isDarkMode && styles.containerDark]}>
       <StatusBar
@@ -209,26 +245,84 @@ export const MyProfileScreen = ({ navigation }) => {
 
       {/* ── Scrollable Card Content ── */}
       <KeyboardAwareScrollView
-        contentContainerStyle={[
+        // One flat object, not an array: on Android this component reads
+        // contentContainerStyle.paddingBottom to add the keyboard height, finds nothing in an array
+        // and then appends `paddingBottom: 0`, which wipes out the bottom space and leaves the Save
+        // button under the navigation bar. The floor keeps clear of the bar if the phone reports
+        // no bottom inset.
+        contentContainerStyle={StyleSheet.flatten([
           styles.scrollContent,
-          { paddingBottom: insets.bottom + vs(36) },
-        ]}
+          {
+            paddingBottom:
+              Math.max(insets.bottom, Platform.OS === 'android' ? vs(48) : vs(24)) + vs(48),
+          },
+        ])}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={e => scrollY.setValue(e.nativeEvent.contentOffset.y)}
         enableOnAndroid
         extraScrollHeight={vs(20)}>
         {/* Main Card Container with 3D Depth matching CreateTripScreen */}
-        <View style={[styles.profileCard, isDarkMode && styles.profileCardDark]}>
-          {/* Top colored accent stripe matching CreateTrip & Community card */}
-          <View style={styles.cardTopAccent} />
+        {/* Summary: who this profile is and how complete it is */}
+        <View
+          testID="profile-hero"
+          style={[styles.profileCard, styles.sectionCard, isDarkMode && styles.profileCardDark]}>
+          <View style={styles.heroRow}>
+            <LinearGradient
+              colors={['#7B2CFF', '#FF4FB8']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroAvatar}>
+              <Text style={styles.heroAvatarText}>
+                {(displayName.trim()[0] || '?').toUpperCase()}
+              </Text>
+            </LinearGradient>
+            <View style={styles.heroInfo}>
+              <Text style={[styles.heroName, isDarkMode && styles.textWhite]} numberOfLines={1}>
+                {displayName.trim() || 'Your name'}
+              </Text>
+              <Text style={[styles.heroEmail, isDarkMode && styles.textMutedDark]} numberOfLines={1}>
+                {email}
+              </Text>
+              {location.trim().length > 0 && (
+                <Text style={[styles.heroLocation, isDarkMode && styles.textMutedDark]} numberOfLines={1}>
+                  📍 {location.trim()}
+                </Text>
+              )}
+            </View>
+          </View>
 
-      
-          <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionHeading, isDarkMode && styles.textWhite]}>
-              Public Identity
+          <View style={styles.strengthRow}>
+            <Text style={[styles.strengthLabel, isDarkMode && styles.textWhite]}>
+              Profile strength
+            </Text>
+            <Text style={styles.strengthPct} testID="profile-strength-pct">
+              {strength}%
             </Text>
           </View>
+          <View style={[styles.strengthTrack, isDarkMode && styles.strengthTrackDark]}>
+            <Animated.View
+              style={[
+                styles.strengthFill,
+                {
+                  width: strengthAnim.interpolate({
+                    inputRange: [0, 100],
+                    outputRange: ['0%', '100%'],
+                  }),
+                },
+              ]}
+            />
+          </View>
+          <Text style={[styles.strengthHint, isDarkMode && styles.textMutedDark]}>
+            {nextHint ? `Next: ${nextHint}` : 'Your profile is complete 🎉'}
+          </Text>
+        </View>
+
+        {/* Section 1: name */}
+        <View style={[styles.profileCard, styles.sectionCard, isDarkMode && styles.profileCardDark]}>
+          <View style={styles.cardTopAccent} />
+
+          <SectionTitle icon="user" title="Public Identity" isDarkMode={isDarkMode} />
 
           {/* Display Name Field (3D Input Wrapper like CreateTripScreen) */}
           <View style={styles.inputGroup}>
@@ -324,8 +418,11 @@ export const MyProfileScreen = ({ navigation }) => {
             </BouncyPressable>
           </View>
 
-          {/* Divider */}
-          <View style={[styles.divider, isDarkMode && styles.dividerDark]} />
+        </View>
+
+        {/* Section 2: profile URL */}
+        <View style={[styles.profileCard, styles.sectionCard, isDarkMode && styles.profileCardDark]}>
+          <View style={styles.cardTopAccent} />
 
           {/* ══════════════════════════════════════
               SECTION 2: @ Profile URL
@@ -422,15 +519,16 @@ export const MyProfileScreen = ({ navigation }) => {
             </BouncyPressable>
           </View>
 
-          {/* Divider */}
-          <View style={[styles.divider, isDarkMode && styles.dividerDark]} />
+        </View>
+
+        {/* Section 3: bio and social links */}
+        <View style={[styles.profileCard, styles.sectionCard, isDarkMode && styles.profileCardDark]}>
+          <View style={styles.cardTopAccent} />
 
           {/* ══════════════════════════════════════
               SECTION 3: Bio & Social Links
           ══════════════════════════════════════ */}
-          <Text style={[styles.sectionHeading, isDarkMode && styles.textWhite]}>
-            Bio & Social Links
-          </Text>
+          <SectionTitle icon="edit-3" title="Bio & Social Links" isDarkMode={isDarkMode} />
 
           {/* Bio Field with 3D Depth & live counter */}
           <View style={styles.inputGroup}>
@@ -756,6 +854,91 @@ export const MyProfileScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  /* ── Summary card ── */
+  sectionCard: { marginBottom: vs(14) },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: s(14), marginBottom: vs(16) },
+  heroAvatar: {
+    width: s(60),
+    height: s(60),
+    borderRadius: s(30),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroAvatarText: {
+    fontFamily: theme.typography.fontFamily.extraBold,
+    fontSize: s(24),
+    color: '#FFFFFF',
+  },
+  heroInfo: { flex: 1, minWidth: 0 },
+  heroName: {
+    fontFamily: theme.typography.fontFamily.extraBold,
+    fontSize: s(18),
+    letterSpacing: -0.3,
+    color: '#1A0B2E',
+  },
+  heroEmail: {
+    fontFamily: theme.typography.fontFamily.regular,
+    fontSize: s(12),
+    color: '#64748B',
+    marginTop: s(2),
+  },
+  heroLocation: {
+    fontFamily: theme.typography.fontFamily.medium,
+    fontSize: s(11.5),
+    color: '#64748B',
+    marginTop: s(4),
+  },
+  strengthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: s(8),
+  },
+  strengthLabel: {
+    fontFamily: theme.typography.fontFamily.bold,
+    fontSize: s(12.5),
+    color: '#1E293B',
+  },
+  strengthPct: {
+    fontFamily: theme.typography.fontFamily.extraBold,
+    fontSize: s(13),
+    color: '#7C3AED',
+  },
+  strengthTrack: {
+    height: s(8),
+    borderRadius: s(4),
+    backgroundColor: '#EDE9FE',
+    overflow: 'hidden',
+  },
+  strengthTrackDark: { backgroundColor: '#2E1654' },
+  strengthFill: { height: '100%', borderRadius: s(4), backgroundColor: '#7C3AED' },
+  strengthHint: {
+    fontFamily: theme.typography.fontFamily.medium,
+    fontSize: s(11.5),
+    color: '#64748B',
+    marginTop: s(8),
+  },
+
+  /* ── Section titles ── */
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(10),
+    marginBottom: vs(16),
+  },
+  sectionIcon: {
+    width: s(30),
+    height: s(30),
+    borderRadius: s(10),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionTitleText: {
+    fontFamily: theme.typography.fontFamily.extraBold,
+    fontSize: s(16),
+    letterSpacing: -0.2,
+    color: '#1A0B2E',
+  },
   container: {
     flex: 1,
     backgroundColor: '#FAF7F2',

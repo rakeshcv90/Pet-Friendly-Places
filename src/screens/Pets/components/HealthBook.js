@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { s, vs, ms } from 'react-native-size-matters';
@@ -9,10 +9,26 @@ import { BouncyPressable } from '../../../components/common/BouncyPressable';
 import { Bob } from '../../Community/Motion';
 import FastImage from '../../../components/common/FastImage';
 import { resolveImageUrl } from '../../../hooks/useDiscovery';
+import { HealthPhotoViewer } from './HealthPhotoViewer';
 import { documentTypeLabel } from '../../../hooks/usePetHealth';
+import { API_BASE_URL, API_ENDPOINTS } from '../../../services/api/apiList';
+import { getItem, STORAGE_KEYS } from '../../../services/storage/storage';
 
-// The source photos attached to each record, whichever field name the API used
-export const bookPages = (records = []) =>
+// The image request for one stored file. The API sends only IDs, and the bytes need the Bearer
+// token, so the picture is requested with an Authorization header (the website's browser session
+// does not carry over to the app).
+export const healthFileSource = (petId, recordId, fileId, token) => ({
+  uri: `${API_BASE_URL}${API_ENDPOINTS.PET_HEALTH_RECORD_FILE(
+    petId,
+    recordId,
+    fileId,
+  )}?variant=processed`,
+  ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+});
+
+// The source photos attached to each record: a file that carries its own web address uses it,
+// otherwise it is loaded from the record and file IDs
+export const bookPages = (records = [], petId, token) =>
   records.flatMap(record => {
     const files = record?.files || record?.pages || record?.documents || [];
     const title = record?.recordName || record?.name || documentTypeLabel(record?.documentType);
@@ -21,7 +37,24 @@ export const bookPages = (records = []) =>
         const url = resolveImageUrl(
           file?.url || file?.fileUrl || file?.file_url || file?.imageUrl || file?.image_url || '',
         );
-        return url ? { key: `${record?.id ?? title}-${file?.id ?? index}`, url, title } : null;
+        const fileId = file?.id ?? file?.fileId ?? file?.file_id;
+        const key = `${record?.id ?? title}-${fileId ?? index}`;
+        const fileName = file?.fileName || file?.originalName || file?.filename || file?.name || '';
+        if (url) {
+          return { key, source: { uri: url }, title, record, fileName, recordId: record?.id, fileId };
+        }
+        if (petId && record?.id && fileId) {
+          return {
+            key,
+            source: healthFileSource(petId, record.id, fileId, token),
+            title,
+            record,
+            fileName,
+            recordId: record.id,
+            fileId,
+          };
+        }
+        return null;
       })
       .filter(Boolean);
   });
@@ -53,9 +86,196 @@ const STEPS = [
   { icon: 'share-social-outline', title: 'Share', text: 'A link for 24 hours' },
 ];
 
+const notAdded = value => (value ? String(value) : 'Not added');
+const day = value => (value ? String(value).slice(0, 10) : '');
+
+// What the website shows beside the page: the record the photo belongs to
+const RecordDetails = ({ record, isDarkMode }) => {
+  const rows = [
+    ['Vaccine', record?.recordName || record?.name],
+    ['Given', day(record?.dateIssued)],
+    ['Next due', day(record?.nextDueDate)],
+    ['Clinic', record?.clinicName || record?.vetName],
+    ['Document type', documentTypeLabel(record?.documentType)],
+  ];
+  return (
+    <View style={[styles.details, isDarkMode && styles.detailsDark]} testID="health-page-details">
+      <Text style={[styles.detailsTitle, isDarkMode && styles.textWhite]}>Health record</Text>
+      <Text style={[styles.detailsSub, isDarkMode && styles.mutedDark]}>
+        Review the photographed page before relying on extracted details.
+      </Text>
+      {rows.map(([label, value], index) => (
+        <View
+          key={label}
+          style={[
+            styles.detailRow,
+            index === rows.length - 1 && styles.detailRowLast,
+            isDarkMode && styles.detailRowDark,
+          ]}>
+          <Text style={[styles.detailLabel, isDarkMode && styles.mutedDark]}>{label}</Text>
+          <Text style={[styles.detailValue, isDarkMode && styles.textWhite]}>
+            {notAdded(value)}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+};
+
+// One page at a time, like the website: Previous / Next, the big photo, its record and a strip of
+// thumbnails to jump between pages
+const PageViewer = ({ pages, isDarkMode, onRemovePage }) => {
+  const [index, setIndex] = useState(0);
+  const [turns, setTurns] = useState({}); // quarter turns per page key
+  const [fullScreen, setFullScreen] = useState(false);
+  const last = pages.length - 1;
+  const current = pages[Math.min(index, last)];
+  const quarter = turns[current.key] || 0;
+
+  // Pages can disappear (a record is removed): keep the index inside the list
+  useEffect(() => {
+    if (index > last) {
+      setIndex(last);
+    }
+  }, [index, last]);
+
+  return (
+    <View>
+      <View style={styles.pager}>
+        <Pressable
+          testID="health-page-prev"
+          accessibilityRole="button"
+          accessibilityState={{ disabled: index === 0 }}
+          disabled={index === 0}
+          onPress={() => setIndex(index - 1)}
+          style={[styles.navBtn, index === 0 && styles.navBtnOff, isDarkMode && styles.navBtnDark]}>
+          <Ionicons name="chevron-back" size={ms(14)} color="#7C3AED" />
+          <Text style={styles.navText}>Previous</Text>
+        </Pressable>
+        <Text style={[styles.pageCount, isDarkMode && styles.textWhite]} testID="health-page-count">
+          {`Page ${index + 1} of ${pages.length}`}
+        </Text>
+        <Pressable
+          testID="health-page-next"
+          accessibilityRole="button"
+          accessibilityState={{ disabled: index === last }}
+          disabled={index === last}
+          onPress={() => setIndex(index + 1)}
+          style={[
+            styles.navBtn,
+            index === last && styles.navBtnOff,
+            isDarkMode && styles.navBtnDark,
+          ]}>
+          <Text style={styles.navText}>Next</Text>
+          <Ionicons name="chevron-forward" size={ms(14)} color="#7C3AED" />
+        </Pressable>
+      </View>
+
+      <View style={[styles.viewer, isDarkMode && styles.viewerDark]}>
+        <View style={[styles.viewerHead, isDarkMode && styles.dividerDark]}>
+          <Text style={[styles.fileName, isDarkMode && styles.textWhite]} numberOfLines={1}>
+            {current.fileName || `Page ${index + 1}`}
+          </Text>
+          <Text style={[styles.original, isDarkMode && styles.mutedDark]}>Stored original</Text>
+        </View>
+        <View style={[styles.stage, isDarkMode && styles.stageDark]}>
+          <Pressable
+            testID="health-page-open"
+            accessibilityRole="button"
+            accessibilityLabel="View page full screen"
+            onPress={() => setFullScreen(true)}
+            style={styles.stageTap}>
+            {/* Every page stays mounted and only the current one is visible, so changing page
+                never reloads a picture or flashes its placeholder */}
+            <View style={styles.stageImage}>
+              {pages.map((page, i) => {
+                const pageSideways = (turns[page.key] || 0) % 2 === 1;
+                return (
+                  <View
+                    key={page.key}
+                    testID={i === index ? 'health-page-image' : undefined}
+                    pointerEvents="none"
+                    style={[
+                      StyleSheet.absoluteFill,
+                      { opacity: i === index ? 1 : 0 },
+                      {
+                        transform: [
+                          { rotate: `${(turns[page.key] || 0) * 90}deg` },
+                          { scale: pageSideways ? 0.78 : 1 },
+                        ],
+                      },
+                    ]}>
+                    <FastImage source={page.source} style={styles.stageFill} resizeMode="contain" />
+                  </View>
+                );
+              })}
+            </View>
+            <View style={styles.expand} pointerEvents="none">
+              <Ionicons name="expand-outline" size={ms(14)} color="#FFFFFF" />
+            </View>
+          </Pressable>
+        </View>
+        <View style={[styles.viewerFoot, isDarkMode && styles.dividerDark]}>
+          <Pressable
+            testID="health-page-rotate"
+            accessibilityRole="button"
+            accessibilityLabel="Rotate page"
+            onPress={() => setTurns(old => ({ ...old, [current.key]: (quarter + 1) % 4 }))}
+            style={styles.rotate}>
+            <Ionicons name="refresh" size={ms(15)} color="#4C1D95" />
+            <Text style={styles.rotateText}>Rotate</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <HealthPhotoViewer
+        visible={fullScreen}
+        pages={pages}
+        index={index}
+        onIndexChange={setIndex}
+        onClose={() => setFullScreen(false)}
+      />
+
+      <RecordDetails record={current.record} isDarkMode={isDarkMode} />
+
+      {onRemovePage && current.fileId && current.recordId ? (
+        <Pressable
+          testID="health-page-remove"
+          accessibilityRole="button"
+          accessibilityLabel="Remove page"
+          onPress={() => onRemovePage(current)}
+          style={[styles.remove, styles.removeSingle, isDarkMode && styles.removeDark]}>
+          <Ionicons name="trash-outline" size={ms(15)} color="#B42318" />
+          <Text style={styles.removeText}>Remove page</Text>
+        </Pressable>
+      ) : null}
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.thumbs}>
+        {pages.map((page, i) => (
+          <Pressable
+            key={page.key}
+            testID={`health-thumb-${i}`}
+            accessibilityRole="button"
+            accessibilityLabel={`Page ${i + 1}`}
+            onPress={() => setIndex(i)}
+            style={[styles.thumb, i === index && styles.thumbOn, isDarkMode && styles.thumbDark]}>
+            <FastImage source={page.source} style={styles.thumbImage} resizeMode="cover" />
+            <Text style={[styles.thumbLabel, isDarkMode && styles.mutedDark]}>{`Page ${i + 1}`}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+};
+
 // "Health records book": every source page in one place, or a friendly empty state
-export const HealthBook = ({ records, isDarkMode, onAddPhotos }) => {
-  const pages = bookPages(records);
+export const HealthBook = ({ records, petId, isDarkMode, onAddPhotos, onRemovePage }) => {
+  const token = getItem(STORAGE_KEYS.ACCESS_TOKEN);
+  // Same page objects between renders, so a picture is not treated as a new one
+  const pages = useMemo(() => bookPages(records, petId, token), [records, petId, token]);
 
   return (
     <View>
@@ -97,20 +317,7 @@ export const HealthBook = ({ records, isDarkMode, onAddPhotos }) => {
             ) : null}
           </View>
         ) : (
-          <View style={styles.grid}>
-            {pages.map(page => (
-              <View key={page.key} style={styles.page}>
-                <FastImage
-                  source={{ uri: page.url }}
-                  style={[styles.pageImage, isDarkMode && styles.pageImageDark]}
-                  resizeMode="cover"
-                />
-                <Text style={[styles.pageTitle, isDarkMode && styles.mutedDark]} numberOfLines={1}>
-                  {page.title}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <PageViewer pages={pages} isDarkMode={isDarkMode} onRemovePage={onRemovePage} />
         )}
       </View>
 
@@ -187,15 +394,136 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontFamily: theme.typography.fontFamily.medium,
   },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: s(10), padding: s(14) },
-  page: { width: '47.5%' },
-  pageImage: { width: '100%', aspectRatio: 0.78, borderRadius: s(14), backgroundColor: '#F5F3FF' },
-  pageImageDark: { backgroundColor: '#27104B' },
-  pageTitle: {
-    marginTop: vs(6),
-    fontSize: s(11.5),
-    color: '#6B5C85',
+  pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: s(14) },
+  navBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(2),
+    paddingHorizontal: s(10),
+    paddingVertical: vs(7),
+    borderRadius: s(12),
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    backgroundColor: '#FFFFFF',
+  },
+  navBtnDark: { backgroundColor: '#27104B', borderColor: '#2E1654' },
+  navBtnOff: { opacity: 0.45 },
+  navText: { fontSize: s(12.5), color: '#7C3AED', fontFamily: theme.typography.fontFamily.bold },
+  pageCount: { fontSize: s(12.5), color: '#475569', fontFamily: theme.typography.fontFamily.bold },
+  viewer: {
+    marginHorizontal: s(14),
+    borderRadius: s(16),
+    borderWidth: 1,
+    borderColor: '#EDE9FE',
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+  },
+  viewerDark: { backgroundColor: '#1A0B30', borderColor: '#2E1654' },
+  viewerHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: s(8),
+    padding: s(12),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  fileName: { flex: 1, fontSize: s(11.5), color: '#0F172A', fontFamily: theme.typography.fontFamily.bold },
+  original: { fontSize: s(11), color: '#64748B', fontFamily: theme.typography.fontFamily.medium },
+  stage: { backgroundColor: '#F3F0FA', padding: s(14), alignItems: 'center' },
+  stageDark: { backgroundColor: '#27104B' },
+  stageImage: { width: '100%', aspectRatio: 0.78, borderRadius: s(10), overflow: 'hidden' },
+  stageTap: { width: '100%' },
+  expand: {
+    position: 'absolute',
+    right: s(8),
+    bottom: s(8),
+    width: s(28),
+    height: s(28),
+    borderRadius: s(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(15,7,29,0.55)',
+  },
+  stageFill: { width: '100%', height: '100%' },
+  viewerFoot: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: s(12),
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  rotate: { flexDirection: 'row', alignItems: 'center', gap: s(5) },
+  rotateText: { fontSize: s(12.5), color: '#4C1D95', fontFamily: theme.typography.fontFamily.bold },
+  details: {
+    margin: s(14),
+    marginBottom: 0,
+    padding: s(16),
+    borderRadius: s(16),
+    borderWidth: 1,
+    borderColor: '#EDE9FE',
+    backgroundColor: '#FFFFFF',
+  },
+  detailsDark: { backgroundColor: '#1A0B30', borderColor: '#2E1654' },
+  detailsTitle: { fontSize: s(17), color: '#0F172A', fontFamily: theme.typography.fontFamily.extraBold },
+  detailsSub: {
+    marginTop: vs(4),
+    marginBottom: vs(6),
+    fontSize: s(12),
+    lineHeight: s(17),
+    color: '#64748B',
     fontFamily: theme.typography.fontFamily.medium,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: s(10),
+    paddingVertical: vs(9),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  detailRowDark: { borderBottomColor: '#2E1654' },
+  detailRowLast: { borderBottomWidth: 0 },
+  detailLabel: { fontSize: s(12.5), color: '#64748B', fontFamily: theme.typography.fontFamily.medium },
+  detailValue: {
+    flexShrink: 1,
+    textAlign: 'right',
+    fontSize: s(12.5),
+    color: '#0F172A',
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  removeSingle: { alignSelf: 'flex-start', marginHorizontal: s(14), marginTop: vs(12) },
+  remove: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(6),
+    paddingHorizontal: s(14),
+    paddingVertical: vs(9),
+    borderRadius: s(12),
+    borderWidth: 1,
+    borderColor: '#FCCACA',
+    backgroundColor: '#FEF3F2',
+  },
+  removeDark: { backgroundColor: '#3A1220', borderColor: '#7A2531' },
+  removeText: { fontSize: s(12.5), color: '#B42318', fontFamily: theme.typography.fontFamily.bold },
+  thumbs: { gap: s(10), padding: s(14) },
+  thumb: {
+    width: s(78),
+    borderRadius: s(12),
+    borderWidth: 2,
+    borderColor: '#EDE9FE',
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+  },
+  thumbDark: { backgroundColor: '#1A0B30', borderColor: '#2E1654' },
+  thumbOn: { borderColor: '#7C3AED' },
+  thumbImage: { width: '100%', height: s(72) },
+  thumbLabel: {
+    paddingVertical: vs(4),
+    textAlign: 'center',
+    fontSize: s(10.5),
+    color: '#6B5C85',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   stackWrap: { alignItems: 'center', justifyContent: 'center', width: s(150), height: s(120) },
   glow: {

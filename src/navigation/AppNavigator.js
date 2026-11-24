@@ -13,6 +13,7 @@ import {
   TravelStoryScreen,
   StoryDetailScreen,
   UrbaniaBookingScreen,
+  UrbaniaBookingsScreen,
   RoadTripRoutesScreen,
   RoadTripDetailScreen,
   RoadTripStopDetailScreen,
@@ -27,6 +28,7 @@ import { PetDetailsScreen } from '../screens/Pets/PetDetails';
 import { PetHealthRecordsScreen } from '../screens/Pets/PetHealthRecordsScreen';
 import { PawsportScreen } from '../screens/Pets/PawsportScreen';
 import { PetEditScreen } from '../screens/Pets/PetEditScreen';
+import { PetProfileScreen } from '../screens/Pets/PetProfileScreen';
 import { SavedPlacesScreen } from '../screens/Profile/SavedPlacesScreen';
 import { MyActivityScreen } from '../screens/Profile/MyActivityScreen';
 import { MySubmissionsScreen } from '../screens/Profile/MySubmissionsScreen';
@@ -36,6 +38,7 @@ import { StoryGuidesScreen, GuideDetailScreen, ListingDetailScreen } from '../sc
 import { SavedScreen } from '../screens/Saved';
 import { InAppBrowserScreen } from '../screens/Web/InAppBrowserScreen';
 import { LeaderboardScreen } from '../screens/Leaderboard/LeaderboardScreen';
+import { PublicPetProfileScreen } from '../screens/Leaderboard/PublicPetProfileScreen';
 import { NotificationsScreen } from '../screens/Notifications';
 import { CommunityDetailScreen, PostDetailScreen, NewPostScreen } from '../screens/Community';
 
@@ -164,6 +167,15 @@ export const AppNavigator = () => {
       <Stack.Screen
         name="StoryDetailScreen"
         component={StoryDetailScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="UrbaniaBookingsScreen"
+        component={UrbaniaBookingsScreen}
         options={{
           animation: 'ios_from_right',
           gestureEnabled: true,
@@ -315,6 +327,15 @@ export const AppNavigator = () => {
         }}
       />
       <Stack.Screen
+        name="PetProfileScreen"
+        component={PetProfileScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
         name="PetDetailsScreen"
         component={PetDetailsScreen}
         options={{
@@ -353,6 +374,15 @@ export const AppNavigator = () => {
       <Stack.Screen
         name="LeaderboardScreen"
         component={LeaderboardScreen}
+        options={{
+          animation: 'ios_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="PublicPetProfileScreen"
+        component={PublicPetProfileScreen}
         options={{
           animation: 'ios_from_right',
           gestureEnabled: true,

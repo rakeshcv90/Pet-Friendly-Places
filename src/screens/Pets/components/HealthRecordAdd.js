@@ -43,6 +43,37 @@ const OutlineButton = ({ label, icon, onPress, testID, isDarkMode }) => (
 export { PrimaryButton, OutlineButton };
 
 // Dashed drop area: take or choose photos of the vaccination book or certificates
+// "Vaccination & Health Reminders": one tick box for this pet's reminder emails
+export const HealthReminderCard = ({ checked, onToggle, disabled, isDarkMode }) => (
+  <BouncyPressable
+    testID="health-reminders"
+    accessibilityRole="checkbox"
+    accessibilityLabel="Vaccination and health reminders"
+    accessibilityState={{ checked: !!checked, disabled: !!disabled }}
+    activeScale={0.98}
+    disabled={disabled}
+    onPress={onToggle}
+    style={[styles.reminder, isDarkMode && styles.reminderDark, disabled && styles.disabled]}>
+    <View style={styles.reminderHead}>
+      <View
+        testID="health-reminders-box"
+        style={[
+          styles.checkbox,
+          checked && styles.checkboxOn,
+          isDarkMode && !checked && styles.checkboxDark,
+        ]}>
+        {checked ? <Ionicons name="checkmark" size={ms(14)} color="#FFFFFF" /> : null}
+      </View>
+      <Text style={[styles.reminderTitle, isDarkMode && styles.textWhite]}>
+        Vaccination & Health Reminders
+      </Text>
+    </View>
+    <Text style={[styles.reminderText, isDarkMode && styles.mutedDark]}>
+      Email reminders 2 weeks before, 3 days before, and on the due date.
+    </Text>
+  </BouncyPressable>
+);
+
 export const HealthPhotoCard = ({
   petName,
   photos,
@@ -50,6 +81,8 @@ export const HealthPhotoCard = ({
   onChoosePhotos,
   onRemovePhoto,
   onEnterByHand,
+  onSavePhotos,
+  savingPhotos,
   isDarkMode,
 }) => (
   <View style={[styles.dashed, isDarkMode && styles.dashedDark]}>
@@ -93,12 +126,30 @@ export const HealthPhotoCard = ({
       />
       <OutlineButton
         testID="health-choose-files"
-        label="Choose files"
-        icon="cloud-upload-outline"
+        label="Choose from gallery"
+        icon="images-outline"
         onPress={onChoosePhotos}
         isDarkMode={isDarkMode}
       />
     </View>
+    {photos.length > 0 && onSavePhotos ? (
+      <View style={styles.savePhotos}>
+        <PrimaryButton
+          testID="health-save-photos"
+          label={
+            savingPhotos
+              ? 'Saving…'
+              : photos.length === 1
+              ? 'Save photo'
+              : `Save ${photos.length} photos`
+          }
+          icon="checkmark-circle-outline"
+          onPress={onSavePhotos}
+          disabled={savingPhotos}
+        />
+      </View>
+    ) : null}
+
     <BouncyPressable testID="health-by-hand" activeScale={0.97} onPress={onEnterByHand}>
       <Text style={[styles.byHand, isDarkMode && styles.mutedDark]}>
         No photo? Enter details by hand.
@@ -127,9 +178,18 @@ const Input = ({ isDarkMode, style, ...props }) => (
 );
 
 // The "Add health record" form. `form` and `onChange(key, value)` are owned by the screen.
-export const HealthRecordForm = ({ form, onChange, onSave, saving, error, isDarkMode }) => (
+export const HealthRecordForm = ({
+  form,
+  onChange,
+  onSave,
+  saving,
+  error,
+  isDarkMode,
+  title = 'Add health record',
+  saveLabel = 'Save record',
+}) => (
   <View style={[styles.formCard, isDarkMode && styles.formCardDark]}>
-    <Text style={[styles.formTitle, isDarkMode && styles.textWhite]}>Add health record</Text>
+    <Text style={[styles.formTitle, isDarkMode && styles.textWhite]}>{title}</Text>
 
     <Field label="Document type" required isDarkMode={isDarkMode}>
       <View style={styles.typeWrap}>
@@ -229,7 +289,7 @@ export const HealthRecordForm = ({ form, onChange, onSave, saving, error, isDark
     <View style={styles.saveRow}>
       <PrimaryButton
         testID="health-save"
-        label={saving ? 'Saving…' : 'Save record'}
+        label={saving ? 'Saving…' : saveLabel}
         onPress={onSave}
         disabled={saving}
       />
@@ -316,6 +376,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  reminder: {
+    marginHorizontal: s(16),
+    marginTop: vs(14),
+    padding: s(16),
+    borderRadius: s(20),
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.2,
+    borderColor: '#EDE9FE',
+    borderBottomWidth: 4,
+    borderBottomColor: '#DDD6FE',
+  },
+  reminderDark: { backgroundColor: '#1A0B30', borderColor: '#2E1654', borderBottomColor: '#4C1D95' },
+  reminderHead: { flexDirection: 'row', alignItems: 'center', gap: s(12) },
+  checkbox: {
+    width: s(22),
+    height: s(22),
+    borderRadius: s(6),
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#C4B5FD',
+    backgroundColor: '#FFFFFF',
+  },
+  checkboxOn: { backgroundColor: PURPLE, borderColor: PURPLE },
+  checkboxDark: { backgroundColor: '#27104B', borderColor: '#4C1D95' },
+  reminderTitle: { flex: 1, fontSize: s(14.5), color: '#1E1B4B', fontFamily: font.extraBold },
+  reminderText: {
+    marginTop: vs(8),
+    marginLeft: s(34),
+    fontSize: s(12.5),
+    lineHeight: s(18),
+    color: '#64748B',
+    fontFamily: font.medium,
+  },
+  savePhotos: { alignItems: 'center', marginTop: vs(14) },
   dashedButtons: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: s(10), marginTop: vs(16) },
   byHand: {
     marginTop: vs(14),

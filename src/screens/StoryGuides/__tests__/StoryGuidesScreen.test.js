@@ -42,7 +42,7 @@ describe('StoryGuidesScreen', () => {
       <StoryGuidesScreen navigation={mockNavigation} route={{}} />,
     );
 
-    expect(getByText('Story & Guides')).toBeTruthy();
+    expect(getByText('Pet Friendly Places')).toBeTruthy();
     expect(getByTestId('tab-travel-stories')).toBeTruthy();
     expect(getByTestId('tab-guides')).toBeTruthy();
     expect(getByText('Travel Story')).toBeTruthy();

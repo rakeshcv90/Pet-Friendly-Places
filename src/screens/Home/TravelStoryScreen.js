@@ -24,8 +24,8 @@ import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { Loader } from '../../components/common/Loader';
 import { ScreenHeader } from '../../components/common/AppHeader/ScreenHeader';
 import { AmbientBackground } from './components';
+import { storyCoverUrl } from './storyCover';
 
-// Turns one API story (list item or GET /stories/{slug}) into what the screen renders
 const formatStory = item => {
     const cleanBody = (item.body || item.content || item.excerpt || '')
       .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '\n\n$1\n\n')
@@ -112,7 +112,7 @@ const formatStory = item => {
       reading_time: readTime,
       excerpt: item.excerpt || cleanBody.slice(0, 160) + '...',
       content: cleanBody || item.excerpt,
-      cover_image: resolveImageUrl(item.cover_image_url || item.og_image_url),
+      cover_image: resolveImageUrl(storyCoverUrl(item)),
       tags: Array.isArray(item.tags)
         ? item.tags
         : typeof item.tags === 'string'
@@ -149,7 +149,6 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
     isRefetching,
   } = useTravelStories();
 
-  // The traveling pack (Apple, Captain, Kimchi) enriched from API dog_cards if available
   const storytellers = useMemo(() => {
     const rawList = Array.isArray(apiStoriesData)
       ? apiStoriesData
@@ -334,8 +333,7 @@ export const TravelStoryScreen = React.memo(function TravelStoryScreen({
     return result;
   }, [allStories, activeCategory, searchQuery]);
 
-  // Opens the story on its own screen. GET /stories/{slug} loads there; the list item is passed
-  // along so the page has content straight away.
+
   const openStory = useCallback(
     story => {
       if (!story) {

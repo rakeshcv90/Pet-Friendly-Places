@@ -44,7 +44,7 @@ const TABS = [
 
 const resolveTab = value => (value === 'guides' || value === 'routes' ? 'guides' : 'stories');
 
-/** One segmented tab. Memoised: a tab change only re-renders the two buttons, not the screen. */
+
 const TabButton = React.memo(function TabButton({ tab, isActive, isDarkMode, iconScale, onPress }) {
   let iconColor = isDarkMode ? '#94A3B8' : '#64748B';
   if (isActive) {
@@ -80,7 +80,7 @@ const TabButton = React.memo(function TabButton({ tab, isActive, isDarkMode, ico
   );
 });
 
-/** Stacked pane: always laid out in place, only its opacity/touch changes, so a switch never relayouts. */
+
 const Pane = ({ isActive, isMounted, children }) => (
   <View
     style={[styles.paneItem, isActive ? styles.paneActive : styles.paneHidden]}
@@ -106,7 +106,6 @@ export const StoryGuidesScreen = React.memo(function StoryGuidesScreen({ navigat
   const activeTabRef = useRef(initialTab);
   const [trackWidth, setTrackWidth] = useState(DEFAULT_TRACK_WIDTH);
 
-  // Lazy mounting: only the first tab is mounted up front, the other warms up when idle
   const [mounted, setMounted] = useState({
     stories: initialTab === 'stories',
     guides: initialTab === 'guides',
@@ -131,14 +130,11 @@ export const StoryGuidesScreen = React.memo(function StoryGuidesScreen({ navigat
     };
   }, []);
 
-  // Animated values (all native driver): pill position (0 = stories, 1 = guides) + icon pops
   const slideAnim = useRef(new Animated.Value(initialTab === 'guides' ? 1 : 0)).current;
   const iconScales = useRef({
     stories: new Animated.Value(initialTab === 'stories' ? 1.05 : 1),
     guides: new Animated.Value(initialTab === 'guides' ? 1.05 : 1),
   }).current;
-
-  // Collapsible header: translateY 0 = visible, -HEADER_COLLAPSE_DISTANCE = collapsed
   const headerTranslateY = useRef(new Animated.Value(0)).current;
   const isHeaderHidden = useRef(false);
   const lastScrollY = useRef(0);
@@ -189,7 +185,7 @@ export const StoryGuidesScreen = React.memo(function StoryGuidesScreen({ navigat
     [setHeaderHidden],
   );
 
-  // Tab switch. Stable identity (state lives in a ref), so memoised children never re-render for it.
+ 
   const handleTabSwitch = useCallback(
     tabKey => {
       if (tabKey === activeTabRef.current) {
@@ -199,11 +195,9 @@ export const StoryGuidesScreen = React.memo(function StoryGuidesScreen({ navigat
       setActiveTab(tabKey);
       setMounted(prev => (prev[tabKey] ? prev : { ...prev, [tabKey]: true }));
 
-      // Never open the new pane under a collapsed header
       setHeaderHidden(false);
       lastScrollY.current = 0;
 
-      // Only the small pill animates; the heavy panes swap in place
       Animated.timing(slideAnim, {
         toValue: tabKey === 'guides' ? 1 : 0,
         duration: 220,
@@ -229,7 +223,6 @@ export const StoryGuidesScreen = React.memo(function StoryGuidesScreen({ navigat
     [slideAnim, iconScales, setHeaderHidden],
   );
 
-  // Re-select a tab when revisited with a new request (e.g. coming back from a guide page)
   const tabRequest = route?.params?.tabRequest;
   const requestedTab = route?.params?.initialTab;
   useEffect(() => {
@@ -238,9 +231,7 @@ export const StoryGuidesScreen = React.memo(function StoryGuidesScreen({ navigat
     }
   }, [tabRequest, requestedTab, handleTabSwitch]);
 
-  // Pill geometry: the track has s(4) padding on each side
   const tabWidth = trackWidth > 0 ? (trackWidth - s(8)) / 2 : 0;
-  // Memoised so a re-render can never swap the animated node mid-animation (that flickers)
   const pillTranslateX = useMemo(
     () =>
       slideAnim.interpolate({
@@ -256,11 +247,10 @@ export const StoryGuidesScreen = React.memo(function StoryGuidesScreen({ navigat
     setTrackWidth(prev => (w > 0 && Math.abs(w - prev) > 2 ? w : prev));
   }, []);
 
-  // Static header, built once: tab changes must not re-render it
   const topHeader = useMemo(
     () => (
       <AppHeader
-        title="Story & Guides"
+        // title=""
         showSearch={false}
         onAvatarPress={() => navigation?.navigate?.('Profile')}
       />
@@ -277,13 +267,13 @@ export const StoryGuidesScreen = React.memo(function StoryGuidesScreen({ navigat
         backgroundColor={isDarkMode ? '#0F071D' : colors.background}
       />
 
-      {/* Persistent status bar cover (top safe-area shield) */}
+     
       <View
         style={[styles.statusBarCover, isDarkMode && styles.statusBarCoverDark, { height: statusInset }]}
         pointerEvents="none"
       />
 
-      {/* Collapsible main container (native translateY) */}
+
       <Animated.View
         style={[
           styles.collapsibleMainContainer,
@@ -291,7 +281,7 @@ export const StoryGuidesScreen = React.memo(function StoryGuidesScreen({ navigat
         ]}>
         <Animated.View style={{ opacity: headerOpacity }}>{topHeader}</Animated.View>
 
-        {/* Segmented tabs: [Travel Story] [Guides] */}
+   
         <View
           style={[styles.segmentTrack, isDarkMode && styles.segmentTrackDark]}
           onLayout={onTrackLayout}>
@@ -317,7 +307,7 @@ export const StoryGuidesScreen = React.memo(function StoryGuidesScreen({ navigat
           ))}
         </View>
 
-        {/* Stacked panes: both stay mounted (scroll position kept), one is visible */}
+     
         <View style={styles.contentWrap}>
           <Pane isActive={activeTab === 'stories'} isMounted={mounted.stories}>
             <TravelStoryScreen navigation={navigation} route={route} hideTopNav onScroll={onScroll} />

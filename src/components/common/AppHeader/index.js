@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, TextInput, Animated, Pressable } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -23,6 +23,63 @@ export const getTimeGreeting = () => {
     return 'GOOD EVENING';
   }
   return 'GOOD NIGHT';
+};
+
+// Three paw prints that light up one after the other, like a pet walking away
+export const PawTrail = () => {
+  const steps = useRef([0, 1, 2].map(() => new Animated.Value(0.25))).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        ...steps.map(step =>
+          Animated.timing(step, { toValue: 1, duration: 380, useNativeDriver: true }),
+        ),
+        Animated.delay(250),
+        Animated.parallel(
+          steps.map(step =>
+            Animated.timing(step, { toValue: 0.25, duration: 450, useNativeDriver: true }),
+          ),
+        ),
+        Animated.delay(150),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [steps]);
+
+  const spots = [
+    [styles.trailPawOne, ms(9), '#B07FD0'],
+    [styles.trailPawTwo, ms(11), '#9B5FCB'],
+    [styles.trailPawThree, ms(9), '#8B3FD9'],
+  ];
+
+  return (
+    <View testID="app-header-paws" style={styles.pawTrail}>
+      {spots.map(([place, size, color], index) => (
+        <Animated.View
+          key={index}
+          testID={`app-header-paw-${index}`}
+          style={[
+            place,
+            {
+              opacity: steps[index],
+              transform: [
+                ...place.transform,
+                {
+                  scale: steps[index].interpolate({
+                    inputRange: [0.25, 1],
+                    outputRange: [0.8, 1.1],
+                  }),
+                },
+              ],
+            },
+          ]}>
+          <Ionicons name="paw" size={size} color={color} />
+        </Animated.View>
+      ))}
+    </View>
+  );
 };
 
 export const SearchBar = ({
@@ -105,14 +162,13 @@ export const SearchBar = ({
 };
 
 export const AppHeader = ({
-  userName,
-
   subtitle,
-  title = 'Where to with your bestie?',
+  title = 'Pet Friendly Places',
+  tagline = 'Explore karo, Sath Travel Karo!',
 
   // Location
   location,
-  showLocation = true,
+  showLocation = false,
   locationActionText = 'Change',
   onLocationPress,
   onSelectCity,
@@ -161,21 +217,15 @@ export const AppHeader = ({
     userProfile?.user ||
     (userProfile?.id ? userProfile : null) ||
     storeUser;
-  const resolvedUserName =
-    userName ||
-    activeUser?.name ||
-    activeUser?.displayName ||
-    activeUser?.display_name ||
-    activeUser?.full_name ||
-    'Pet Parent';
-
   const apiLocation = activeUser?.location || activeUser?.city;
 
   // Priority: 1. explicit prop -> 2. global store -> 3. user profile API -> 4. fallback
   const displayLocation = location || globalLocation || apiLocation || 'Delhi NCR';
 
-  const resolvedGreeting = getTimeGreeting();
-  const resolvedSubtitle = subtitle || `${resolvedGreeting}, ${resolvedUserName.toUpperCase()}`;
+  // "Explore karo, Sath Travel Karo!" -> the first part in pink, the rest in purple
+  const taglineSplit = tagline.indexOf(',') + 1;
+  const taglineLead = tagline.slice(0, taglineSplit);
+  const taglineEnd = tagline.slice(taglineSplit);
 
   const handleLocationPress = () => {
     if (onLocationPress) {
@@ -212,13 +262,10 @@ export const AppHeader = ({
       {/* ── 1. Top Header Row ── */}
       <View style={[styles.header, headerStyle]}>
         <View style={styles.headerLeft}>
-          {/* Avatar Badge */}
           <BouncyPressable activeScale={0.88} onPress={onAvatarPress || (() => {})}>
             <Animated.View
               style={avatarTransform.length > 0 ? { transform: avatarTransform } : null}>
               {avatarComponent || (
-                // The rounded shape comes from plain views (shadow outside, clip inside) so it does
-                // not depend on the gradient applying its own radius on the first draw
                 <View style={styles.avatarBadge} testID="app-header-avatar">
                   <View style={styles.avatarClip}>
                     <LinearGradient
@@ -247,20 +294,23 @@ export const AppHeader = ({
             </Animated.View>
           </BouncyPressable>
 
-          {/* Greeting & Location */}
+          {/* Title & tagline */}
           <View style={styles.headerTextGroup}>
+            {subtitle ? (
+              <Text
+                style={[styles.greetingSubtitle, isDarkMode && styles.greetingSubtitleDark]}
+                numberOfLines={1}>
+                {subtitle}
+              </Text>
+            ) : null}
             <Text
-              style={[styles.greetingSubtitle, isDarkMode && styles.greetingSubtitleDark]}
-              numberOfLines={1}>
-              {resolvedSubtitle}
-            </Text>
-            <Text
+              testID="app-header-title"
               style={[styles.greetingTitle, isDarkMode && styles.greetingTitleDark]}
               numberOfLines={1}>
               {title}
             </Text>
 
-            {showLocation && (
+            {showLocation ? (
               <BouncyPressable
                 activeScale={0.93}
                 style={styles.locationRow}
@@ -278,6 +328,19 @@ export const AppHeader = ({
                   {locationActionText}
                 </Text>
               </BouncyPressable>
+            ) : (
+              <View style={styles.taglineRow}>
+                <Text
+                  testID="app-header-tagline"
+                  style={styles.tagline}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}>
+                  <Text style={styles.taglinePink}>{taglineLead}</Text>
+                  <Text style={styles.taglinePurple}>{taglineEnd}</Text>
+                </Text>
+                <PawTrail />
+              </View>
             )}
           </View>
         </View>

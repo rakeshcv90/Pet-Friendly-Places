@@ -2,7 +2,7 @@ import React from 'react';
 import { ScrollView } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import { SavedScreen } from '../index';
+import { SavedScreen, STEPS, SECTION_DESCRIPTIONS, HERO_TEXT } from '../index';
 
 const mockNavigation = { navigate: jest.fn(), goBack: jest.fn() };
 
@@ -175,4 +175,133 @@ describe('SavedScreen (Community tab)', () => {
     expect(getByText('K')).toBeTruthy();
     expect(queryByText('R')).toBeNull();
   });
+
+  describe('the descriptions the website shows', () => {
+    const LONG =
+      'Bengaluru pet parents — parks, cafes, vets, weekend getaways from the city, and local meetups. One of India\'s most pet-loving cities, in one place.';
+
+    it('shows the full hero text, not a two-line cut', () => {
+      const { getByTestId } = renderScreen();
+      const hero = getByTestId('hero-description');
+
+      expect(hero.props.children).toBe(HERO_TEXT);
+      expect(hero.props.numberOfLines).toBeUndefined();
+      expect(HERO_TEXT).toMatch(/Moderated, permanent, and searchable/);
+      expect(HERO_TEXT).toMatch(/Not another chat group where answers scroll away/);
+    });
+
+    it('puts the website line under By Topic, By City and How it works', () => {
+      const { getAllByTestId, getByText } = renderScreen();
+      const lines = getAllByTestId('section-description').map(node => node.props.children);
+
+      expect(lines).toEqual([
+        'Questions, tips and stories for every pet parent journey',
+        'Connect with pet parents in your city',
+        'A genuine space, built, moderated, and used by Indian pet parents.',
+      ]);
+      expect(getByText(SECTION_DESCRIPTIONS.topic)).toBeTruthy();
+      expect(getByText(SECTION_DESCRIPTIONS.city)).toBeTruthy();
+      expect(getByText(SECTION_DESCRIPTIONS.how)).toBeTruthy();
+    });
+
+    it('shows a community description in full instead of cutting it after two lines', () => {
+      mockCommunities.mockReturnValue({
+        data: [{ id: 3, slug: 'bengaluru', type: 'CITY', name: 'Bengaluru', description: LONG, emoji: '🌳', memberCount: 26, postCount: 0 }],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+      const { getByText } = renderScreen();
+      const description = getByText(LONG);
+
+      expect(description.props.numberOfLines).toBeUndefined();
+    });
+
+    it('uses the website wording for the three steps', () => {
+      const { getByText } = renderScreen();
+
+      expect(STEPS.map(step => step.title)).toEqual(['Ask anything', 'Share discoveries', 'Reviewed with care']);
+      STEPS.forEach(step => {
+        expect(getByText(step.title)).toBeTruthy();
+        expect(getByText(step.desc)).toBeTruthy();
+      });
+      expect(getByText(/New members' first posts are reviewed by our team before going live/)).toBeTruthy();
+    });
+
+    it('shows each step in full, with no line limit', () => {
+      const { getByText } = renderScreen();
+
+      STEPS.forEach(step => {
+        expect(getByText(step.desc).props.numberOfLines).toBeUndefined();
+      });
+    });
+  });
+
+  describe('the long-form text from the website', () => {
+    it('shows it on the screen itself, not only in the popup', () => {
+      const { getByTestId, getByText } = renderScreen();
+
+      expect(getByTestId('community-about')).toBeTruthy();
+      expect(getByText("Why India's pet parents needed a place like this")).toBeTruthy();
+      expect(getByText('Lessons the road taught us (so you can skip the hard way)')).toBeTruthy();
+      expect(getByText('The questions this community was built for')).toBeTruthy();
+      expect(getByText('Frequently asked questions')).toBeTruthy();
+    });
+
+    it('shows the opening paragraphs and the lessons', () => {
+      const { getByText } = renderScreen();
+
+      expect(getByText(/Every day, somewhere in India, a pet parent types a question into a WhatsApp group/)).toBeTruthy();
+      expect(getByText('“Pet friendly” on the internet means almost nothing')).toBeTruthy();
+      expect(getByText('Ask the narrower question')).toBeTruthy();
+      expect(getByText('Leopard country is real')).toBeTruthy();
+    });
+
+    it('lists all six questions of the FAQ', () => {
+      const { getByText } = renderScreen();
+
+      [
+        'Is there an online community or forum for pet parents in India?',
+        'How is this different from a WhatsApp pet group?',
+        'Can I trust the advice here?',
+        'Is Tails Community free?',
+        'I run a pet business. Can I participate?',
+        'My dog is an indie. Is this community for me?',
+      ].forEach(question => expect(getByText(question)).toBeTruthy());
+    });
+
+    it('opens the first answer, keeps the others closed, and opens one when its question is tapped', () => {
+      const { getByText, queryByText } = renderScreen();
+      const FIRST = /There are many WhatsApp and Facebook pet groups in India/;
+      const FREE = /Create a free account, join the communities that fit your life/;
+
+      expect(getByText(FIRST)).toBeTruthy();
+      expect(queryByText(FREE)).toBeNull();
+
+      fireEvent.press(getByText('Is Tails Community free?'));
+
+      expect(getByText(FREE)).toBeTruthy();
+      // Only one answer is open at a time
+      expect(queryByText(FIRST)).toBeNull();
+    });
+
+    it('closes an open answer when its question is tapped again', () => {
+      const { getByText, queryByText } = renderScreen();
+
+      fireEvent.press(getByText('Is there an online community or forum for pet parents in India?'));
+
+      expect(queryByText(/There are many WhatsApp and Facebook pet groups in India/)).toBeNull();
+    });
+
+    it('is still in the About popup too', () => {
+      const { getByText, getAllByText, getByLabelText } = renderScreen();
+      const before = getAllByText('Frequently asked questions').length;
+
+      fireEvent.press(getByLabelText('About the community'));
+
+      expect(getByText('About Tails Community')).toBeTruthy();
+      expect(getAllByText('Frequently asked questions').length).toBeGreaterThan(before);
+    });
+  });
 });
+

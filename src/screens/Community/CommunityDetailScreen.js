@@ -14,6 +14,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { s, ms } from 'react-native-size-matters';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
+import { BackButton } from '../../components/common/BackButton';
 import { theme } from '../../theme';
 import { useStore } from '../../store';
 import {
@@ -159,15 +160,17 @@ export const CommunityDetailScreen = ({ navigation, route }) => {
   const isDarkMode = useStore(state => state.isDarkMode);
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState('ALL');
-  const { isMember, isAuthenticated, isPending, toggle } = useCommunityMembership(community.slug);
+  const { isMember, memberCount, refetchMembership, isAuthenticated, isPending, toggle } =
+    useCommunityMembership(community.slug);
   const [modal, setModal] = useState({ visible: false });
   const showModal = config => setModal({ visible: true, ...config });
   const closeModal = () => setModal(prev => ({ ...prev, visible: false }));
 
   // Live counts, refreshed after joining or leaving
-  const { data: liveCommunities } = useCommunities();
+  const { data: liveCommunities, refetch: refetchCommunities } = useCommunities();
   const liveCommunity = liveCommunities?.find(item => item.slug === community.slug);
-  const members = liveCommunity?.memberCount ?? community.members;
+  // The count from the membership call is the freshest, e.g. right after joining or leaving
+  const members = memberCount ?? liveCommunity?.memberCount ?? community.members;
   const postCount = liveCommunity?.postCount ?? community.posts;
 
   const {
@@ -180,6 +183,22 @@ export const CommunityDetailScreen = ({ navigation, route }) => {
     hasNextPage,
     isFetchingNextPage,
   } = useCommunityPosts(community.slug);
+
+  // Pull to refresh reloads everything on the page, not only the posts: whether the user is a
+  // member and the member count can change on the website too
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refetch(),
+        isAuthenticated ? refetchMembership() : null,
+        refetchCommunities(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch, refetchMembership, refetchCommunities, isAuthenticated]);
 
   const allPosts = data?.pages?.flatMap(page => page?.posts || []) || [];
   const posts = filter === 'ALL' ? allPosts : allPosts.filter(post => post.type === filter);
@@ -259,13 +278,11 @@ export const CommunityDetailScreen = ({ navigation, route }) => {
         />
         <NightSky topInset={insets.top} />
 
-        <BouncyPressable
-          activeScale={0.95}
+        <BackButton
+          testID="community-back"
           onPress={() => navigation.goBack()}
-          style={styles.backLink}>
-          <Feather name="chevron-left" size={ms(15)} color="rgba(255,255,255,0.8)" />
-          <Text style={styles.backLinkText}>🐾 Tails Community</Text>
-        </BouncyPressable>
+          style={styles.backBtn}
+        />
 
         <View style={styles.titleRow}>
           <Bob style={styles.emojiTile} distance={4} duration={2400}>
@@ -474,8 +491,8 @@ export const CommunityDetailScreen = ({ navigation, route }) => {
         onEndReachedThreshold={0.4}
         refreshControl={
           <RefreshControl
-            refreshing={isRefetching && !isFetchingNextPage}
-            onRefresh={refetch}
+            refreshing={refreshing || (isRefetching && !isFetchingNextPage)}
+            onRefresh={handleRefresh}
             tintColor="#FFFFFF"
             colors={[PURPLE]}
           />
@@ -538,19 +555,7 @@ const styles = StyleSheet.create({
   },
   heroTopFade: { position: 'absolute', top: 0, left: 0, right: 0 },
 
-  backLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: s(2),
-    marginBottom: s(8),
-    marginLeft: -s(4),
-  },
-  backLinkText: {
-    fontFamily: theme.typography.fontFamily.semiBold,
-    fontSize: s(11.5),
-    color: 'rgba(255,255,255,0.78)',
-  },
+  backBtn: { alignSelf: 'flex-start', marginBottom: s(12) },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',

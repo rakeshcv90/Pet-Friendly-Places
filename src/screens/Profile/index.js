@@ -65,7 +65,7 @@ const sanitizePet = (pet, index = 0) => {
   };
 };
 
-export const ProfileScreen = ({ navigation }) => {
+export const ProfileScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const storeUser = useStore(state => state.user);
   const storePets = useStore(state => state.pets) || [];
@@ -119,6 +119,14 @@ export const ProfileScreen = ({ navigation }) => {
 
   // Modals state
   const [addPetModalVisible, setAddPetModalVisible] = useState(false);
+
+  // The pet profile page's "Add a pet" button sends the user here with the add-pet form to open
+  useEffect(() => {
+    if (route?.params?.openAddPet) {
+      setAddPetModalVisible(true);
+      navigation?.setParams?.({ openAddPet: undefined });
+    }
+  }, [route?.params?.openAddPet, navigation]);
   const [petToast, setPetToast] = useState('');
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
@@ -227,7 +235,7 @@ export const ProfileScreen = ({ navigation }) => {
       <PetCarousel
         pets={pets}
         isDarkMode={isDarkMode}
-        onOpen={pet => navigation.navigate('PetDetailsScreen', { pet })}
+        onOpen={pet => navigation.navigate('PetProfileScreen', { pet })}
         onHealth={pet => navigation.navigate('PetHealthRecordsScreen', { pet })}
         onPawsport={pet => navigation.navigate('PawsportScreen', { pet })}
         onEdit={pet => navigation.navigate('PetEditScreen', { pet })}
@@ -316,6 +324,10 @@ export const ProfileScreen = ({ navigation }) => {
     navigation?.navigate?.('SavedPlacesScreen');
   }, [navigation]);
 
+  const handleOpenUrbaniaBookings = useCallback(() => {
+    navigation?.navigate?.('UrbaniaBookingsScreen');
+  }, [navigation]);
+
   const handleOpenSubmissions = useCallback(() => {
     navigation?.navigate?.('MySubmissionsScreen');
   }, [navigation]);
@@ -382,6 +394,15 @@ export const ProfileScreen = ({ navigation }) => {
             color: '#EC4899',
             bgColor: isDarkMode ? '#4A0E2E' : '#FDF2F8',
             onPress: handleOpenSavedPlaces,
+          },
+          {
+            id: 'urbania_bookings',
+            title: 'Urbania bookings',
+            icon: 'bus-outline',
+            color: '#4C1D95',
+            bgColor: isDarkMode ? '#27104B' : '#F1EAFB',
+            badge: 'Trips 🚐',
+            onPress: handleOpenUrbaniaBookings,
           },
           {
             id: 'my_submissions',
@@ -477,6 +498,7 @@ export const ProfileScreen = ({ navigation }) => {
       handleOpenFollowing,
       handleOpenSavedPlaces,
       handleOpenSubmissions,
+      handleOpenUrbaniaBookings,
       handleOpenMyProfile,
       handleOpenPrivacy,
       navigation,

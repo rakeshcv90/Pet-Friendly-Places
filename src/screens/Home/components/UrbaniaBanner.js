@@ -147,11 +147,10 @@ const Rumble = ({ children }) => {
   );
 };
 
-export const UrbaniaBanner = ({ onBookNow }) => {
+// The van driving in, with wind streaks and a moving road: the Home banner and the booking history
+// page show the same scene
+export const UrbaniaVanScene = ({ style }) => {
   const drive = useRef(new Animated.Value(0)).current;
-  const pulse = useLoop(1100, { easing: Easing.inOut(Easing.sin), yoyo: true });
-  const nudge = useLoop(650, { easing: Easing.inOut(Easing.quad), yoyo: true });
-  const glowDrift = useLoop(3600, { easing: Easing.inOut(Easing.sin), yoyo: true });
 
   useEffect(() => {
     Animated.spring(drive, {
@@ -162,6 +161,43 @@ export const UrbaniaBanner = ({ onBookNow }) => {
       useNativeDriver: true,
     }).start();
   }, [drive]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      testID="urbania-van-scene"
+      style={[
+        styles.vanWrap,
+        style,
+        {
+          opacity: drive,
+          transform: [
+            ...(style?.transform || []),
+            { translateX: drive.interpolate({ inputRange: [0, 1], outputRange: [s(110), 0] }) },
+          ],
+        },
+      ]}>
+      <WindStreaks />
+      <Rumble>
+        <View style={styles.van}>
+          <Image
+            testID="urbania-van"
+            source={theme.images.urbaniaVan}
+            style={styles.vanImage}
+            resizeMode="contain"
+            accessibilityLabel="Travel With Tails and Rubicon pet-friendly Urbania van"
+          />
+        </View>
+      </Rumble>
+      <Road />
+    </Animated.View>
+  );
+};
+
+export const UrbaniaBanner = ({ onBookNow }) => {
+  const pulse = useLoop(1100, { easing: Easing.inOut(Easing.sin), yoyo: true });
+  const nudge = useLoop(650, { easing: Easing.inOut(Easing.quad), yoyo: true });
+  const glowDrift = useLoop(3600, { easing: Easing.inOut(Easing.sin), yoyo: true });
 
   return (
     <View style={styles.card} testID="urbania-banner">
@@ -204,31 +240,7 @@ export const UrbaniaBanner = ({ onBookNow }) => {
           </Enter>
         </View>
 
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.vanWrap,
-            {
-              opacity: drive,
-              transform: [
-                { translateX: drive.interpolate({ inputRange: [0, 1], outputRange: [s(110), 0] }) },
-              ],
-            },
-          ]}>
-          <WindStreaks />
-          <Rumble>
-            <View style={styles.van}>
-              <Image
-                testID="urbania-van"
-                source={theme.images.urbaniaVan}
-                style={styles.vanImage}
-                resizeMode="contain"
-                accessibilityLabel="Travel With Tails and Rubicon pet-friendly Urbania van"
-              />
-            </View>
-          </Rumble>
-          <Road />
-        </Animated.View>
+        <UrbaniaVanScene />
       </View>
 
       <Enter index={2}>
@@ -357,7 +369,14 @@ const styles = StyleSheet.create({
   vanWrap: { width: VAN_WIDTH, marginLeft: s(2), marginRight: -s(8) },
   van: { width: VAN_WIDTH, height: VAN_HEIGHT },
   // An exact size, so the picture is never drawn at its natural (much larger) pixel size
-  vanImage: { position: 'absolute', top: 0, left: 0, width: VAN_WIDTH, height: VAN_HEIGHT },
+  vanImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: VAN_WIDTH,
+    height: VAN_HEIGHT,
+    resizeMode: 'contain',
+  },
   streaks: {
     position: 'absolute',
     top: 0,

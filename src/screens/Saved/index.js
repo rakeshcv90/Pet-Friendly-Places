@@ -24,6 +24,7 @@ import { resolveImageUrl } from '../../hooks/useDiscovery';
 import { DraggableFab } from '../Community/DraggableFab';
 import { InfoButton } from '../Community/InfoButton';
 import { CommunityInfoModal } from '../Community/CommunityInfoModal';
+import { CommunityInfoContent } from '../Community/CommunityAbout';
 import {
   toCommunityCard,
   credentialLabel,
@@ -43,21 +44,37 @@ const GRID_CARD_WIDTH = Math.floor((SCREEN_WIDTH - GUTTER * 2 - GRID_GAP) / 2) -
 const PURPLE = '#7B2CFF';
 const DEEP_PURPLE = '#3B108F';
 
-const STEPS = [
+// The website's own wording for how the community works
+export const STEPS = [
   {
     icon: '💬',
     bg: '#EDE9FE',
     title: 'Ask anything',
-    desc: 'Post questions and get lived answers.',
+    desc: 'Post questions about pet travel, vets, food, or behaviour, fellow pet parents have real, lived answers.',
   },
   {
     icon: '📍',
     bg: '#CCFBF1',
-    title: 'Share finds',
-    desc: 'Add dog-friendly places for everyone.',
+    title: 'Share discoveries',
+    desc: "Found a hidden dog-friendly café? A pet-safe beach? Share it with the community and it's there forever.",
   },
-  { icon: '✨', bg: '#D1FAE5', title: 'Reviewed', desc: 'Moderated and verified with care.' },
+  {
+    icon: '✨',
+    bg: '#D1FAE5',
+    title: 'Reviewed with care',
+    desc: "New members' first posts are reviewed by our team before going live, so this stays a safe, genuinely helpful space for every pet parent.",
+  },
 ];
+
+// The line under each section heading, as on the website
+export const SECTION_DESCRIPTIONS = {
+  topic: 'Questions, tips and stories for every pet parent journey',
+  city: 'Connect with pet parents in your city',
+  how: 'A genuine space, built, moderated, and used by Indian pet parents.',
+};
+
+export const HERO_TEXT =
+  'Ask questions, share discoveries, and connect with fellow pet parents across India. Moderated, permanent, and searchable. Not another chat group where answers scroll away.';
 
 const FadeIn = ({ index = 0, children, style }) => {
   const progress = useRef(new Animated.Value(0)).current;
@@ -357,10 +374,17 @@ const Reveal = ({ scrollY, onMeasure, children }) => {
   );
 };
 
-const SectionHeading = ({ overline, title, isDarkMode }) => (
+const SectionHeading = ({ overline, title, description, isDarkMode }) => (
   <View style={styles.sectionHeading}>
     <Text style={styles.overline}>{overline}</Text>
     <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>{title}</Text>
+    {description ? (
+      <Text
+        testID="section-description"
+        style={[styles.sectionDesc, isDarkMode && styles.textMutedDark]}>
+        {description}
+      </Text>
+    ) : null}
   </View>
 );
 
@@ -403,9 +427,7 @@ const CommunityTile = ({ item, accent, onPress, index = 0 }) => (
       <Text style={styles.tileTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
         {item.title}
       </Text>
-      <Text style={styles.tileDesc} numberOfLines={2}>
-        {item.desc}
-      </Text>
+      <Text style={styles.tileDesc}>{item.desc}</Text>
       <View style={styles.tilePills}>
         <View style={styles.tilePill}>
           <Text
@@ -823,8 +845,10 @@ export const SavedScreen = ({ navigation }) => {
           <Text style={[styles.heroTitle, isDarkMode && styles.textLight]}>
             Where pet parents <Text style={styles.heroTitleAccent}>find their people</Text>
           </Text>
-          <Text style={[styles.heroSubtitle, isDarkMode && styles.textMutedDark]} numberOfLines={2}>
-            Ask questions, share discoveries and connect with fellow pet parents.
+          <Text
+            testID="hero-description"
+            style={[styles.heroSubtitle, isDarkMode && styles.textMutedDark]}>
+            {HERO_TEXT}
           </Text>
           <LeaderboardCard
             topPets={(topPets || []).slice(0, 3)}
@@ -863,7 +887,12 @@ export const SavedScreen = ({ navigation }) => {
 
         {/* By Topic */}
         <Reveal scrollY={scrollY}>
-          <SectionHeading overline="Explore" title="By Topic" isDarkMode={isDarkMode} />
+          <SectionHeading
+            overline="Explore"
+            title="By Topic"
+            description={SECTION_DESCRIPTIONS.topic}
+            isDarkMode={isDarkMode}
+          />
           <SectionState
             withLoader
             isLoading={isLoading}
@@ -887,7 +916,12 @@ export const SavedScreen = ({ navigation }) => {
 
         {/* By City */}
         <Reveal scrollY={scrollY}>
-          <SectionHeading overline="Nearby" title="By City" isDarkMode={isDarkMode} />
+          <SectionHeading
+            overline="Nearby"
+            title="By City"
+            description={SECTION_DESCRIPTIONS.city}
+            isDarkMode={isDarkMode}
+          />
           <SectionState
             isLoading={isLoading}
             isError={isError && !apiCommunities}
@@ -909,7 +943,12 @@ export const SavedScreen = ({ navigation }) => {
 
         {/* How it works */}
         <Reveal scrollY={scrollY}>
-          <SectionHeading overline="How it works" title="Tails Community" isDarkMode={isDarkMode} />
+          <SectionHeading
+            overline="How it works"
+            title="Tails Community"
+            description={SECTION_DESCRIPTIONS.how}
+            isDarkMode={isDarkMode}
+          />
           <View style={styles.steps}>
             {STEPS.map((step, i) => (
               <Tilt3D
@@ -922,13 +961,18 @@ export const SavedScreen = ({ navigation }) => {
                   </View>
                 </Float>
                 <Text style={[styles.stepTitle, isDarkMode && styles.textLight]}>{step.title}</Text>
-                <Text
-                  style={[styles.cardDesc, styles.stepDesc, isDarkMode && styles.textMutedDark]}
-                  numberOfLines={3}>
+                <Text style={[styles.cardDesc, styles.stepDesc, isDarkMode && styles.textMutedDark]}>
                   {step.desc}
                 </Text>
               </Tilt3D>
             ))}
+          </View>
+        </Reveal>
+
+        {/* The long-form text from the website: why it exists, lessons from the road, what to ask, FAQ */}
+        <Reveal scrollY={scrollY}>
+          <View style={styles.aboutWrap} testID="community-about">
+            <CommunityInfoContent isDarkMode={isDarkMode} />
           </View>
         </Reveal>
 
@@ -1372,6 +1416,15 @@ const styles = StyleSheet.create({
     lineHeight: s(14),
     letterSpacing: 0.72,
     textTransform: 'uppercase',
+  },
+  aboutWrap: { marginHorizontal: GUTTER, marginTop: s(22) },
+  sectionDesc: {
+    marginTop: s(3),
+    marginBottom: s(8),
+    fontFamily: theme.typography.fontFamily.regular,
+    fontSize: s(12),
+    lineHeight: s(17),
+    color: '#6B7280',
   },
   sectionTitle: {
     fontSize: s(21),

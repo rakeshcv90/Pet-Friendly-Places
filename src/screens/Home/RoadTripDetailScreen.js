@@ -19,6 +19,7 @@ import { s, vs, ms } from 'react-native-size-matters';
 import { theme } from '../../theme';
 import { useStore } from '../../store';
 import { useRoadTripDetail } from '../../hooks/useDiscovery';
+import { parseFaqs } from './routeFaq';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { Loader } from '../../components/common/Loader';
 
@@ -199,24 +200,16 @@ export const RoadTripDetailScreen = ({ navigation, route }) => {
     return sections.filter(sec => sec.title || sec.body);
   }, [routeObj?.intro_markdown]);
 
-  // Parse FAQ markdown into question and answer pairs
-  const parsedFaqs = useMemo(() => {
-    const raw = routeObj?.faq_markdown;
-    if (!raw) return [];
+  // The FAQ markdown as question and answer pairs (routes write it in a few different ways)
+  const parsedFaqs = useMemo(() => parseFaqs(routeObj?.faq_markdown), [routeObj?.faq_markdown]);
 
-    const regex = /\*\*(.*?)\*\*\n([\s\S]*?)(?=(?:\*\*|$))/g;
-    const faqs = [];
-    let match;
-    while ((match = regex.exec(raw)) !== null) {
-      faqs.push({
-        question: match[1].trim(),
-        answer: match[2].trim().replace(/\[(.*?)\]\(.*?\)/g, '$1'), // Strip raw markdown link wrappers
-      });
+  // The "Welcome to <city>" card: open the search screen for the destination city
+  const handleOpenDestination = useCallback(() => {
+    const city = routeObj?.destination_city;
+    if (city) {
+      navigation.navigate('SearchScreen', { query: city });
     }
-    return faqs;
-  }, [routeObj?.faq_markdown]);
-
-
+  }, [navigation, routeObj?.destination_city]);
 
   // Handle Stop click - Navigate to RoadTripStopDetailScreen for listing items!
   const handleOpenStopDetail = useCallback(
@@ -956,9 +949,11 @@ export const RoadTripDetailScreen = ({ navigation, route }) => {
                     YOU'VE ARRIVED AT YOUR DESTINATION
                   </Text>
                   <BouncyPressable
-                    activeScale={1}
-                    // onPress={handleOpenDestination}
-                  >
+                    testID="road-trip-destination"
+                    accessibilityRole="button"
+                    accessibilityLabel={`Explore ${routeObj.destination_city}`}
+                    activeScale={0.97}
+                    onPress={handleOpenDestination}>
                     <View style={[styles.arrivalCard, isDarkMode && styles.arrivalCardDark]}>
                       <View style={styles.arrivalCardLeft}>
                         <Text

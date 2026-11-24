@@ -46,6 +46,11 @@ export const API_ENDPOINTS = {
   MY_PLACE_SUBMISSIONS: '/me/place-submissions',
 
   SAVED_PLACES: '/accounts/me/saved',
+  // GET the signed-in account's Urbania bookings (requests and confirmed trips)
+  MY_URBANIA_BOOKINGS: '/accounts/me/urbania-bookings',
+  // POST { reference, name, phone, details }: asks staff to check ownership of a booking. Path is a
+  // best guess until it is confirmed against the API docs.
+  URBANIA_STAFF_REVIEW: '/accounts/me/urbania-bookings/ownership-review',
   // GET the signed-in account's profile privacy switches; PATCH one switch at a time
   PRIVACY: '/accounts/me/privacy',
   // The signed-in account's pets
@@ -69,7 +74,49 @@ export const API_ENDPOINTS = {
   // A pet's private health records. GET list, POST create (JSON). Photos are added one at a time:
   // POST multipart { file } to .../health-records/{recordId}/files
   PET_HEALTH_RECORDS: petId => `/pets/${petId}/health-records`,
+  // GET reads and PATCH changes { notifyHealthRemindersEmail }: email reminders only, not push
+  PET_HEALTH_SETTINGS: petId => `/pets/${petId}/health-settings`,
+  // PATCH edits a record's details; DELETE archives it (restorable, 204 No Content)
+  PET_HEALTH_RECORD: (petId, recordId) => `/pets/${petId}/health-records/${recordId}`,
+  PET_HEALTH_ARCHIVED: petId => `/pets/${petId}/health-records/archived`,
+  PET_HEALTH_RESTORE: (petId, recordId) => `/pets/${petId}/health-records/${recordId}/restore`,
+  // POST one vaccination entry: vaccineName, dateAdministered and/or dueDate, batch, clinic, vet
+  PET_HEALTH_VACCINATIONS: (petId, recordId) =>
+    `/pets/${petId}/health-records/${recordId}/vaccinations`,
+  // POST arranges the pages newest first; PATCH .../files/order sets a chosen order
+  PET_HEALTH_ORGANIZE: (petId, recordId) => `/pets/${petId}/health-records/${recordId}/organize`,
+  PET_HEALTH_FILES_ORDER: (petId, recordId) =>
+    `/pets/${petId}/health-records/${recordId}/files/order`,
+  // POST starts reading one file / every page; suggestions stay unconfirmed until approved
+  PET_HEALTH_EXTRACT: (petId, recordId, fileId) =>
+    `/pets/${petId}/health-records/${recordId}/files/${fileId}/extract`,
+  PET_HEALTH_EXTRACT_BULK: (petId, recordId) =>
+    `/pets/${petId}/health-records/${recordId}/extract/bulk`,
+  PET_HEALTH_EXTRACT_APPROVE: (petId, recordId, fileId) =>
+    `/pets/${petId}/health-records/${recordId}/files/${fileId}/extract/approve`,
+  // GET the confirmed vaccine history; POST .../due-date { entryId, dueDate } confirms a due date
+  PET_HEALTH_HISTORY: petId => `/pets/${petId}/health-history`,
+  // GET ?q= searches clinics and vets; POST links the chosen one to a vaccination entry
+  // with { listingId }
+  PET_HEALTH_VET_SUGGESTIONS: petId => `/pets/${petId}/health-records/vet-suggestions`,
+  PET_HEALTH_VET_CONFIRM: (petId, recordId, entryId) =>
+    `/pets/${petId}/health-records/${recordId}/vaccinations/${entryId}/vet-confirm`,
+  PET_HEALTH_HISTORY_DUE_DATE: petId => `/pets/${petId}/health-history/due-date`,
   PET_HEALTH_RECORD_FILES: (petId, recordId) => `/pets/${petId}/health-records/${recordId}/files`,
+  // GET returns the image bytes (not JSON) and needs the Bearer token; ?variant=processed falls back
+  // to the stored original when no processed copy exists yet
+  PET_HEALTH_RECORD_FILE: (petId, recordId, fileId) =>
+    `/pets/${petId}/health-records/${recordId}/files/${fileId}`,
+  // Public profile by slug (no sign-in needed). The response carries the pet's id
+  PET_BY_SLUG: slug => `/pets/by-slug/${slug}`,
+  // GET { followerCount, viewerFollowing }. POST follows, DELETE unfollows: both need the Bearer
+  // token and answer { following, followerCount }
+  PET_FOLLOWERS: petId => `/pets/${petId}/followers`,
+  PET_FOLLOW: petId => `/pets/${petId}/follow`,
+  // GET the comments visible to the viewer; POST { body } adds one (sign-in needed)
+  PET_MEDIA_COMMENTS: mediaId => `/pets/media/${mediaId}/comments`,
+  // GET { likeCount, viewerLiked }; POST toggles the viewer's like and answers the new state
+  PET_MEDIA_LIKES: mediaId => `/pets/media/${mediaId}/likes`,
   // Public pawsport: pet name, stamp total, distinct places, stamp details
   PAWSPORT: petSlug => `/traveller/${petSlug}/pawsport`,
 
@@ -81,7 +128,11 @@ export const API_ENDPOINTS = {
 
   COMMUNITY: {
     LIST: '/community/communities',
+    // POST { communitySlug } toggles: joins when not a member, leaves when already one. Answers
+    // { joined, memberCount }
     MEMBERSHIPS: '/community/memberships',
+    // GET (signed in) answers { joined, memberCount } for the current user
+    MEMBERSHIP: communitySlug => `/community/memberships/${communitySlug}`,
     MY_ACTIVITY: '/community/my-activity',
     MEDIA_UPLOAD: '/community/media/upload',
     POSTS: '/community/posts',

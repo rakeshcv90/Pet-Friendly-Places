@@ -18,15 +18,14 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { s, ms } from 'react-native-size-matters';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
+import { BackButton } from '../../components/common/BackButton';
 import { theme } from '../../theme';
 import { useStore } from '../../store';
-import { WEB_BASE_URL } from '../../services/api/apiList';
 import { useLeaderboard, LEADERBOARD_WINDOWS } from '../../hooks/useLeaderboard';
 import { resolveImageUrl } from '../../hooks/useDiscovery';
 import { Loader } from '../../components/common/Loader';
 import { ErrorState } from '../Community/LoadingStates';
 import { Bob, Enter, Shine } from '../Community/Motion';
-import { WEBSITE_CHROME_SELECTORS } from '../Community/utils';
 
 const GUTTER = s(15);
 const LEADERBOARD_LIMIT = 20;
@@ -580,11 +579,7 @@ export const LeaderboardScreen = ({ navigation }) => {
   const ordered = [second, champion, third];
 
   const openPet = entry =>
-    navigation.navigate('InAppBrowserScreen', {
-      url: `${WEB_BASE_URL}/traveller/${entry.slug}`,
-      title: entry.petName,
-      hideSelectors: WEBSITE_CHROME_SELECTORS,
-    });
+    navigation.navigate('PublicPetProfileScreen', { slug: entry.slug, entry });
 
   const goTab = screen => navigation.navigate('MainTabs', { screen });
 
@@ -714,13 +709,7 @@ export const LeaderboardScreen = ({ navigation }) => {
             />
 
             <View style={styles.topRow}>
-              <BouncyPressable
-                activeScale={0.88}
-                accessibilityLabel="Back"
-                onPress={() => navigation.goBack()}
-                style={styles.backBtn}>
-                <Feather name="chevron-left" size={ms(20)} color="#FFFFFF" />
-              </BouncyPressable>
+              <BackButton onPress={() => navigation.goBack()} />
               <View style={styles.pill}>
                 <Text style={styles.pillText} numberOfLines={1} adjustsFontSizeToFit>
                   🏆 India's most adventurous pet leaderboard
@@ -891,16 +880,6 @@ const styles = StyleSheet.create({
     left: -s(10),
     bottom: s(30),
     transform: [{ rotate: '-25deg' }],
-  },
-  backBtn: {
-    width: s(34),
-    height: s(34),
-    borderRadius: s(17),
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: s(10) },
   heroBody: { alignItems: 'center', marginTop: s(10) },

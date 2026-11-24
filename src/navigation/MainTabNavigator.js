@@ -56,6 +56,14 @@ const TabButton = ({ route, isFocused, onPress, onLongPress, isDarkMode, accentC
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const activeAnim = useRef(new Animated.Value(isFocused ? 1 : 0)).current;
 
+  // Premium touches: the icon spins a full turn and settles in with a little overshoot, a halo ring bursts out
+  // behind it, and the centre Explore button glows softly while it idles
+  const popAnim = useRef(new Animated.Value(1)).current;
+  // Both rest at 1, where they are fully faded out: nothing shows until a burst plays
+  const haloAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(1)).current;
+  const hasMounted = useRef(false);
+
   useEffect(() => {
     Animated.timing(activeAnim, {
       toValue: isFocused ? 1 : 0,
@@ -63,7 +71,65 @@ const TabButton = ({ route, isFocused, onPress, onLongPress, isDarkMode, accentC
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
-  }, [isFocused, activeAnim]);
+
+    // Skip the burst on first paint: only animate when the user actually switches tab
+    if (hasMounted.current && isFocused) {
+      popAnim.setValue(0);
+      haloAnim.setValue(0);
+      Animated.parallel([
+        Animated.spring(popAnim, {
+          toValue: 1,
+          friction: 6,
+          tension: 110,
+          useNativeDriver: true,
+        }),
+        Animated.timing(haloAnim, {
+          toValue: 1,
+          duration: 560,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+    hasMounted.current = true;
+  }, [isFocused, activeAnim, popAnim, haloAnim]);
+
+  const isExploreTab = route.name === 'Explore';
+  useEffect(() => {
+    if (!isExploreTab) {
+      return undefined;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 0, duration: 0, useNativeDriver: true }),
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 1600,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.delay(500),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isExploreTab, glowAnim]);
+
+  const iconPopStyle = {
+    transform: [
+      { translateY: popAnim.interpolate({ inputRange: [0, 1], outputRange: [4, 0] }) },
+      { rotate: popAnim.interpolate({ inputRange: [0, 1], outputRange: ['-360deg', '0deg'] }) },
+      { scale: popAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) },
+    ],
+  };
+  const haloStyle = {
+    opacity: haloAnim.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0] }),
+    transform: [{ scale: haloAnim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.7] }) }],
+  };
+  const glowStyle = {
+    opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0] }),
+    transform: [{ scale: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.55] }) }],
+  };
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
@@ -136,14 +202,28 @@ const TabButton = ({ route, isFocused, onPress, onLongPress, isDarkMode, accentC
         onPressOut={handlePressOut}
         style={styles.tabItem}>
         <Animated.View style={[styles.tabContent, { transform: [{ scale: scaleAnim }] }]}>
-          <View style={[styles.exploreOuterPod, isDarkMode && styles.exploreOuterPodDark]}>
-            <LinearGradient
-              colors={['#EE2A7B', '#A855F7', '#8233FE']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.exploreGradientBtn}>
-              <Ionicons name="search" size={ms(18)} color="#FFFFFF" />
-            </LinearGradient>
+          <View style={styles.exploreWrap}>
+            <Animated.View
+              pointerEvents="none"
+              testID="tab-explore-glow"
+              style={[styles.exploreGlow, glowStyle]}
+            />
+            <Animated.View
+              pointerEvents="none"
+              testID="tab-halo-Explore"
+              style={[styles.exploreGlow, styles.exploreHalo, haloStyle]}
+            />
+            <View style={[styles.exploreOuterPod, isDarkMode && styles.exploreOuterPodDark]}>
+              <LinearGradient
+                colors={['#EE2A7B', '#A855F7', '#8233FE']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.exploreGradientBtn}>
+                <Animated.View style={iconPopStyle}>
+                  <Ionicons name="search" size={ms(18)} color="#FFFFFF" />
+                </Animated.View>
+              </LinearGradient>
+            </View>
           </View>
           <Animated.Text
             numberOfLines={1}
@@ -181,20 +261,29 @@ const TabButton = ({ route, isFocused, onPress, onLongPress, isDarkMode, accentC
       onPressOut={handlePressOut}
       style={styles.tabItem}>
       <Animated.View style={[styles.tabContent, { transform: [{ scale: scaleAnim }] }]}>
-        <Animated.View
-          style={[
-            styles.iconSquircleBase,
-            {
-              backgroundColor: squircleBg,
-              transform: [{ scale: squircleScale }],
-            },
-          ]}>
-          <Ionicons
-            name={isFocused ? config.activeIcon : config.icon}
-            size={ms(18)}
-            color={isFocused ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#8E8E93'}
+        <View style={styles.iconWrap}>
+          <Animated.View
+            pointerEvents="none"
+            testID={`tab-halo-${route.name}`}
+            style={[styles.iconHalo, { backgroundColor: primaryAccent }, haloStyle]}
           />
-        </Animated.View>
+          <Animated.View
+            style={[
+              styles.iconSquircleBase,
+              {
+                backgroundColor: squircleBg,
+                transform: [{ scale: squircleScale }],
+              },
+            ]}>
+            <Animated.View style={isFocused ? iconPopStyle : null}>
+              <Ionicons
+                name={isFocused ? config.activeIcon : config.icon}
+                size={ms(18)}
+                color={isFocused ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#8E8E93'}
+              />
+            </Animated.View>
+          </Animated.View>
+        </View>
         <Animated.Text
           numberOfLines={1}
           style={[
@@ -348,6 +437,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  /* Halo ring that bursts out of the icon when a tab is selected */
+  iconWrap: {
+    width: s(34),
+    height: s(32),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconHalo: {
+    position: 'absolute',
+    width: s(34),
+    height: s(32),
+    borderRadius: s(11),
+  },
+
   /* Compact Active / Inactive icon containers */
   iconSquircleBase: {
     width: s(34),
@@ -358,8 +461,24 @@ const styles = StyleSheet.create({
   },
 
   /* Compact Explore center button */
-  exploreOuterPod: {
+  exploreWrap: {
     marginTop: -s(12),
+    width: s(46),
+    height: s(46),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exploreGlow: {
+    position: 'absolute',
+    width: s(46),
+    height: s(46),
+    borderRadius: s(16),
+    backgroundColor: '#A855F7',
+  },
+  exploreHalo: {
+    backgroundColor: '#EE2A7B',
+  },
+  exploreOuterPod: {
     width: s(46),
     height: s(46),
     borderRadius: s(16),

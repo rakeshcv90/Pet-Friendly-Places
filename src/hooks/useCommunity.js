@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { AppState } from 'react-native';
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api/apiClient';
 import { API_ENDPOINTS, API_BASE_URL } from '../services/api/apiList';
@@ -111,22 +112,90 @@ export const filterActivity = (items, filter) =>
 
 const readMemberships = () => getItem(STORAGE_KEYS.COMMUNITY_MEMBERSHIPS, true) || {};
 
-// Join / leave a community. The API only exposes a toggle (POST /community/memberships) and no way
-// to read membership, so the last known state is remembered on the device per signed-in user.
-// Exactly one request is sent per toggle, and its `joined` value is the source of truth.
+const readMembershipState = data => ({
+  joined: !!data?.joined,
+  memberCount: Number.isFinite(Number(data?.memberCount)) ? Number(data.memberCount) : null,
+});
+
+// Join / leave a community. POST /community/memberships is a toggle, and GET
+// /community/memberships/{slug} reports the real state, so the server is the source of truth. The
+// last known state is also kept on the device so the button is right before the GET answers.
+// Exactly one POST is sent per tap. If it times out, the state is read back with a GET: when it
+// changed the POST did succeed, and when it did not the failure is reported so it can be retried.
 export const useCommunityMembership = communitySlug => {
   const queryClient = useQueryClient();
   const user = useStore(state => state.user);
   const isAuthenticated = useStore(state => state.isAuthenticated);
-  const storageKey = `${user?.id ?? user?.email ?? 'anon'}:${communitySlug}`;
+  const userKey = user?.id ?? user?.email ?? 'anon';
+  const storageKey = `${userKey}:${communitySlug}`;
+  const queryKey = ['community', 'membership', communitySlug, userKey];
   const [isMember, setIsMember] = useState(() => !!readMemberships()[storageKey]);
 
+  const remember = joined => {
+    setIsMember(joined);
+    setItem(STORAGE_KEYS.COMMUNITY_MEMBERSHIPS, { ...readMemberships(), [storageKey]: joined });
+  };
+
+  const status = useQuery({
+    queryKey,
+    enabled: !!isAuthenticated && !!communitySlug,
+    queryFn: async () =>
+      readMembershipState(await api.get(API_ENDPOINTS.COMMUNITY.MEMBERSHIP(communitySlug))),
+    staleTime: 1000 * 30,
+  });
+
+  // Whatever the server says wins over the remembered copy
+  const serverJoined = status.data?.joined;
+  useEffect(() => {
+    if (typeof serverJoined === 'boolean') {
+      remember(serverJoined);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverJoined]);
+
+  // Joining or leaving on the website (or another phone) happens while the app is in the
+  // background, so look again whenever the app comes back to the foreground
+  const refetchMembership = status.refetch;
+  useEffect(() => {
+    if (!isAuthenticated || !communitySlug) {
+      return undefined;
+    }
+    const subscription = AppState.addEventListener('change', next => {
+      if (next === 'active') {
+        refetchMembership();
+      }
+    });
+    return () => subscription?.remove?.();
+  }, [isAuthenticated, communitySlug, refetchMembership]);
+
   const mutation = useMutation({
-    mutationFn: () => api.post(API_ENDPOINTS.COMMUNITY.MEMBERSHIPS, { communitySlug }),
-    onSuccess: data => {
-      const joined = !!data?.joined;
-      setIsMember(joined);
-      setItem(STORAGE_KEYS.COMMUNITY_MEMBERSHIPS, { ...readMemberships(), [storageKey]: joined });
+    mutationFn: async () => {
+      try {
+        return readMembershipState(
+          await api.post(API_ENDPOINTS.COMMUNITY.MEMBERSHIPS, { communitySlug }),
+        );
+      } catch (error) {
+        // No response means a timeout or a dropped connection: the POST may still have gone through
+        if (error?.response) {
+          throw error;
+        }
+        let current;
+        try {
+          current = readMembershipState(
+            await api.get(API_ENDPOINTS.COMMUNITY.MEMBERSHIP(communitySlug)),
+          );
+        } catch (checkError) {
+          throw error;
+        }
+        if (current.joined !== isMember) {
+          return current;
+        }
+        throw error;
+      }
+    },
+    onSuccess: state => {
+      remember(state.joined);
+      queryClient.setQueryData(queryKey, state);
       // Member counts changed
       queryClient.invalidateQueries({ queryKey: ['community', 'list'] });
     },
@@ -134,6 +203,8 @@ export const useCommunityMembership = communitySlug => {
 
   return {
     isMember,
+    memberCount: status.data?.memberCount ?? null,
+    refetchMembership,
     isAuthenticated,
     isPending: mutation.isPending,
     toggle: () => mutation.mutateAsync(),

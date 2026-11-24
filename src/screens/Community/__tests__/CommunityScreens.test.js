@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { RefreshControl } from 'react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { CommunityDetailScreen } from '../CommunityDetailScreen';
 import { PostDetailScreen } from '../PostDetailScreen';
 import { useStore } from '../../../store';
@@ -94,11 +95,12 @@ describe('CommunityDetailScreen', () => {
   });
 
   it('follows the website layout: hero details, filters and guidelines', () => {
-    const { getByText } = render(
+    const { getByText, getByTestId } = render(
       <CommunityDetailScreen navigation={mockNavigation} route={{ params: { community: COMMUNITY } }} />,
     );
 
-    expect(getByText('🐾 Tails Community')).toBeTruthy();
+    // The standard white back button, not a text link
+    expect(getByTestId('community-back')).toBeTruthy();
     expect(getByText('Travel & Road Trips')).toBeTruthy();
     expect(getByText('12')).toBeTruthy();
     expect(getByText('Posts')).toBeTruthy();
@@ -167,11 +169,11 @@ describe('CommunityDetailScreen', () => {
   });
 
   it('goes back from the hero link and the All Communities button', () => {
-    const { getByText } = render(
+    const { getByText, getByLabelText } = render(
       <CommunityDetailScreen navigation={mockNavigation} route={{ params: { community: COMMUNITY } }} />,
     );
 
-    fireEvent.press(getByText('🐾 Tails Community'));
+    fireEvent.press(getByLabelText('Back'));
     fireEvent.press(getByText('All Communities'));
     expect(mockNavigation.goBack).toHaveBeenCalledTimes(2);
   });
@@ -310,6 +312,54 @@ describe('CommunityDetailScreen membership', () => {
     fireEvent.press(getByText('Join Community'));
 
     await waitFor(() => expect(getByText('Something went wrong')).toBeTruthy());
+  });
+
+  it('pull to refresh reloads the posts, the membership and the member count', async () => {
+    const refetchPosts = jest.fn().mockResolvedValue({});
+    const refetchMembership = jest.fn().mockResolvedValue({});
+    const refetchCommunities = jest.fn().mockResolvedValue({});
+    mockPostsState.mockReturnValue({
+      data: { pages: [{ posts: [] }] },
+      isLoading: false,
+      isError: false,
+      refetch: refetchPosts,
+    });
+    mockMembership.mockReturnValue(membership({ refetchMembership }));
+    mockCommunities.mockReturnValue({ data: undefined, refetch: refetchCommunities });
+    const { UNSAFE_getByType } = renderScreen();
+
+    await act(async () => {
+      await UNSAFE_getByType(RefreshControl).props.onRefresh();
+    });
+
+    expect(refetchPosts).toHaveBeenCalledTimes(1);
+    expect(refetchMembership).toHaveBeenCalledTimes(1);
+    expect(refetchCommunities).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not ask for membership when refreshing as a guest', async () => {
+    const refetchMembership = jest.fn().mockResolvedValue({});
+    mockPostsState.mockReturnValue({
+      data: { pages: [{ posts: [] }] },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn().mockResolvedValue({}),
+    });
+    mockMembership.mockReturnValue(membership({ isAuthenticated: false, refetchMembership }));
+    mockCommunities.mockReturnValue({ data: undefined, refetch: jest.fn().mockResolvedValue({}) });
+    const { UNSAFE_getByType } = renderScreen();
+
+    await act(async () => {
+      await UNSAFE_getByType(RefreshControl).props.onRefresh();
+    });
+    expect(refetchMembership).not.toHaveBeenCalled();
+  });
+
+  it('shows the freshest member count from the membership call over the directory', () => {
+    mockMembership.mockReturnValue(membership({ memberCount: 30 }));
+    mockCommunities.mockReturnValue({ data: [{ slug: 'travel-and-road-trips', memberCount: 27 }] });
+    const { getByText } = renderScreen();
+    expect(getByText('30')).toBeTruthy();
   });
 
   it('shows live member counts from the directory', () => {

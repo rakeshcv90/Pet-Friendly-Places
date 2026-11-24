@@ -1,12 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated, Easing, StyleSheet } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import Feather from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { s, ms } from 'react-native-size-matters';
+import { s } from 'react-native-size-matters';
 
 import { theme } from '../../../theme';
-import { BouncyPressable } from '../../../components/common/BouncyPressable';
+import { BackPill } from '../../../components/common/BackPill';
 import { NightSky } from '../../Community/NightSky';
 import { Bob, Enter } from '../../Community/Motion';
 
@@ -73,17 +72,7 @@ export const PetHero = ({ title, subtitle, eyebrow, backLabel = '🐾 Back', onB
       <NightSky topInset={insets.top} />
 
       <Enter index={0} style={styles.backRow}>
-        <View style={styles.backPill}>
-          <BouncyPressable
-            testID="pet-hero-back"
-            accessibilityLabel="Back"
-            activeScale={0.88}
-            onPress={onBack}
-            style={styles.backBtn}>
-            <Feather name="chevron-left" size={ms(20)} color="#FFFFFF" />
-          </BouncyPressable>
-          <Text style={styles.backText}>{backLabel}</Text>
-        </View>
+        <BackPill testID="pet-hero-back" label={backLabel} onPress={onBack} />
       </Enter>
 
       {!!eyebrow && (
@@ -117,21 +106,6 @@ const styles = StyleSheet.create({
   },
   topFade: { position: 'absolute', top: 0, left: 0, right: 0 },
   backRow: { alignSelf: 'flex-start', marginBottom: s(12) },
-  backPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: s(8),
-    paddingRight: s(14),
-    borderRadius: s(20),
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-  },
-  backText: {
-    fontFamily: theme.typography.fontFamily.semiBold,
-    fontSize: s(12.5),
-    color: 'rgba(255,255,255,0.92)',
-  },
   eyebrow: {
     marginBottom: s(3),
     fontFamily: theme.typography.fontFamily.bold,
@@ -172,15 +146,5 @@ const styles = StyleSheet.create({
     fontSize: s(14.5),
     lineHeight: s(21),
     color: 'rgba(255,255,255,0.88)',
-  },
-  backBtn: {
-    width: s(34),
-    height: s(34),
-    borderRadius: s(17),
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

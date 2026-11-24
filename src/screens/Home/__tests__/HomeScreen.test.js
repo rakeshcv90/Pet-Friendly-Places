@@ -22,6 +22,10 @@ jest.mock('../../../hooks/useDiscovery', () => ({
   useHomeData: () => ({
     data: {
       top_categories: [{ category: 'Cafe', listing_count: 5 }],
+      top_cities: [
+        { city: 'New Delhi', state: 'Delhi', listing_count: 53, hero_image_url: null },
+        { city: 'Rishikesh', state: 'Uttarakhand', listing_count: 48, hero_image_url: null },
+      ],
       stories: [
         {
           id: '1',
@@ -61,7 +65,7 @@ describe('HomeScreen Component', () => {
 
   it('opens with the Urbania road trip banner as the main card under the header', () => {
     const { getByText, getByTestId, queryByText } = renderWithNavigation(
-      <HomeScreen navigation={mockNavigation} />
+      <HomeScreen navigation={mockNavigation} />,
     );
 
     expect(getByTestId('urbania-banner')).toBeTruthy();
@@ -102,18 +106,83 @@ describe('HomeScreen Component', () => {
     expect(mockNavigation.navigate).toHaveBeenCalledWith('UrbaniaBookingScreen');
   });
 
-  it('renders categories from home data', () => {
-    const { getByText } = renderWithNavigation(
-      <HomeScreen navigation={mockNavigation} />
+  it('shows the popular destinations from the API above the quick actions', () => {
+    const { getByText, getByTestId, toJSON } = renderWithNavigation(
+      <HomeScreen navigation={mockNavigation} />,
     );
+
+    expect(getByText('Popular Indian Destinations for Pet Travel')).toBeTruthy();
+    expect(getByTestId('destination-0-count').props.children).toBe('53 places');
+
+    const texts = [];
+    const walk = node => {
+      if (typeof node === 'string') {
+        texts.push(node);
+      } else if (Array.isArray(node)) {
+        node.forEach(walk);
+      } else if (node && node.children) {
+        node.children.forEach(walk);
+      }
+    };
+    walk(toJSON());
+    const destinations = texts.indexOf('Popular Indian Destinations for Pet Travel');
+    const quick = texts.indexOf('Quick actions');
+    expect(destinations).toBeGreaterThan(-1);
+    expect(quick).toBeGreaterThan(-1);
+    expect(destinations).toBeLessThan(quick);
+  });
+
+  it('opens the city page when a destination is tapped', () => {
+    const { getByTestId } = renderWithNavigation(<HomeScreen navigation={mockNavigation} />);
+
+    fireEvent.press(getByTestId('destination-1'));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('CityDetail', {
+      city: 'Rishikesh',
+      state: 'Uttarakhand',
+    });
+  });
+
+  it('shows the water and nature section below the destinations and above the quick actions', () => {
+    const { getByText, toJSON } = renderWithNavigation(<HomeScreen navigation={mockNavigation} />);
+
+    expect(getByText('Water, nature and outdoor pet access')).toBeTruthy();
+    const texts = [];
+    const walk = node => {
+      if (typeof node === 'string') {
+        texts.push(node);
+      } else if (Array.isArray(node)) {
+        node.forEach(walk);
+      } else if (node && node.children) {
+        node.children.forEach(walk);
+      }
+    };
+    walk(toJSON());
+    const destinations = texts.indexOf('Popular Indian Destinations for Pet Travel');
+    const nature = texts.indexOf('Water, nature and outdoor pet access');
+    const quick = texts.indexOf('Quick actions');
+    expect(destinations).toBeGreaterThan(-1);
+    expect(nature).toBeGreaterThan(destinations);
+    expect(quick).toBeGreaterThan(nature);
+  });
+
+  it('opens Search on the Nature & Water filter from the Explore button', () => {
+    const { getByTestId } = renderWithNavigation(<HomeScreen navigation={mockNavigation} />);
+
+    fireEvent.press(getByTestId('nature-explore'));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('SearchScreen', {
+      apiCategory: 'Nature & Water',
+      category: 'Paws in the Wild',
+    });
+  });
+
+  it('renders categories from home data', () => {
+    const { getByText } = renderWithNavigation(<HomeScreen navigation={mockNavigation} />);
 
     expect(getByText('Cafe')).toBeTruthy();
   });
 
   it('renders View all button and navigates to TravelStoryScreen on press', () => {
-    const { getByTestId } = renderWithNavigation(
-      <HomeScreen navigation={mockNavigation} />
-    );
+    const { getByTestId } = renderWithNavigation(<HomeScreen navigation={mockNavigation} />);
 
     const viewAllBtn = getByTestId('view-all-stories-btn');
     expect(viewAllBtn).toBeTruthy();
@@ -123,9 +192,7 @@ describe('HomeScreen Component', () => {
   });
 
   it('renders View all in Curated road trips and navigates to RoadTripRoutesScreen on press', () => {
-    const { getByTestId } = renderWithNavigation(
-      <HomeScreen navigation={mockNavigation} />
-    );
+    const { getByTestId } = renderWithNavigation(<HomeScreen navigation={mockNavigation} />);
 
     const viewAllRoutesBtn = getByTestId('view-all-road-trips-btn');
     expect(viewAllRoutesBtn).toBeTruthy();

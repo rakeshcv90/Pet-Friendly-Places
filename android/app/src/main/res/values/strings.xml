@@ -1,3 +1,6 @@
 <resources>
     <string name="app_name">Pet Friendly Places</string>
+    <!-- Revopush OTA server. The deployment key is not here: it is set per build type (debug,
+         release = Production, releaseStaging = Staging) in android/app/build.gradle. -->
+    <string moduleConfig="true" name="CodePushServerUrl">https://api.revopush.org</string>
 </resources>

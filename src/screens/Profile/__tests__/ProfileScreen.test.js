@@ -1,6 +1,8 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { ProfileScreen } from '../index';
+import { useAppUpdateStore } from '../../../services/appUpdate/appUpdateStore';
+import { __resetAppUpdateForTests } from '../../../services/appUpdate/InAppUpdateService';
 
 let mockPets = [];
 const mockNavigation = { navigate: jest.fn(), goBack: jest.fn(), setParams: jest.fn() };
@@ -76,5 +78,43 @@ describe('ProfileScreen menu', () => {
   it('does not open the add-pet form on a normal visit', () => {
     render(<ProfileScreen navigation={mockNavigation} route={{ params: {} }} />);
     expect(mockNavigation.setParams).not.toHaveBeenCalled();
+  });
+
+  describe('Update rows', () => {
+    it('has two separate rows in the main Profile menu: the store update and the OTA update', () => {
+      const { getByText } = render(<ProfileScreen navigation={mockNavigation} />);
+
+      expect(getByText('Check for app update')).toBeTruthy();
+      expect(getByText('Check for OTA update')).toBeTruthy();
+    });
+
+    it('shows the native version on the app row, not on the OTA row', () => {
+      const { getByText } = render(<ProfileScreen navigation={mockNavigation} />);
+
+      // From the mocked device info: version 1.0, build 1
+      expect(getByText('v1.0 (1)')).toBeTruthy();
+    });
+
+    it('opens the OTA update check from the OTA row', async () => {
+      const { getByText, findByText, queryByText } = render(
+        <ProfileScreen navigation={mockNavigation} />,
+      );
+      expect(queryByText('Updates unavailable')).toBeNull();
+
+      fireEvent.press(getByText('Check for OTA update'));
+
+      // Tests run as a development build, where updates are off, so the sheet explains that
+      expect(await findByText('Updates unavailable')).toBeTruthy();
+    });
+
+    it('opens the store update dialog from the app row', () => {
+      __resetAppUpdateForTests();
+      const { getByText } = render(<ProfileScreen navigation={mockNavigation} />);
+
+      fireEvent.press(getByText('Check for app update'));
+
+      expect(useAppUpdateStore.getState().modalVisible).toBe(true);
+      expect(useAppUpdateStore.getState().source).toBe('manual');
+    });
   });
 });

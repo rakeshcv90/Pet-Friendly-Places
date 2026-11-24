@@ -8,12 +8,14 @@ import {
   Animated,
   Dimensions,
   BackHandler,
+  useWindowDimensions,
 } from 'react-native';
 import Video from 'react-native-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { s, ms } from 'react-native-size-matters';
 import { theme } from '../../theme';
 import { useStore } from '../../store';
+import { getFitLayout } from './splashLayout';
 
 export const MainSplash = ({ navigation, onFinish }) => {
   const insets = useSafeAreaInsets();
@@ -22,10 +24,13 @@ export const MainSplash = ({ navigation, onFinish }) => {
   const hasFinishedRef = useRef(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [videoLoaded, setVideoLoaded] = useState(false);
+  // The video is 1080x1920. Fill a normal phone, but on a wide screen (foldable, tablet) show the
+  // whole video: filling it would cut off the top and the bottom.
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const videoFit = getFitLayout(1080, 1920, windowWidth, windowHeight).mode;
 
   // Calculate system navigation bar height to avoid covering bottom graphics/text
   const screenHeight = Dimensions.get('screen').height;
-  const windowHeight = Dimensions.get('window').height;
   const systemNavHeight = Math.max(insets.bottom, screenHeight - windowHeight);
   const bottomInset = systemNavHeight > 0 ? systemNavHeight + s(6) : s(16);
 
@@ -75,6 +80,7 @@ export const MainSplash = ({ navigation, onFinish }) => {
       />
 
       <Video
+        testID="splash-video"
         source={theme.images.splashVideo}
         style={[
           styles.video,
@@ -82,7 +88,7 @@ export const MainSplash = ({ navigation, onFinish }) => {
             bottom: bottomInset,
           },
         ]}
-        resizeMode="cover"
+        resizeMode={videoFit}
         repeat={false}
         paused={false}
         muted={true}

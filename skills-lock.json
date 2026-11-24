@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "revopush-setup": {
+      "source": "revopush/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/revopush/skills/revopush-setup/SKILL.md",
+      "computedHash": "de96fb14f12137061b387dbd4f4857cbeafea469801bc22d4a38be3819bf0fc7"
+    }
+  }
+}

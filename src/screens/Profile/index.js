@@ -9,6 +9,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../../store';
 import { useUserProfile, useMyPets, useCreatePet } from '../../hooks/useUser';
 import { useMyActivity, filterActivity } from '../../hooks/useCommunity';
+import { useOtaVersionInfo } from '../../hooks/useOtaUpdate';
+import { useAppVersionLabel, useInAppUpdate } from '../../hooks/useInAppUpdate';
+import { OtaUpdateSheet } from '../../components/ota/OtaUpdateSheet';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { s, vs, ms } from 'react-native-size-matters';
 
@@ -129,6 +132,11 @@ export const ProfileScreen = ({ navigation, route }) => {
   }, [route?.params?.openAddPet, navigation]);
   const [petToast, setPetToast] = useState('');
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
+  // Check for updates (over-the-air updates)
+  const [updateSheetVisible, setUpdateSheetVisible] = useState(false);
+  const otaVersion = useOtaVersionInfo();
+  const appVersionLabel = useAppVersionLabel();
+  const { openCheck: openAppUpdateCheck } = useInAppUpdate();
   const [helpModalVisible, setHelpModalVisible] = useState(false);
 
   const [confirmModalConfig, setConfirmModalConfig] = useState({
@@ -466,6 +474,26 @@ export const ProfileScreen = ({ navigation, route }) => {
             onPress: () => navigation.navigate('ChangePasswordScreen'),
           },
           {
+            // New native versions, from Google Play / the App Store
+            id: 'check_app_update',
+            title: 'Check for app update',
+            icon: 'storefront-outline',
+            color: '#7C3AED',
+            bgColor: isDarkMode ? '#2D1652' : '#F5F3FF',
+            badge: appVersionLabel || undefined,
+            onPress: openAppUpdateCheck,
+          },
+          {
+            // JavaScript fixes, from Revopush. Its badge is the OTA release, not the app version.
+            id: 'check_updates',
+            title: 'Check for OTA update',
+            icon: 'cloud-download-outline',
+            color: '#7C3AED',
+            bgColor: isDarkMode ? '#2D1652' : '#F5F3FF',
+            badge: otaVersion.label || undefined,
+            onPress: () => setUpdateSheetVisible(true),
+          },
+          {
             id: 'logout',
             title: 'Logout',
             icon: 'log-out-outline',
@@ -501,6 +529,9 @@ export const ProfileScreen = ({ navigation, route }) => {
       handleOpenUrbaniaBookings,
       handleOpenMyProfile,
       handleOpenPrivacy,
+      otaVersion.label,
+      appVersionLabel,
+      openAppUpdateCheck,
       navigation,
     ],
   );
@@ -951,6 +982,12 @@ export const ProfileScreen = ({ navigation, route }) => {
         publicProfile={publicProfile}
         setPublicProfile={setPublicProfile}
         onChangePassword={() => navigation.navigate('ChangePasswordScreen')}
+      />
+
+      <OtaUpdateSheet
+        visible={updateSheetVisible}
+        onClose={() => setUpdateSheetVisible(false)}
+        isDarkMode={isDarkMode}
       />
 
       {/* ── 8. Add Pet Modal Component ── */}

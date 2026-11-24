@@ -9,7 +9,15 @@ require Pod::Executable.execute_command('node', ['-p',
 require_relative '../node_modules/react-native-permissions/scripts/setup'
 setup_permissions(['Camera', 'LocationWhenInUse', 'Notifications'])
 
-platform :ios, min_ios_version_supported
+# Revopush (OTA updates) needs iOS 15.5 or newer
+platform :ios, '15.5'
+
+# Staging is a copy of Release (used for internal OTA testing builds), so its pods build as release
+project 'PetFriendly',
+  'Debug' => :debug,
+  'Release' => :release,
+  'Staging' => :release
+
 prepare_react_native_project!
 
 linkage = ENV['USE_FRAMEWORKS']

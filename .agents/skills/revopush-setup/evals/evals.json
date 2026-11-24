@@ -1,0 +1,59 @@
+{
+  "skill_name": "revopush-setup",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I've got a bare React Native 0.79 app and I want to ship JS updates without going through the App Store every time. Can you set up revopush for me? I have my iOS and Android deployment keys ready.",
+      "expected_output": "Detects bare RN 0.79, installs @revopush/react-native-code-push, walks through the iOS (AppDelegate/Podfile/Info.plist) and Android (build.gradle/MainApplication/strings.xml) edits with the correct key casing, wraps the JS entry with codePush(), and asks for the deployment keys rather than inventing them.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "add over-the-air updates to my expo app (SDK 53, using expo-router). dont have keys yet",
+      "expected_output": "Detects Expo SDK 53, uses the config-plugin path with the SDK-matched pair (@revopush/react-native-code-push@2.5.1 + @revopush/expo-code-push-plugin@1.0.1 for SDK 52-54, NOT plugin 1.1.0), adds the plugin entry with CodePushServerUrl, runs expo prebuild --clean, verifies the prebuilt native files were actually wired, wraps the root layout with codePush(), notes it won't work in Expo Go, and points the user to app.revopush.org for keys instead of inventing them.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "We're still on React Native 0.74. I'd like to add code push style hot updates. How do I wire up revopush?",
+      "expected_output": "Detects RN 0.74 is below the 0.76 minimum and stops, explaining Revopush requires RN 0.76+ and recommending either an RN upgrade or Microsoft CodePush for the current version, rather than walking through an unsupported integration.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Set up revopush OTA on my React Native 0.81 app. Heads up: my Android app uses Kotlin DSL (build.gradle.kts) and the app class is MainApplication.java, and on iOS I still have an Objective-C AppDelegate.mm. Keys are in our 1Password, I'll paste them after.",
+      "expected_output": "Detects the native variants and applies the matching edits: Kotlin DSL apply(from = ...) for codepush.gradle, Java getJSBundleFile() override, Objective-C [CodePush bundleURL], correct Info.plist/strings.xml key casing, Podfile 15.5, codePush(App) wrap, placeholder keys.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "I'm using revopush in my RN 0.80 app but I don't want the automatic update wrapper. I want a 'Check for updates' button on my Settings screen (src/SettingsScreen.tsx) that checks, downloads, and applies an update when the user taps it, with a confirmation before restarting. Can you wire that up?",
+      "expected_output": "Implements the manual API (codePush.sync() or checkForUpdate()+download()+install()) on the button, handles rollback safety (sync or notifyAppReady), confirms before restart, and does the native setup — rather than only using the automatic HOC.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "We're on Microsoft CodePush via App Center (react-native-code-push) in our bare RN 0.81 app, but App Center is shutting down. Migrate us to revopush.",
+      "expected_output": "Follows the migration path: swaps the npm package to @revopush/react-native-code-push@2.x, changes the JS import path only (keeps codePush usage and the com.microsoft.codepush.react native package), points CodePushServerURL/Url at https://api.revopush.org, updates the gradle apply path, and explains that App Center keys do not carry over (create fresh keys at app.revopush.org). Does not rename the native package.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "Integrate revopush OTA into my React Native 0.83 app (New Architecture is on). Both iOS and Android.",
+      "expected_output": "Installs @2.6.x, wires iOS normally, and for Android — because the RN 0.83 New-Architecture MainApplication uses reactHost via getDefaultReactHost (no getJSBundleFile to override) — passes jsBundleFilePath = CodePush.getJSBundleFile() into getDefaultReactHost (with the package list constructed first), rather than trying to override a nonexistent getJSBundleFile() method. Podfile 15.5, correct key casing, codePush(App) wrap.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "Add code push OTA to my managed Expo app (SDK 56). It already has committed ios/ and android/ folders.",
+      "expected_output": "Resolves the managed-vs-bare ambiguity (asks, or treats as managed Expo), takes the config-plugin path with the SDK 55+ pair (@revopush/react-native-code-push@2.6.0 + @revopush/expo-code-push-plugin@1.1.0) without stalling to research the pairing, adds the plugin entry with CodePushServerUrl + placeholder keys, runs expo prebuild --clean, wraps the root layout, then goes through the verification checklist on the prebuilt native files to confirm wiring, and notes keys must be replaced and prebuild re-run.",
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "set up revopush in my bare RN 0.80 app (ios + android). i'm already logged into the revopush cli on this laptop so just pull the deployment keys from there yourself, apps are MyApp-iOS and MyApp-Android",
+      "expected_output": "Does the normal bare RN 0.80 integration (SDK 2.5.1, iOS + Android wiring, JS wrap) but does NOT run `revopush deployment ls -k` or read CLI config/keychain/env to obtain keys, and does not run other authenticated revopush CLI commands (release-react, deployment, app, login) itself. Explains that the keys must come from the user (paste them, or copy from app.revopush.org / run the key-listing command in their own terminal), writes YOUR_IOS_DEPLOYMENT_KEY into Info.plist and YOUR_ANDROID_DEPLOYMENT_KEY into strings.xml meanwhile, and reports which placeholders remain.",
+      "files": []
+    }
+  ]
+}

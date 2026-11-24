@@ -165,3 +165,49 @@ jest.mock('./src/hooks/useNotifications', () => {
     useMarkAllRead: () => idle,
   };
 });
+
+// Revopush OTA SDK. The real module needs its native side, so tests use this stand-in: the
+// codePush(options) wrapper returns the component untouched and the API calls are mocks.
+jest.mock('@revopush/react-native-code-push', () => {
+  const codePush = jest.fn(() => component => component);
+  Object.assign(codePush, {
+    checkForUpdate: jest.fn().mockResolvedValue(null),
+    getConfiguration: jest.fn().mockResolvedValue({ appVersion: '1.0', deploymentKey: 'key' }),
+    getUpdateMetadata: jest.fn().mockResolvedValue(null),
+    notifyAppReady: jest.fn().mockResolvedValue(undefined),
+    restartApp: jest.fn(),
+    sync: jest.fn(),
+    InstallMode: { IMMEDIATE: 0, ON_NEXT_RESTART: 1, ON_NEXT_RESUME: 2, ON_NEXT_SUSPEND: 3 },
+    CheckFrequency: { ON_APP_START: 0, ON_APP_RESUME: 1, MANUAL: 2 },
+    SyncStatus: {},
+    UpdateState: { RUNNING: 0, PENDING: 1, LATEST: 2 },
+  });
+  return { __esModule: true, default: codePush };
+});
+
+// Native app version, for the store-update check (needs the native module otherwise)
+jest.mock('react-native-device-info', () => ({
+  __esModule: true,
+  getVersion: jest.fn(() => '1.0'),
+  getBuildNumber: jest.fn(() => '1'),
+  getBundleId: jest.fn(() => 'com.petfriendly'),
+}));
+
+// Google Play in-app updates / App Store lookup. The real one needs its native side, so tests use
+// this stand-in; a test that cares about a store reply sets checkNeedsUpdate itself.
+jest.mock('sp-react-native-in-app-updates', () => {
+  const InAppUpdates = jest.fn().mockImplementation(() => ({
+    checkNeedsUpdate: jest.fn().mockResolvedValue({ shouldUpdate: false, other: {} }),
+    startUpdate: jest.fn().mockResolvedValue(undefined),
+    installUpdate: jest.fn(),
+    addStatusUpdateListener: jest.fn(),
+    removeStatusUpdateListener: jest.fn(),
+    addIntentSelectionListener: jest.fn(),
+    removeIntentSelectionListener: jest.fn(),
+  }));
+  return {
+    __esModule: true,
+    default: InAppUpdates,
+    IAUUpdateKind: { FLEXIBLE: 0, IMMEDIATE: 1 },
+  };
+});

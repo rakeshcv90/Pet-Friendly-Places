@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CodePushServerURL</key>
+	<string>https://api.revopush.org</string>
+	<!-- Set per build configuration (Debug, Release = Production, Staging) by the CODEPUSH_KEY build
+	     setting. Fill in the real keys in Xcode: target PetFriendly > Build Settings > CODEPUSH_KEY. -->
+	<key>CodePushDeploymentKey</key>
+  <string>$(CODEPUSH_KEY)</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

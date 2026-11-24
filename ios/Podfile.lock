@@ -1,8 +1,16 @@
 PODS:
+  - Base64 (1.1.2)
+  - CodePush (2.6.3):
+    - Base64 (~> 1.1)
+    - JWT (~> 3.0.0-beta.12)
+    - React-Core
+    - SSZipArchive (~> 2.5.5)
   - FBLazyVector (0.84.1)
   - hermes-engine (250829098.0.9):
     - hermes-engine/Pre-built (= 250829098.0.9)
   - hermes-engine/Pre-built (250829098.0.9)
+  - JWT (3.0.0-beta.14):
+    - Base64 (~> 1.1.2)
   - MMKVCore (2.4.0)
   - NitroMmkv (4.3.2):
     - hermes-engine
@@ -2037,6 +2045,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - RNDeviceInfo (10.3.0):
+    - React-Core
   - RNKeychain (10.0.0):
     - hermes-engine
     - RCTRequired
@@ -2172,9 +2182,11 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - SSZipArchive (2.5.5)
   - Yoga (0.0.0)
 
 DEPENDENCIES:
+  - "CodePush (from `../node_modules/@revopush/react-native-code-push`)"
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - NitroMmkv (from `../node_modules/react-native-mmkv`)
@@ -2255,6 +2267,7 @@ DEPENDENCIES:
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - ReactNativeDependencies (from `../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)
   - "RNDateTimePicker (from `../node_modules/@react-native-community/datetimepicker`)"
+  - RNDeviceInfo (from `../node_modules/react-native-device-info`)
   - RNKeychain (from `../node_modules/react-native-keychain`)
   - RNLinearGradient (from `../node_modules/react-native-linear-gradient`)
   - RNPermissions (from `../node_modules/react-native-permissions`)
@@ -2264,9 +2277,14 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - Base64
+    - JWT
     - MMKVCore
+    - SSZipArchive
 
 EXTERNAL SOURCES:
+  CodePush:
+    :path: "../node_modules/@revopush/react-native-code-push"
   FBLazyVector:
     :path: "../node_modules/react-native/Libraries/FBLazyVector"
   hermes-engine:
@@ -2426,6 +2444,8 @@ EXTERNAL SOURCES:
     :podspec: "../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec"
   RNDateTimePicker:
     :path: "../node_modules/@react-native-community/datetimepicker"
+  RNDeviceInfo:
+    :path: "../node_modules/react-native-device-info"
   RNKeychain:
     :path: "../node_modules/react-native-keychain"
   RNLinearGradient:
@@ -2440,8 +2460,11 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
+  Base64: cecfb41a004124895a7bcee567a89bae5a89d49b
+  CodePush: 0bbf7d6e610504f81c33f2094c3262106283cc30
   FBLazyVector: e97c19a5a442429d1988f182a1940fb08df514da
   hermes-engine: 33b93768a36d7e4ca294e7041a8586def552c306
+  JWT: ef71dfb03e1f842081e64dc42eef0e164f35d251
   MMKVCore: 3d16ce9f7d411e135020915fde98a056859a1efa
   NitroMmkv: b94a2c63a98d5bdf6bb697eb876e2af039d1874b
   NitroModules: ec72e184ad11adcc47ce9544bff224ee45cdbeba
@@ -2520,13 +2543,15 @@ SPEC CHECKSUMS:
   ReactCommon: 07572bf9e687c8a52fbe4a3641e9e3a1a477c78e
   ReactNativeDependencies: e5fd043a752e54b0f4dd8afa75347b4341deadf2
   RNDateTimePicker: 089c6d01113f221c14b0744fab32dbc6c2d5fb45
+  RNDeviceInfo: 32413a6eefa0de704834b9d2afe5be596b44a66d
   RNKeychain: 667b7bd224f14055ae4cb52b41a82ad0ad70574f
   RNLinearGradient: 8248d88b4bb978f47f5538630234d35f20df48b4
   RNPermissions: 453637a77799b22f339c0ac5cf6ef1aea9735e5c
   RNScreens: 70436301b648fad29c11ebbe5e96ae9cf1040267
   RNVectorIcons: 4351544f100d4f12cac156a7c13399e60bab3e26
+  SSZipArchive: c69881e8ac5521f0e622291387add5f60f30f3c4
   Yoga: c0b3f2c7e8d3e327e450223a2414ca3fa296b9a2
 
-PODFILE CHECKSUM: a99c7b5d96fd7049434cfa8dd62cef9ff5197e71
+PODFILE CHECKSUM: cb102dfef34ad798d8acdba3e8809009f44a734a
 
 COCOAPODS: 1.16.2

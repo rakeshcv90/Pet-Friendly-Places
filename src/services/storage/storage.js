@@ -17,6 +17,7 @@ export const STORAGE_KEYS = {
   APP_LOCK_OFFERED: 'APP_LOCK_OFFERED',
   PERMISSIONS_OFFERED: 'PERMISSIONS_OFFERED',
   INSTALL_MARKER: 'INSTALL_MARKER',
+  APP_UPDATE_POLICY: 'APP_UPDATE_POLICY',
 };
 
 // ── Secure storage ──────────────────────────────────────────────────────────────────────────

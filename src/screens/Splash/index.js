@@ -7,10 +7,10 @@ import { theme } from '../../theme';
 import { useStore } from '../../store';
 import { s } from 'react-native-size-matters';
 import { Button } from '../../components/common/Button';
+import { getFitLayout } from './splashLayout';
 
 const IMAGE_WIDTH = 887;
 const IMAGE_HEIGHT = 1773;
-const IMAGE_RATIO = IMAGE_WIDTH / IMAGE_HEIGHT; // ~ 0.50028
 
 export const SplashScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -26,31 +26,14 @@ export const SplashScreen = ({ navigation }) => {
     }
   }, [isAuthenticated]);
 
-  // Cover the full screen: scale image to fill without any top offset
-  const screenRatio = screenWidth / screenHeight;
-  let imgWidth = screenWidth;
-  let imgHeight = screenHeight;
-  let imgLeft = 0;
-  let imgTop = 0;
-
-  if (screenRatio > IMAGE_RATIO) {
-    // Screen is wider (shorter) than image — match width, center vertically
-    imgWidth = screenWidth;
-    imgHeight = screenWidth / IMAGE_RATIO;
-    // Center the image vertically so the dog doesn't get clipped at the bottom
-    imgTop = (screenHeight - imgHeight) / 2;
-  } else {
-    // Screen is taller than image — match height, center horizontally
-    imgHeight = screenHeight;
-    imgWidth = screenHeight * IMAGE_RATIO;
-    imgLeft = (screenWidth - imgWidth) / 2;
-  }
-
+  // Phones: fill the screen. Wide screens (a foldable open, a tablet): show the whole picture and
+  // fill the sides with a blurred copy, instead of zooming in until the logo and the dog are cut off.
+  const layout = getFitLayout(IMAGE_WIDTH, IMAGE_HEIGHT, screenWidth, screenHeight);
   const dynamicImageStyle = {
-    width: imgWidth,
-    height: imgHeight,
-    top: imgTop,
-    left: imgLeft,
+    width: layout.width,
+    height: layout.height,
+    top: layout.top,
+    left: layout.left,
   };
 
   const dynamicContentStyle = {
@@ -63,6 +46,19 @@ export const SplashScreen = ({ navigation }) => {
 
       {/* Full-screen background image */}
       <View style={styles.imageContainer}>
+        {layout.mode === 'contain' && (
+          <>
+            {/* The picture does not reach the sides: a blurred, dimmed copy fills the screen */}
+            <FastImage
+              testID="splash-blur-fill"
+              source={theme.images.splashBackground1}
+              style={StyleSheet.absoluteFill}
+              resizeMode="cover"
+              blurRadius={30}
+            />
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.blurDim]} />
+          </>
+        )}
         <FastImage
           source={theme.images.splashBackground1}
           style={[styles.backgroundImage, dynamicImageStyle]}
@@ -108,8 +104,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.l,
     paddingTop: s(60),
   },
+  blurDim: { backgroundColor: 'rgba(20,10,40,0.25)' },
   getStartedButton: {
     width: '80%',
+    // On a wide screen 80% would be an enormous button
+    maxWidth: 380,
     alignSelf: 'center',
     marginBottom: theme.spacing.m,
   },

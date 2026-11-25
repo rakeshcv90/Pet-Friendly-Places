@@ -13,6 +13,9 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = theme.dimensions.window;
 const isSmallDevice = SCREEN_HEIGHT < 720;
 const IMAGE_HEIGHT = isSmallDevice ? SCREEN_HEIGHT * 0.42 : SCREEN_HEIGHT * 0.5;
 const DOT_SLOT_WIDTH = s(24);
+// On a tablet or an unfolded foldable there is room for the title on one line (or two, if long)
+const isWideScreen = SCREEN_WIDTH >= 600;
+export const formatTitle = title => (isWideScreen ? title.replace(/\n/g, ' ') : title);
 
 const ONBOARDING_DATA = [
   {
@@ -121,7 +124,7 @@ const AnimatedSlide = ({ item, index, scrollX }) => {
         </Animated.View>
 
         <Animated.Text style={[styles.title, { transform: [{ translateY: titleTranslateY }] }]}>
-          {item.title}
+          {formatTitle(item.title)}
         </Animated.Text>
         <Animated.Text
           style={[styles.subtitle, { transform: [{ translateY: subtitleTranslateY }] }]}>
@@ -616,6 +619,8 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     width: '100%',
+    // On a tablet a full-width button is enormous: keep it a normal size, centred
+    maxWidth: 520,
     flexDirection: 'row',
     alignItems: 'center',
     height: s(54),

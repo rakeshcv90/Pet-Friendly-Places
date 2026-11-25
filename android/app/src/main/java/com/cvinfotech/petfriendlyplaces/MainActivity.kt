@@ -1,4 +1,4 @@
-package com.petfriendly
+package com.cvinfotech.petfriendlyplaces
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

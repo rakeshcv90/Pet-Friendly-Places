@@ -1,4 +1,4 @@
-package com.petfriendly
+package com.cvinfotech.petfriendlyplaces
 
 import android.app.Application
 import com.facebook.react.PackageList

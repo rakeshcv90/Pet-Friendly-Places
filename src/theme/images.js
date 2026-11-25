@@ -1,6 +1,8 @@
 export const images = {
   splashBackground: require('../assets/images/splash.webp'),
   splashBackground1: require('../assets/images/splash2.webp'),
+  // Wider welcome picture (2:3) for tablets and foldables
+  splashTablet: require('../assets/images/splash3.png'),
   splashVideo: require('../assets/images/video1.mp4'),
   logo: require('../assets/images/logonew.webp'),
   pass: require('../assets/images/pass.webp'),

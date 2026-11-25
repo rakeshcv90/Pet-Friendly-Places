@@ -8,11 +8,21 @@
 // caller fills the leftover sides with a blurred copy of the same picture.
 export const MAX_CROP_RATIO = 1.15;
 
-export const getFitLayout = (contentWidth, contentHeight, screenWidth, screenHeight) => {
+// A picture with nothing important near its edges (like the logo video, a centred logo on a plain
+// background) can be cropped much more than the welcome picture before anything is lost.
+export const EDGE_SAFE_CROP_RATIO = 1.6;
+
+export const getFitLayout = (
+  contentWidth,
+  contentHeight,
+  screenWidth,
+  screenHeight,
+  maxCropRatio = MAX_CROP_RATIO,
+) => {
   const cover = Math.max(screenWidth / contentWidth, screenHeight / contentHeight);
   const contain = Math.min(screenWidth / contentWidth, screenHeight / contentHeight);
   const screenIsWider = screenWidth / screenHeight > contentWidth / contentHeight;
-  const useCover = !screenIsWider || cover / contain <= MAX_CROP_RATIO;
+  const useCover = !screenIsWider || cover / contain <= maxCropRatio;
   const scale = useCover ? cover : contain;
   const width = contentWidth * scale;
   const height = contentHeight * scale;

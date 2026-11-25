@@ -20,8 +20,12 @@ import { Loader } from '../../../components/common/Loader';
 import { theme } from '../../../theme';
 import { useForgotPassword } from '../../../hooks/useAuth';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isSmallDevice = SCREEN_HEIGHT < 750;
+// A tablet or unfolded foldable: the form stays a phone-sized column in the middle of the screen
+const FORM_MAX_WIDTH = 480;
+const isWideScreen = SCREEN_WIDTH >= 600;
+const sidePadding = isWideScreen ? (SCREEN_WIDTH - FORM_MAX_WIDTH) / 2 : s(24);
 
 export const ForgotPasswordScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -99,7 +103,7 @@ export const ForgotPasswordScreen = ({ navigation }) => {
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: Math.max(insets.top, s(16)) + s(10),
+            paddingTop: Math.max(insets.top, s(16)) + s(10) + (isWideScreen ? SCREEN_HEIGHT * 0.06 : 0),
             paddingBottom: Math.max(insets.bottom, s(16)) + s(20),
           },
         ]}
@@ -284,7 +288,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: s(24),
+    paddingHorizontal: sidePadding,
   },
   illustrationContainer: {
     alignItems: 'center',

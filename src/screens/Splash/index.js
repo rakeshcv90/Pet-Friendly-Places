@@ -9,8 +9,14 @@ import { s } from 'react-native-size-matters';
 import { Button } from '../../components/common/Button';
 import { getFitLayout } from './splashLayout';
 
-const IMAGE_WIDTH = 887;
-const IMAGE_HEIGHT = 1773;
+// Top to bottom colours of the picture's edges: sky, the glow near the horizon, then forest
+const SIDE_FILL_COLORS = ['#7FAEE3', '#F3C77E', '#C9A24C', '#4E6B2B'];
+const SIDE_FILL_LOCATIONS = [0, 0.3, 0.55, 1];
+
+// Phones use the tall picture; tablets and foldables (screens at least this wide) use the 2:3 one
+const PHONE_IMAGE = { width: 887, height: 1773 };
+const TABLET_IMAGE = { width: 1024, height: 1536 };
+const TABLET_MIN_ASPECT = 0.6;
 
 export const SplashScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -28,7 +34,10 @@ export const SplashScreen = ({ navigation }) => {
 
   // Phones: fill the screen. Wide screens (a foldable open, a tablet): show the whole picture and
   // fill the sides with a blurred copy, instead of zooming in until the logo and the dog are cut off.
-  const layout = getFitLayout(IMAGE_WIDTH, IMAGE_HEIGHT, screenWidth, screenHeight);
+  const isTablet = screenWidth / screenHeight >= TABLET_MIN_ASPECT;
+  const picture = isTablet ? TABLET_IMAGE : PHONE_IMAGE;
+  const pictureSource = isTablet ? theme.images.splashTablet : theme.images.splashBackground1;
+  const layout = getFitLayout(picture.width, picture.height, screenWidth, screenHeight);
   const dynamicImageStyle = {
     width: layout.width,
     height: layout.height,
@@ -48,19 +57,18 @@ export const SplashScreen = ({ navigation }) => {
       <View style={styles.imageContainer}>
         {layout.mode === 'contain' && (
           <>
-            {/* The picture does not reach the sides: a blurred, dimmed copy fills the screen */}
-            <FastImage
-              testID="splash-blur-fill"
-              source={theme.images.splashBackground1}
+            {/* The picture does not reach the sides: a calm gradient in the picture's own colours
+                (sky, sunset glow, forest) sits behind, in case a side is wider than one mirrored copy */}
+            <LinearGradient
+              testID="splash-side-fill"
+              colors={SIDE_FILL_COLORS}
+              locations={SIDE_FILL_LOCATIONS}
               style={StyleSheet.absoluteFill}
-              resizeMode="cover"
-              blurRadius={30}
             />
-            <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.blurDim]} />
           </>
         )}
         <FastImage
-          source={theme.images.splashBackground1}
+          source={pictureSource}
           style={[styles.backgroundImage, dynamicImageStyle]}
           objectFit="cover"
         />
@@ -104,7 +112,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.l,
     paddingTop: s(60),
   },
-  blurDim: { backgroundColor: 'rgba(20,10,40,0.25)' },
   getStartedButton: {
     width: '80%',
     // On a wide screen 80% would be an enormous button

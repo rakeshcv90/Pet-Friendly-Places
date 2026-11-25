@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { s, ms } from 'react-native-size-matters';
 import { theme } from '../../theme';
 import { useStore } from '../../store';
-import { getFitLayout } from './splashLayout';
+import { getFitLayout, EDGE_SAFE_CROP_RATIO } from './splashLayout';
 
 export const MainSplash = ({ navigation, onFinish }) => {
   const insets = useSafeAreaInsets();
@@ -24,10 +24,10 @@ export const MainSplash = ({ navigation, onFinish }) => {
   const hasFinishedRef = useRef(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [videoLoaded, setVideoLoaded] = useState(false);
-  // The video is 1080x1920. Fill a normal phone, but on a wide screen (foldable, tablet) show the
-  // whole video: filling it would cut off the top and the bottom.
+  // The video is 1080x1920: a centred logo on a plain background. It fills phones and tablets (only
+  // empty space is cropped); a near-square foldable screen shows the whole video instead.
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const videoFit = getFitLayout(1080, 1920, windowWidth, windowHeight).mode;
+  const videoFit = getFitLayout(1080, 1920, windowWidth, windowHeight, EDGE_SAFE_CROP_RATIO).mode;
 
   // Calculate system navigation bar height to avoid covering bottom graphics/text
   const screenHeight = Dimensions.get('screen').height;

@@ -21,20 +21,35 @@ describe('Welcome screen (Get Started) on different screens', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('fills a normal phone without any blurred side fill', () => {
+  it('fills a normal phone without any side fill', () => {
     screen(...PHONE);
     const { queryByTestId, getByText } = render(<SplashScreen navigation={navigation} />);
 
-    expect(queryByTestId('splash-blur-fill')).toBeNull();
+    expect(queryByTestId('splash-side-fill')).toBeNull();
     expect(getByText('Get Started')).toBeTruthy();
   });
 
-  it('shows the whole picture on a foldable, with a blurred fill at the sides', () => {
+  it('shows the whole picture on a foldable, with a colour gradient at the sides', () => {
     screen(...FOLDABLE);
     const { getByTestId } = render(<SplashScreen navigation={navigation} />);
 
-    const fill = getByTestId('splash-blur-fill');
-    expect(fill.props.blurRadius).toBe(30);
+    const fill = getByTestId('splash-side-fill');
+    expect(fill.props.colors.length).toBeGreaterThan(1);
+  });
+
+  it('uses the wider 2:3 picture on a tablet and the tall one on a phone', () => {
+    const { theme } = require('../../../theme');
+    const sourceOf = tree => tree.UNSAFE_getAllByType(require('../../../components/common/FastImage').default)
+      .map(n => n.props.source);
+
+    screen(...PHONE);
+    const phone = sourceOf(render(<SplashScreen navigation={navigation} />));
+    expect(phone).toContain(theme.images.splashBackground1);
+    expect(phone).not.toContain(theme.images.splashTablet);
+
+    screen(1600, 2560);
+    const tablet = sourceOf(render(<SplashScreen navigation={navigation} />));
+    expect(tablet).toContain(theme.images.splashTablet);
   });
 
   it('keeps the Get Started button a sensible size on a wide screen', () => {

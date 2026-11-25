@@ -19,8 +19,10 @@ import { Loader } from '../../../components/common/Loader';
 import { theme } from '../../../theme';
 import { useLogin } from '../../../hooks/useAuth';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isSmallDevice = SCREEN_HEIGHT < 750;
+// A tablet or unfolded foldable: the form stays a phone-sized column in the middle, and starts lower
+const isWideScreen = SCREEN_WIDTH >= 600;
 
 export const LoginScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -118,114 +120,116 @@ export const LoginScreen = ({ navigation }) => {
           {
             paddingTop: isSmallDevice
               ? Math.max(insets.top, s(24)) + s(50)
-              : Math.max(insets.top, s(50)) + s(50),
+              : Math.max(insets.top, s(50)) + s(50) + (isWideScreen ? SCREEN_HEIGHT * 0.06 : 0),
           },
         ]}
         enableOnAndroid={true}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
-        {/* Brand Header */}
-        <View style={styles.header}>
-          <Image source={theme.images.logo} style={styles.logoImage} resizeMode="contain" />
-          <Text style={styles.title}>Welcome back</Text>
-          <Text style={styles.subtitle}>Sign in to continue your journey</Text>
-        </View>
+        <View style={styles.column}>
+          {/* Brand Header */}
+          <View style={styles.header}>
+            <Image source={theme.images.logo} style={styles.logoImage} resizeMode="contain" />
+            <Text style={styles.title}>Welcome back</Text>
+            <Text style={styles.subtitle}>Sign in to continue your journey</Text>
+          </View>
 
-        {/* Login Form */}
-        <View style={styles.form}>
-          {/* API Error Alert Banner */}
-          {apiError ? (
-            <View style={styles.apiErrorBanner}>
-              <FeatherIcon
-                name="alert-circle"
-                size={s(16)}
-                color="#B91C1C"
-                style={styles.apiErrorIcon}
-              />
-              <Text style={styles.apiErrorText}>{apiError}</Text>
-            </View>
-          ) : null}
+          {/* Login Form */}
+          <View style={styles.form}>
+            {/* API Error Alert Banner */}
+            {apiError ? (
+              <View style={styles.apiErrorBanner}>
+                <FeatherIcon
+                  name="alert-circle"
+                  size={s(16)}
+                  color="#B91C1C"
+                  style={styles.apiErrorIcon}
+                />
+                <Text style={styles.apiErrorText}>{apiError}</Text>
+              </View>
+            ) : null}
 
-          {/* Email or Phone Input */}
-          <Input
-            label="Email or Phone"
-            labelStyle={styles.inputLabel}
-            placeholder="you@example.com"
-            placeholderTextColor={theme.colors.primary}
-            value={email}
-            onChangeText={handleEmailChange}
-            error={errors.email}
-            style={isSmallDevice ? styles.inputCompactMargin : styles.inputNormalMargin}
-            inputWrapperStyle={styles.inputBox}
-            inputStyle={styles.inputText}
-            leftIcon={
-              <FeatherIcon
-                name="user"
-                size={isSmallDevice ? s(16) : s(18)}
-                color={theme.colors.primaryDark}
-              />
-            }
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+            {/* Email or Phone Input */}
+            <Input
+              label="Email or Phone"
+              labelStyle={styles.inputLabel}
+              placeholder="you@example.com"
+              placeholderTextColor={theme.colors.primary}
+              value={email}
+              onChangeText={handleEmailChange}
+              error={errors.email}
+              style={isSmallDevice ? styles.inputCompactMargin : styles.inputNormalMargin}
+              inputWrapperStyle={styles.inputBox}
+              inputStyle={styles.inputText}
+              leftIcon={
+                <FeatherIcon
+                  name="user"
+                  size={isSmallDevice ? s(16) : s(18)}
+                  color={theme.colors.primaryDark}
+                />
+              }
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
 
-          {/* Password Input */}
-          <Input
-            label="Password"
-            labelStyle={styles.inputLabel}
-            placeholder="••••••••"
-            placeholderTextColor={theme.colors.primary}
-            value={password}
-            onChangeText={handlePasswordChange}
-            error={errors.password}
-            secureTextEntry={!showPassword}
-            style={isSmallDevice ? styles.inputCompactMargin : styles.inputNormalMargin}
-            inputWrapperStyle={styles.inputBox}
-            inputStyle={styles.inputText}
-            leftIcon={
-              <FeatherIcon
-                name="lock"
-                size={isSmallDevice ? s(16) : s(18)}
-                color={theme.colors.primaryDark}
-              />
-            }
-            rightIcon={
-              <FeatherIcon
-                name={showPassword ? 'eye' : 'eye-off'}
-                size={isSmallDevice ? s(16) : s(18)}
-                color={theme.colors.primaryDark}
-              />
-            }
-            onRightIconPress={() => setShowPassword(!showPassword)}
-          />
+            {/* Password Input */}
+            <Input
+              label="Password"
+              labelStyle={styles.inputLabel}
+              placeholder="••••••••"
+              placeholderTextColor={theme.colors.primary}
+              value={password}
+              onChangeText={handlePasswordChange}
+              error={errors.password}
+              secureTextEntry={!showPassword}
+              style={isSmallDevice ? styles.inputCompactMargin : styles.inputNormalMargin}
+              inputWrapperStyle={styles.inputBox}
+              inputStyle={styles.inputText}
+              leftIcon={
+                <FeatherIcon
+                  name="lock"
+                  size={isSmallDevice ? s(16) : s(18)}
+                  color={theme.colors.primaryDark}
+                />
+              }
+              rightIcon={
+                <FeatherIcon
+                  name={showPassword ? 'eye' : 'eye-off'}
+                  size={isSmallDevice ? s(16) : s(18)}
+                  color={theme.colors.primaryDark}
+                />
+              }
+              onRightIconPress={() => setShowPassword(!showPassword)}
+            />
 
-          {/* Forgot Password Link */}
-          <TouchableOpacity
-            style={styles.forgotPasswordContainer}
-            onPress={() => navigation.navigate('ForgotPassword')}
-            activeOpacity={0.7}>
-            <Text style={styles.forgotPasswordText}>Forgot password?</Text>
-          </TouchableOpacity>
-
-          {/* Primary Login Button */}
-          <Button
-            title="Login"
-            onPress={handleLogin}
-            isLoading={isPending}
-            disabled={isPending}
-            gradientColors={['rgb(5 16, 143)', 'rgb(123, 44, 255)']}
-            width="80%"
-            style={styles.loginButton}
-            contentStyle={isSmallDevice ? styles.buttonCompactContent : null}
-            textStyle={styles.loginButtonText}
-          />
-
-          {/* Footer */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Register')} activeOpacity={0.7}>
-              <Text style={styles.signupText}>Sign Up</Text>
+            {/* Forgot Password Link */}
+            <TouchableOpacity
+              style={styles.forgotPasswordContainer}
+              onPress={() => navigation.navigate('ForgotPassword')}
+              activeOpacity={0.7}>
+              <Text style={styles.forgotPasswordText}>Forgot password?</Text>
             </TouchableOpacity>
+
+            {/* Primary Login Button */}
+            <Button
+              title="Login"
+              onPress={handleLogin}
+              isLoading={isPending}
+              disabled={isPending}
+              gradientColors={['rgb(5 16, 143)', 'rgb(123, 44, 255)']}
+              width="80%"
+              style={styles.loginButton}
+              contentStyle={isSmallDevice ? styles.buttonCompactContent : null}
+              textStyle={styles.loginButtonText}
+            />
+
+            {/* Footer */}
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Don't have an account? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Register')} activeOpacity={0.7}>
+                <Text style={styles.signupText}>Sign Up</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </KeyboardAwareScrollView>
@@ -242,7 +246,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     position: 'absolute',
-  
   },
   keyboardView: {
     flex: 1,
@@ -250,6 +253,11 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: s(24),
+  },
+  column: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   header: {
     marginBottom: isSmallDevice ? s(14) : s(14),

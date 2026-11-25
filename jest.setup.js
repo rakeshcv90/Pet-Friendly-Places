@@ -190,7 +190,7 @@ jest.mock('react-native-device-info', () => ({
   __esModule: true,
   getVersion: jest.fn(() => '1.0'),
   getBuildNumber: jest.fn(() => '1'),
-  getBundleId: jest.fn(() => 'com.petfriendly'),
+  getBundleId: jest.fn(() => 'com.cvinfotech.petfriendlyplaces'),
 }));
 
 // Google Play in-app updates / App Store lookup. The real one needs its native side, so tests use

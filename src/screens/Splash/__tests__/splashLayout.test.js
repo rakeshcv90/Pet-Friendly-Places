@@ -1,4 +1,4 @@
-import { getFitLayout, MAX_CROP_RATIO } from '../splashLayout';
+import { getFitLayout, MAX_CROP_RATIO, EDGE_SAFE_CROP_RATIO } from '../splashLayout';
 
 // The welcome picture is 887 x 1773 (a tall portrait)
 const W = 887;
@@ -31,7 +31,7 @@ describe('getFitLayout', () => {
     expect(layout.height).toBeCloseTo(2152);
     expect(layout.width).toBeCloseTo(2152 * (W / H));
     expect(layout.top).toBeCloseTo(0);
-    // Centred, with room left on both sides for the blurred fill
+    // Centred, with room left on both sides for the side fill
     expect(layout.left).toBeGreaterThan(0);
     expect(layout.left).toBeCloseTo((2076 - layout.width) / 2);
   });
@@ -75,5 +75,13 @@ describe('getFitLayout', () => {
         expect(layout.top).toBeGreaterThanOrEqual(-1e-6);
       }
     }
+  });
+
+  it('lets the logo video fill a tablet, since only empty space is cropped', () => {
+    const tablet = [1200, 1766];
+    expect(getFitLayout(1080, 1920, ...tablet).mode).toBe('contain');
+    expect(getFitLayout(1080, 1920, ...tablet, EDGE_SAFE_CROP_RATIO).mode).toBe('cover');
+    // A near-square foldable would lose too much, so it still shows the whole video
+    expect(getFitLayout(1080, 1920, 2076, 2152, EDGE_SAFE_CROP_RATIO).mode).toBe('contain');
   });
 });

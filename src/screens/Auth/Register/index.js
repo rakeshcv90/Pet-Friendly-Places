@@ -12,6 +12,7 @@ import {
 import { s } from 'react-native-size-matters';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeatherIcon from 'react-native-vector-icons/Feather';
+import { AuthBackground } from '../../../components/common/AuthBackground';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import FastImage from '../../../components/common/FastImage';
 import { Input } from '../../../components/common/Input';
@@ -23,6 +24,10 @@ import { useRegister } from '../../../hooks/useAuth';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isSmallDevice = SCREEN_HEIGHT < 750;
+// A tablet or unfolded foldable: the form stays a phone-sized column in the middle of the screen
+const FORM_MAX_WIDTH = 480;
+const isWideScreen = SCREEN_WIDTH >= 600;
+const sidePadding = isWideScreen ? (SCREEN_WIDTH - FORM_MAX_WIDTH) / 2 : s(20);
 
 const CARD_WIDTH = Math.min(Math.round(SCREEN_WIDTH * 0.76), s(290));
 const CARD_MARGIN = s(12);
@@ -271,10 +276,11 @@ export const RegisterScreen = ({ navigation }) => {
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <FastImage
+      <AuthBackground
         source={theme.images.backgroundimg1}
-        style={styles.backgroundImage}
-        resizeMode="cover"
+        imageWidth={863}
+        imageHeight={1823}
+        testID="register-background"
       />
 
       {/* Premium Animated Loading Modal */}
@@ -292,7 +298,7 @@ export const RegisterScreen = ({ navigation }) => {
           {
             paddingTop: isSmallDevice
               ? Math.max(insets.top, s(-10)) + s(-10)
-              : Math.max(insets.top, s(0)) + s(0),
+              : Math.max(insets.top, s(0)) + s(0) + (isWideScreen ? SCREEN_HEIGHT * 0.06 : 0),
             paddingBottom: s(10),
           },
         ]}
@@ -849,7 +855,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: s(20),
+    paddingHorizontal: sidePadding,
   },
   stepContainer: {
     width: '100%',

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,18 @@ import { useReuniteCases, filterReunitePosts } from '../../hooks/useReunite';
 import { ReunitePostCard } from './components';
 import { TABS, PET_FILTER_OPTIONS } from './ReuniteScreen';
 
+// One grid cell. Memoised, so a row only draws again when its own post or the theme changes.
+const ReuniteRow = React.memo(({ item, index, isDarkMode, onOpen }) => (
+  <ReunitePostCard
+    post={item}
+    isDarkMode={isDarkMode}
+    tilt={index % 2 === 0 ? '-2deg' : '2deg'}
+    onPress={() => onOpen(item)}
+  />
+));
+
+const keyOfPost = post => post.id;
+
 export const ReuniteListScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const isDarkMode = useStore(state => state.isDarkMode);
@@ -27,6 +39,16 @@ export const ReuniteListScreen = ({ navigation, route }) => {
   const posts = useMemo(
     () => filterReunitePosts(allPosts, activeTab, species),
     [allPosts, activeTab, species],
+  );
+  const openPost = useCallback(
+    post => navigation.navigate('ReuniteDetailScreen', { post }),
+    [navigation],
+  );
+  const renderPost = useCallback(
+    ({ item, index }) => (
+      <ReuniteRow item={item} index={index} isDarkMode={isDarkMode} onOpen={openPost} />
+    ),
+    [isDarkMode, openPost],
   );
 
   const renderEmpty = () => {
@@ -111,7 +133,7 @@ export const ReuniteListScreen = ({ navigation, route }) => {
 
       <FlatList
         data={posts}
-        keyExtractor={post => post.id}
+        keyExtractor={keyOfPost}
         numColumns={2}
         columnWrapperStyle={styles.column}
         contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + s(24) }]}
@@ -119,14 +141,10 @@ export const ReuniteListScreen = ({ navigation, route }) => {
         refreshing={isRefetching}
         onRefresh={refetch}
         ListEmptyComponent={renderEmpty}
-        renderItem={({ item, index }) => (
-          <ReunitePostCard
-            post={item}
-            isDarkMode={isDarkMode}
-            tilt={index % 2 === 0 ? '-2deg' : '2deg'}
-            onPress={() => navigation.navigate('ReuniteDetailScreen', { post: item })}
-          />
-        )}
+        renderItem={renderPost}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={7}
       />
     </View>
   );

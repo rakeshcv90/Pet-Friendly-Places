@@ -65,11 +65,14 @@ const titleCase = text =>
     .trim();
 
 /** API types are sometimes slugs ("resort_hotel"): prettify those, keep curated text as written. */
-const readableType = value => (/^[a-z0-9]+(_[a-z0-9]+)+$/.test(String(value || '')) ? titleCase(value) : value);
+const readableType = value =>
+  /^[a-z0-9]+(_[a-z0-9]+)+$/.test(String(value || '')) ? titleCase(value) : value;
 
 /** Splits a policy paragraph into its sentences. */
 export const splitSentences = text =>
-  (String(text || '').match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) || []).map(p => p.trim()).filter(Boolean);
+  (String(text || '').match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) || [])
+    .map(p => p.trim())
+    .filter(Boolean);
 
 const unique = list => [...new Set(list)];
 
@@ -86,7 +89,14 @@ const PET_LEVELS = {
   pet_allowed: 'Pets Allowed',
 };
 
-const PET_EMOJI = { dogs: '🐶', cats: '🐱', rabbits: '🐰', birds: '🦜', hamsters: '🐹', 'guinea pigs': '🐹' };
+const PET_EMOJI = {
+  dogs: '🐶',
+  cats: '🐱',
+  rabbits: '🐰',
+  birds: '🦜',
+  hamsters: '🐹',
+  'guinea pigs': '🐹',
+};
 
 const ATTRIBUTES = [
   ['water_access_available', 'Water Access'],
@@ -123,7 +133,9 @@ const mapsUrlFor = raw => {
     return `https://www.google.com/maps/search/?api=1&query=${raw.latitude},${raw.longitude}`;
   }
   const query = [raw.name, raw.address].filter(Boolean).join(' ');
-  return query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : null;
+  return query
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+    : null;
 };
 
 const locationOf = item =>
@@ -144,7 +156,11 @@ const buildQuickFacts = raw => {
     : raw.pet_charges;
   add('wallet-outline', 'Pet Charges', charges);
   add('car-outline', 'Parking', raw.parking_available === true ? 'Available' : null);
-  add('home-outline', raw.category === 'Stays' ? 'Room Type' : 'Type', readableType(raw.specific_type));
+  add(
+    'home-outline',
+    raw.category === 'Stays' ? 'Room Type' : 'Type',
+    readableType(raw.specific_type),
+  );
   add('scale-outline', 'Dog Sizes', parseList(raw.allowed_dog_sizes).join(', '));
   add('bed-outline', 'Pets in Room', raw.pets_in_room === true ? 'Yes' : null);
   add('restaurant-outline', 'Pets in Restaurant', raw.pets_in_restaurant === true ? 'Yes' : null);
@@ -160,7 +176,12 @@ const buildPolicy = raw => {
   return {
     keyRules: splitSentences(raw.pet_policy),
     restricted: parseList(raw.restricted_areas),
-    offLeash: raw.off_leash_use_permitted === true ? 'Yes' : raw.off_leash_use_permitted === false ? 'No' : '',
+    offLeash:
+      raw.off_leash_use_permitted === true
+        ? 'Yes'
+        : raw.off_leash_use_permitted === false
+        ? 'No'
+        : '',
     leashRules: raw.leash_policy || '',
     charges: raw.pet_charges_notes || raw.pet_charges || '',
     allowedPets: parseList(raw.allowed_pet_types),
@@ -180,13 +201,32 @@ export const buildListing = raw => {
     return null;
   }
 
-  const photos = (Array.isArray(raw.images) ? raw.images : [])
-    .filter(img => img && img.image_url && (!img.media_type || img.media_type === 'image'))
-    .sort((a, b) => Number(Boolean(b.is_main)) - Number(Boolean(a.is_main)))
-    .map(img => resolveImageUrl(img.image_url));
+  const entries = (Array.isArray(raw.images) ? raw.images : []).filter(img => img && img.image_url);
+  const isVideo = img => img.media_type === 'video';
+  const photoEntries = entries
+    .filter(img => !isVideo(img))
+    .sort((a, b) => Number(Boolean(b.is_main)) - Number(Boolean(a.is_main)));
+  const videoEntries = entries.filter(isVideo);
+  const photos = photoEntries.map(img => resolveImageUrl(img.image_url));
   if (!photos.length && raw.main_image_url) {
     photos.push(resolveImageUrl(raw.main_image_url));
   }
+  // Everything the website's gallery shows: the photos (main one first), then the videos
+  const media = [
+    ...photoEntries.map(img => ({
+      type: 'image',
+      url: resolveImageUrl(img.image_url),
+      caption: img.caption || '',
+    })),
+    ...(photoEntries.length || !raw.main_image_url
+      ? []
+      : [{ type: 'image', url: resolveImageUrl(raw.main_image_url), caption: '' }]),
+    ...videoEntries.map(img => ({
+      type: 'video',
+      url: resolveImageUrl(img.image_url),
+      caption: img.caption || '',
+    })),
+  ];
 
   let verifiedLabel = null;
   if (raw.tails_verified) {
@@ -221,6 +261,8 @@ export const buildListing = raw => {
     verifiedLabel,
     levelLabel,
     photos,
+    media,
+    videoCount: videoEntries.length,
     excerpt: raw.excerpt || '',
     descriptionHtml: raw.description || '',
     petsWelcomed: parseList(raw.allowed_pet_types).map(label => ({
@@ -267,3 +309,45 @@ export const buildListing = raw => {
 };
 
 export { formatPublishedDate };
+
+// Why a place could not be loaded, so the screen can say the right thing instead of always
+// "Listing not found": the place really does not exist (404), the server is slow or unreachable, or
+// the server failed.
+export const listingErrorKind = error => {
+  if (!error) {
+    return 'notFound';
+  }
+  const status = error.response?.status;
+  if (status === 404) {
+    return 'notFound';
+  }
+  if (status >= 500) {
+    return 'server';
+  }
+  if (error.code === 'ECONNABORTED' || /timeout/i.test(error.message || '')) {
+    return 'timeout';
+  }
+  if (!error.response) {
+    return 'offline';
+  }
+  return 'notFound';
+};
+
+export const LISTING_ERROR_COPY = {
+  notFound: {
+    title: 'Listing not found',
+    text: 'We could not load this place. Check your connection and try again.',
+  },
+  timeout: {
+    title: 'This is taking too long',
+    text: 'The place is slow to load right now. Please try again in a moment.',
+  },
+  offline: {
+    title: 'No connection',
+    text: 'We could not reach the server. Check your internet connection and try again.',
+  },
+  server: {
+    title: 'Something went wrong',
+    text: 'The server had a problem loading this place. Please try again in a moment.',
+  },
+};

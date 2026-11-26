@@ -7,9 +7,10 @@ import { ms } from 'react-native-size-matters';
 import { images as themeImages } from '../../../theme';
 import { styles } from './styles';
 import { AppImage } from '../../../components/common/AppImage';
+import { VideoThumb } from '../../../components/common/GalleryVideo';
 
-/** Swipeable photo gallery; tapping a photo (or the counter) opens the full gallery. */
-export const ListingGallery = ({ photos, height, onOpen }) => {
+/** Swipeable gallery of photos and videos; tapping one (or the counter) opens the full gallery. */
+export const ListingGallery = ({ media, photos = [], height, onOpen }) => {
   const { width } = useWindowDimensions();
   const [index, setIndex] = useState(0);
 
@@ -20,7 +21,9 @@ export const ListingGallery = ({ photos, height, onOpen }) => {
   }).current;
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 60 }).current;
 
-  const data = photos.length ? photos : [null];
+  // `media` is photos and videos; callers that only have photo addresses still work
+  const items = media || photos.map(url => ({ type: 'image', url }));
+  const data = items.length ? items : [null];
 
   return (
     <View style={{ height }}>
@@ -29,7 +32,7 @@ export const ListingGallery = ({ photos, height, onOpen }) => {
         pagingEnabled
         data={data}
         showsHorizontalScrollIndicator={false}
-        keyExtractor={(uri, i) => `${uri || 'none'}-${i}`}
+        keyExtractor={(item, i) => `${item?.url || 'none'}-${i}`}
         getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
@@ -37,12 +40,21 @@ export const ListingGallery = ({ photos, height, onOpen }) => {
           <TouchableOpacity
             activeOpacity={0.95}
             disabled={!item}
+            testID={item ? `listing-media-${i}` : undefined}
             onPress={() => onOpen && onOpen(i)}>
-            <AppImage
-              source={item ? { uri: item, priority: FastImage.priority.high } : themeImages.noimage}
-              style={{ width, height }}
-              resizeMode="cover"
-            />
+            {item?.type === 'video' ? (
+              <View style={{ width, height }}>
+                <VideoThumb uri={item.url} testID={`listing-video-thumb-${i}`} />
+              </View>
+            ) : (
+              <AppImage
+                source={
+                  item ? { uri: item.url, priority: FastImage.priority.high } : themeImages.noimage
+                }
+                style={{ width, height }}
+                resizeMode="cover"
+              />
+            )}
           </TouchableOpacity>
         )}
       />
@@ -52,7 +64,7 @@ export const ListingGallery = ({ photos, height, onOpen }) => {
         style={styles.galleryShade}
         pointerEvents="none"
       />
-      {photos.length > 0 ? (
+      {items.length > 0 ? (
         <TouchableOpacity
           testID="listing-open-gallery"
           activeOpacity={0.85}
@@ -60,13 +72,17 @@ export const ListingGallery = ({ photos, height, onOpen }) => {
           onPress={() => onOpen && onOpen(index)}>
           <Ionicons name="images-outline" size={ms(13)} color="#FFFFFF" />
           <Text style={styles.galleryCounterText}>
-            {photos.length > 1 ? `${index + 1}/${photos.length}` : '1 photo'}
+            {items.length > 1
+              ? `${index + 1}/${items.length}`
+              : items[0]?.type === 'video'
+              ? '1 video'
+              : '1 photo'}
           </Text>
         </TouchableOpacity>
       ) : null}
-      {photos.length > 1 ? (
+      {items.length > 1 ? (
         <View style={styles.dots} pointerEvents="none">
-          {photos.slice(0, 8).map((_, i) => (
+          {items.slice(0, 8).map((_, i) => (
             <View key={i} style={[styles.dot, i === index && styles.dotActive]} />
           ))}
         </View>

@@ -15,9 +15,15 @@ export const ListingVerified = ({ listing, palette, isDarkMode }) => {
   }
 
   return (
-    <SectionCard title="Verification" icon="shield-checkmark-outline" palette={palette} isDarkMode={isDarkMode}>
+    <SectionCard
+      title="Verification"
+      icon="shield-checkmark-outline"
+      palette={palette}
+      isDarkMode={isDarkMode}>
       <LinearGradient
-        colors={isDarkMode ? ['rgba(34,197,94,0.22)', 'rgba(34,197,94,0.04)'] : ['#DCFCE7', '#F0FDF4']}
+        colors={
+          isDarkMode ? ['rgba(34,197,94,0.22)', 'rgba(34,197,94,0.04)'] : ['#DCFCE7', '#F0FDF4']
+        }
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.verifiedBanner}>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Image } from 'react-native';
-import { render, fireEvent } from '@testing-library/react-native';
-import FastImage, { prefetchImages } from '../index';
+import { render, fireEvent, act } from '@testing-library/react-native';
+import FastImage, { prefetchImages, MAX_RETRIES, RETRY_DELAY_MS } from '../index';
 
 describe('FastImage (React Native Image underneath)', () => {
   it('keeps the constants screens read', () => {
@@ -65,16 +65,110 @@ describe('FastImage (React Native Image underneath)', () => {
       expect(queryByTestId('fast-image-placeholder')).toBeNull();
     });
 
-    it('falls back to the "no image" picture and reports onError when it fails', () => {
+    it('tries again after a failure, and only then falls back to the "no image" picture', () => {
+      jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'] });
       const onError = jest.fn();
-      const { UNSAFE_getByType, getByTestId, queryByTestId } = render(
+      const { UNSAFE_getByType, getByTestId, queryByTestId, unmount } = render(
         <FastImage source={remote} style={{ width: 100, height: 100 }} onError={onError} />,
       );
-      fireEvent(UNSAFE_getByType(Image), 'error', { nativeEvent: {} });
 
+      // First and second failures: the placeholder stays, nothing is reported, it asks again
+      for (let i = 0; i < MAX_RETRIES; i += 1) {
+        fireEvent(UNSAFE_getByType(Image), 'error', { nativeEvent: {} });
+        expect(onError).not.toHaveBeenCalled();
+        expect(getByTestId('fast-image-placeholder')).toBeTruthy();
+        act(() => {
+          jest.advanceTimersByTime(RETRY_DELAY_MS * (i + 1));
+        });
+      }
+
+      // The last try fails too
+      fireEvent(UNSAFE_getByType(Image), 'error', { nativeEvent: {} });
       expect(onError).toHaveBeenCalledTimes(1);
       expect(getByTestId('fast-image-fallback')).toBeTruthy();
       expect(queryByTestId('fast-image-placeholder')).toBeNull();
+      unmount();
+      jest.useRealTimers();
+    });
+
+    it('shows the picture when a retry succeeds', () => {
+      jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'] });
+      const onError = jest.fn();
+      const onLoad = jest.fn();
+      const { UNSAFE_getByType, queryByTestId, unmount } = render(
+        <FastImage
+          source={remote}
+          style={{ width: 100, height: 100 }}
+          onError={onError}
+          onLoad={onLoad}
+        />,
+      );
+      fireEvent(UNSAFE_getByType(Image), 'error', { nativeEvent: {} });
+      act(() => {
+        jest.advanceTimersByTime(RETRY_DELAY_MS);
+      });
+      fireEvent(UNSAFE_getByType(Image), 'load', { nativeEvent: {} });
+
+      expect(onError).not.toHaveBeenCalled();
+      expect(onLoad).toHaveBeenCalledTimes(1);
+      expect(queryByTestId('fast-image-placeholder')).toBeNull();
+      expect(queryByTestId('fast-image-fallback')).toBeNull();
+      unmount();
+      jest.useRealTimers();
+    });
+
+    it('loads our own uploads as a resized copy, like the website', () => {
+      const photo = 'https://petfriendlyplaces.in/api/storage/objects/uploads/abc-123';
+      const { UNSAFE_getByType } = render(
+        <FastImage source={{ uri: photo }} style={{ width: '100%', height: 100 }} />,
+      );
+      const uri = UNSAFE_getByType(Image).props.source.uri;
+      expect(uri).toBe(
+        'https://petfriendlyplaces.in/_next/image?url=%2Fapi%2Fstorage%2Fobjects%2Fuploads%2Fabc-123&w=1080&q=75',
+      );
+    });
+
+    it('asks for the smallest copy for a small picture', () => {
+      const photo = 'https://petfriendlyplaces.in/api/storage/objects/uploads/abc-123';
+      const { UNSAFE_getByType } = render(
+        <FastImage source={{ uri: photo }} style={{ width: 72, height: 72 }} />,
+      );
+      expect(UNSAFE_getByType(Image).props.source.uri).toContain('&w=640&');
+    });
+
+    it('does not change other addresses', () => {
+      const { UNSAFE_getByType } = render(
+        <FastImage source={remote} style={{ width: 100, height: 100 }} />,
+      );
+      expect(UNSAFE_getByType(Image).props.source.uri).toBe(remote.uri);
+    });
+
+    it('falls back to the original address if the resized copy keeps failing', () => {
+      jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'] });
+      const photo = 'https://petfriendlyplaces.in/api/storage/objects/uploads/abc-123';
+      const onError = jest.fn();
+      const { UNSAFE_getByType, unmount } = render(
+        <FastImage source={{ uri: photo }} style={{ width: 100, height: 100 }} onError={onError} />,
+      );
+      for (let i = 0; i < MAX_RETRIES; i += 1) {
+        fireEvent(UNSAFE_getByType(Image), 'error', { nativeEvent: {} });
+        act(() => {
+          jest.advanceTimersByTime(RETRY_DELAY_MS * (i + 1));
+        });
+      }
+      // Last resized try fails: the original is requested, and nothing is reported yet
+      fireEvent(UNSAFE_getByType(Image), 'error', { nativeEvent: {} });
+      expect(onError).not.toHaveBeenCalled();
+      expect(UNSAFE_getByType(Image).props.source.uri).toBe(photo);
+      unmount();
+      jest.useRealTimers();
+    });
+
+    it('asks Android to decode web pictures at the size they are drawn, not at full size', () => {
+      const { UNSAFE_getByType } = render(
+        <FastImage source={remote} style={{ width: 100, height: 100 }} />,
+      );
+      expect(UNSAFE_getByType(Image).props.resizeMethod).toBe('resize');
     });
 
     it('starts again from the placeholder when the picture changes', () => {

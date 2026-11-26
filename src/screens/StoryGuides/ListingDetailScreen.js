@@ -1,10 +1,11 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StatusBar, Animated, RefreshControl, Share } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { s, vs, ms } from 'react-native-size-matters';
 import { useStore } from '../../store';
 import { useListingDetail } from '../../hooks/useDiscovery';
+import { logListing, summarizeListingMedia } from '../../utils/listingDebug';
 import { Loader } from '../../components/common/Loader';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { FloatingHeader } from './GuideDetail/FloatingHeader';
@@ -13,7 +14,7 @@ import { useGuideScroll } from './GuideDetail/useGuideScroll';
 import { CompactBar } from './GuideDetail/CompactBar';
 import { Reveal } from './GuideDetail/Reveal';
 import { WEB_ORIGIN } from './GuideDetail/constants';
-import { buildListing } from './ListingDetail/listingModel';
+import { buildListing, listingErrorKind, LISTING_ERROR_COPY } from './ListingDetail/listingModel';
 import { listingPalette } from './ListingDetail/listingPalette';
 import { useSavePlace } from '../../hooks/useUser';
 import { ListingGallery } from './ListingDetail/ListingGallery';
@@ -30,6 +31,8 @@ import { ListingNearby } from './ListingDetail/ListingNearby';
 import { ContactBar, BAR_HEIGHT, contactActions } from './ListingDetail/ContactBar';
 import { styles } from './ListingDetail/styles';
 
+// How long loading takes before the screen says it is slower than usual
+const SLOW_LOADING_MS = 6000;
 
 export const ListingDetailScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
@@ -37,10 +40,27 @@ export const ListingDetailScreen = ({ navigation, route }) => {
   const palette = useMemo(() => listingPalette(isDarkMode), [isDarkMode]);
 
   const slug = route?.params?.slug || null;
-  const { data, isLoading, refetch, isRefetching } = useListingDetail(slug);
+  const { data, isLoading, error, refetch, isRefetching } = useListingDetail(slug);
   const raw = data?.listing || data || null;
   const listing = useMemo(() => buildListing(raw), [raw]);
 
+  // After a few seconds of loading, say it is slow so the person knows the app has not frozen
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!isLoading) {
+      setSlow(false);
+      return undefined;
+    }
+    const timer = setTimeout(() => setSlow(true), SLOW_LOADING_MS);
+    return () => clearTimeout(timer);
+  }, [isLoading]);
+
+  // Development only: print what the API sent and what the app shows, to compare with Postman
+  useEffect(() => {
+    if (raw) {
+      logListing('response', JSON.stringify(summarizeListingMedia(raw, listing?.photos), null, 2));
+    }
+  }, [raw, listing]);
 
   const scroll = useGuideScroll(Boolean(listing));
   const { saved, toggle: toggleSave } = useSavePlace(raw?.id, raw);
@@ -56,7 +76,10 @@ export const ListingDetailScreen = ({ navigation, route }) => {
       return;
     }
     try {
-      await Share.share({ title: listing.name, message: `🐾 ${listing.name} on PetFriendly\n${pageUrl}` });
+      await Share.share({
+        title: listing.name,
+        message: `🐾 ${listing.name} on PetFriendly\n${pageUrl}`,
+      });
     } catch {
       // user cancelled
     }
@@ -67,22 +90,27 @@ export const ListingDetailScreen = ({ navigation, route }) => {
   if (isLoading && !listing) {
     return (
       <View style={[styles.centerBox, { backgroundColor: palette.bg }]}>
-        <Loader fullScreen title="Loading listing..." subtitle="Fetching place details..." />
+        <Loader
+          fullScreen
+          title="Loading listing..."
+          subtitle={
+            slow ? 'This is taking longer than usual. Please wait...' : 'Fetching place details...'
+          }
+        />
         <FloatingHeader topInset={topInset} onBack={handleBack} onShare={handleShare} />
       </View>
     );
   }
 
   if (!listing) {
+    const errorCopy = LISTING_ERROR_COPY[listingErrorKind(error)];
     return (
       <View style={[styles.fill, { backgroundColor: palette.bg }]}>
         <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
         <View style={[styles.centerBox, { paddingTop: topInset + vs(40) }]}>
           <Ionicons name="alert-circle-outline" size={ms(44)} color={palette.accent} />
-          <Text style={[styles.centerTitle, { color: palette.text }]}>Listing not found</Text>
-          <Text style={[styles.centerText, { color: palette.muted }]}>
-            We could not load this place. Check your connection and try again.
-          </Text>
+          <Text style={[styles.centerTitle, { color: palette.text }]}>{errorCopy.title}</Text>
+          <Text style={[styles.centerText, { color: palette.muted }]}>{errorCopy.text}</Text>
           <BouncyPressable
             testID="listing-retry-button"
             style={[styles.retryBtn, { backgroundColor: palette.soft }]}
@@ -133,8 +161,10 @@ export const ListingDetailScreen = ({ navigation, route }) => {
         {/* photos: parallax while scrolling, stretch when pulled down */}
         <View style={styles.galleryClip}>
           <Animated.View
-            style={{ transform: [{ translateY: motion.heroTranslateY }, { scale: motion.heroScale }] }}>
-            <ListingGallery photos={listing.photos} height={vs(290)} onOpen={setViewerIndex} />
+            style={{
+              transform: [{ translateY: motion.heroTranslateY }, { scale: motion.heroScale }],
+            }}>
+            <ListingGallery media={listing.media} height={vs(290)} onOpen={setViewerIndex} />
           </Animated.View>
         </View>
         <ListingHeaderCard {...sectionProps} motion={motion} />
@@ -172,7 +202,7 @@ export const ListingDetailScreen = ({ navigation, route }) => {
 
       <PhotoViewer
         visible={viewerIndex !== null}
-        photos={listing.photos}
+        media={listing.media}
         startIndex={viewerIndex || 0}
         onClose={() => setViewerIndex(null)}
       />

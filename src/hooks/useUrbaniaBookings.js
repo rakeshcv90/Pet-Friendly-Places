@@ -4,7 +4,7 @@ import { API_ENDPOINTS } from '../services/api/apiList';
 import { useStore } from '../store';
 import { getItem, STORAGE_KEYS } from '../services/storage/storage';
 import { readAccountBookings } from '../screens/Home/urbaniaBooking';
-import { devLog } from '../services/urbania/urbaniaApi';
+import { devLog, logBookingCompare } from '../services/urbania/urbaniaApi';
 
 // The signed-in account's Urbania bookings (GET /accounts/me/urbania-bookings), read into the same
 // shape the history page keeps on the phone
@@ -16,7 +16,9 @@ export const useUrbaniaBookings = (options = {}) => {
     queryFn: async () => {
       const data = await api.get(API_ENDPOINTS.MY_URBANIA_BOOKINGS);
       devLog('account bookings response', data);
-      return readAccountBookings(data);
+      const bookings = readAccountBookings(data);
+      logBookingCompare(data, bookings);
+      return bookings;
     },
     enabled: !!token,
     staleTime: 1000 * 30,

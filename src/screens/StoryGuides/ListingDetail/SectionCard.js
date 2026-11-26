@@ -42,11 +42,7 @@ export const Pill = ({ label, icon, background, color }) => (
 /** Icon + label + value row used by the pet policy section. */
 export const FactRow = ({ icon, label, value, palette, first }) => (
   <View
-    style={[
-      styles.factRow,
-      !first && styles.factRowBorder,
-      { borderTopColor: palette.border },
-    ]}>
+    style={[styles.factRow, !first && styles.factRowBorder, { borderTopColor: palette.border }]}>
     <View style={[styles.factIcon, { backgroundColor: palette.soft }]}>
       <Ionicons name={icon} size={ms(15)} color={palette.accent} />
     </View>

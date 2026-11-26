@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { Animated, StyleSheet } from 'react-native';
+import { render, fireEvent, act } from '@testing-library/react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { HomeScreen } from '../index';
 
@@ -199,5 +200,56 @@ describe('HomeScreen Component', () => {
 
     fireEvent.press(viewAllRoutesBtn);
     expect(mockNavigation.navigate).toHaveBeenCalledWith('RoadTripRoutesScreen');
+  });
+
+  describe('smooth scrolling', () => {
+    it('keeps the cards free of 3D tilt (perspective / rotateX), which is costly while scrolling', () => {
+      const { UNSAFE_getAllByType } = renderWithNavigation(<HomeScreen navigation={mockNavigation} />);
+      const transforms = UNSAFE_getAllByType(Animated.View)
+        .map(view => StyleSheet.flatten(view.props.style)?.transform)
+        .filter(Array.isArray)
+        .flat();
+      expect(transforms.some(t => t && 'perspective' in t)).toBe(false);
+      expect(transforms.some(t => t && 'rotateX' in t)).toBe(false);
+    });
+
+    it('caches the moving background shapes as one layer each, so scrolling does not redraw them', () => {
+      const { UNSAFE_getAllByType } = renderWithNavigation(<HomeScreen navigation={mockNavigation} />);
+      const cached = UNSAFE_getAllByType(Animated.View).filter(
+        view => view.props.renderToHardwareTextureAndroid === true,
+      );
+      // five glow shapes and two paw watermarks
+      expect(cached.length).toBeGreaterThanOrEqual(7);
+    });
+
+    it('runs the looping call-to-action motion only while Home is on screen', () => {
+      const stops = [];
+      const loopSpy = jest.spyOn(Animated, 'loop').mockImplementation(() => ({
+        start: jest.fn(),
+        stop: jest.fn(() => stops.push('stop')),
+      }));
+      const handlers = {};
+      const navigation = {
+        ...mockNavigation,
+        addListener: jest.fn((event, handler) => {
+          handlers[event] = handler;
+          return jest.fn();
+        }),
+      };
+      renderWithNavigation(<HomeScreen navigation={navigation} />);
+      const startedWhileFocused = loopSpy.mock.calls.length;
+      expect(startedWhileFocused).toBeGreaterThan(0);
+
+      // Other parts of the screen have their own loops, so count only what changes: another tab is
+      // opened and Home's own two loops (the nudge and the wiggle) stop
+      const stoppedBefore = stops.length;
+      act(() => handlers.blur());
+      expect(stops.length - stoppedBefore).toBeGreaterThanOrEqual(2);
+
+      // Back on Home: they start again
+      act(() => handlers.focus());
+      expect(loopSpy.mock.calls.length - startedWhileFocused).toBeGreaterThanOrEqual(2);
+      loopSpy.mockRestore();
+    });
   });
 });

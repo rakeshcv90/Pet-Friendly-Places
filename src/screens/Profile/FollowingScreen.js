@@ -27,9 +27,15 @@ import { AmbientBackground } from '../Home/components';
 
 const REMOVE_ANIMATION = {
   duration: 280,
-  create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+  create: {
+    type: LayoutAnimation.Types.easeInEaseOut,
+    property: LayoutAnimation.Properties.opacity,
+  },
   update: { type: LayoutAnimation.Types.easeInEaseOut },
-  delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+  delete: {
+    type: LayoutAnimation.Types.easeInEaseOut,
+    property: LayoutAnimation.Properties.opacity,
+  },
 };
 
 const capitalize = text => (text ? text.charAt(0).toUpperCase() + text.slice(1) : '');
@@ -38,7 +44,9 @@ export const followerLabel = count => `${count} ${count === 1 ? 'follower' : 'fo
 
 // "Dog · Golden Retriever · 1 follower"
 export const petSummaryLine = pet =>
-  [capitalize(pet.species), pet.breed, followerLabel(pet.followerCount)].filter(Boolean).join(' · ');
+  [capitalize(pet.species), pet.breed, followerLabel(pet.followerCount)]
+    .filter(Boolean)
+    .join(' · ');
 
 // Created once: a new function on every render would restart the loops each time the screen updates
 const EASE_SINE = Easing.inOut(Easing.sin);
@@ -56,8 +64,18 @@ const useLoop = ({ duration, easing = EASE_SINE, steady = false }) => {
         if (cancelled || reduced) {
           return;
         }
-        const forward = Animated.timing(value, { toValue: 1, duration, easing, useNativeDriver: true });
-        const back = Animated.timing(value, { toValue: 0, duration, easing, useNativeDriver: true });
+        const forward = Animated.timing(value, {
+          toValue: 1,
+          duration,
+          easing,
+          useNativeDriver: true,
+        });
+        const back = Animated.timing(value, {
+          toValue: 0,
+          duration,
+          easing,
+          useNativeDriver: true,
+        });
         loop = Animated.loop(steady ? forward : Animated.sequence([forward, back]));
         loop.start();
       })
@@ -117,159 +135,185 @@ export const followedSince = value => {
 const STAGGER_MS = 70;
 const MAX_STAGGER = 8;
 
-const FollowedPetCard = ({ pet, index, pulse, spin, shine, isDarkMode, busy, onView, onUnfollow }) => {
-  const enter = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(enter, {
-      toValue: 1,
-      duration: 420,
-      delay: Math.min(index, MAX_STAGGER) * STAGGER_MS,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [enter, index]);
-  const since = followedSince(pet.followedAt);
+const FollowedPetCard = React.memo(
+  ({ pet, index, pulse, spin, shine, isDarkMode, busy, onView, onUnfollow }) => {
+    const enter = useRef(new Animated.Value(0)).current;
+    useEffect(() => {
+      Animated.timing(enter, {
+        toValue: 1,
+        duration: 420,
+        delay: Math.min(index, MAX_STAGGER) * STAGGER_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }, [enter, index]);
+    const since = followedSince(pet.followedAt);
 
-  return (
-    <Animated.View
-      testID={`following-card-${pet.id}`}
-      style={[
-        styles.card,
-        isDarkMode && styles.cardDark,
-        {
-          opacity: enter,
-          transform: [
-            { translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [28, 0] }) },
-            { scale: enter.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) },
-          ],
-        },
-      ]}>
-      <View style={styles.cardTop}>
-        <View style={styles.ring}>
-          {/* The gradient turns slowly behind the photo, so the ring looks alive */}
-          <Animated.View
-            testID={`following-ring-${pet.id}`}
-            style={[
-              styles.ringSpin,
-              { transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] },
-            ]}>
-            <LinearGradient
-              colors={['#7B2CFF', '#C026D3', '#FF4FB8', '#FBBF24']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.ringGradient}
-            />
-          </Animated.View>
-          <View style={[styles.avatar, isDarkMode && styles.avatarDark]}>
-            {pet.photo ? (
-              <FastImage
-                source={{ uri: resolveImageUrl(pet.photo) }}
-                style={styles.avatarImg}
-                resizeMode="cover"
-              />
-            ) : (
-              <Ionicons name="paw" size={ms(24)} color="#7B2CFF" />
-            )}
-          </View>
-        </View>
-        <View style={styles.cardText}>
-          <View style={styles.nameRow}>
-            <Text
-              style={[styles.name, isDarkMode && styles.textWhite]}
-              numberOfLines={1}
-              testID={`following-name-${pet.id}`}>
-              {pet.petName}
-            </Text>
-            {pet.level > 0 ? (
-              <LinearGradient
-                colors={['#FBBF24', '#F59E0B']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.level}
-                testID={`following-level-${pet.id}`}>
-                <Animated.View
-                  style={{
-                    transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.35] }) }],
-                  }}>
-                  <Ionicons name="star" size={ms(9)} color="#FFFFFF" />
-                </Animated.View>
-                <Text style={styles.levelText}>{`Lv ${pet.level}`}</Text>
-              </LinearGradient>
-            ) : null}
-          </View>
-          <Text style={[styles.meta, isDarkMode && styles.mutedDark]} numberOfLines={1}>
-            {petSummaryLine(pet)}
-          </Text>
-          {since ? (
-            <View style={styles.sinceRow}>
-              <Animated.View
-                style={{
-                  transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] }) }],
-                }}>
-                <Ionicons name="heart" size={ms(11)} color="#EC4899" />
-              </Animated.View>
-              <Text style={[styles.since, isDarkMode && styles.mutedDark]} testID={`following-since-${pet.id}`}>
-                {`Following since ${since}`}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      </View>
-      <View style={styles.actions}>
-        <BouncyPressable
-          testID={`following-view-${pet.id}`}
-          activeScale={0.96}
-          disabled={!pet.slug}
-          onPress={() => onView(pet)}
-          style={[styles.btnWrap, !pet.slug && styles.disabled]}>
-          <LinearGradient
-            colors={['#7B2CFF', '#C026D3']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[styles.btn, styles.clip]}>
-            <Ionicons name="paw-outline" size={ms(15)} color="#FFFFFF" />
-            <Text style={styles.viewText}>View</Text>
-            {/* A soft light glides across the button now and then */}
+    return (
+      <Animated.View
+        testID={`following-card-${pet.id}`}
+        style={[
+          styles.card,
+          isDarkMode && styles.cardDark,
+          {
+            opacity: enter,
+            transform: [
+              { translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [28, 0] }) },
+              { scale: enter.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) },
+            ],
+          },
+        ]}>
+        <View style={styles.cardTop}>
+          <View style={styles.ring}>
+            {/* The gradient turns slowly behind the photo, so the ring looks alive */}
             <Animated.View
-              pointerEvents="none"
-              testID={`following-shine-${pet.id}`}
+              testID={`following-ring-${pet.id}`}
               style={[
-                styles.shine,
+                styles.ringSpin,
                 {
                   transform: [
-                    { translateX: shine.interpolate({ inputRange: [0, 0.45, 1], outputRange: [-140, 200, 200] }) },
-                    { skewX: '-20deg' },
+                    {
+                      rotate: spin.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      }),
+                    },
                   ],
                 },
-              ]}
-            />
-          </LinearGradient>
-        </BouncyPressable>
-        <BouncyPressable
-          testID={`following-unfollow-${pet.id}`}
-          activeScale={0.96}
-          disabled={busy}
-          onPress={() => onUnfollow(pet)}
-          style={[
-            styles.btnWrap,
-            styles.btn,
-            styles.unfollowBtn,
-            isDarkMode && styles.unfollowBtnDark,
-            busy && styles.disabled,
-          ]}>
-          {busy ? (
-            <ActivityIndicator size="small" color="#DC2626" testID={`following-busy-${pet.id}`} />
-          ) : (
-            <>
-              <Ionicons name="heart-dislike-outline" size={ms(15)} color="#DC2626" />
-              <Text style={styles.unfollowText}>Unfollow</Text>
-            </>
-          )}
-        </BouncyPressable>
-      </View>
-    </Animated.View>
-  );
-};
+              ]}>
+              <LinearGradient
+                colors={['#7B2CFF', '#C026D3', '#FF4FB8', '#FBBF24']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.ringGradient}
+              />
+            </Animated.View>
+            <View style={[styles.avatar, isDarkMode && styles.avatarDark]}>
+              {pet.photo ? (
+                <FastImage
+                  source={{ uri: resolveImageUrl(pet.photo) }}
+                  style={styles.avatarImg}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Ionicons name="paw" size={ms(24)} color="#7B2CFF" />
+              )}
+            </View>
+          </View>
+          <View style={styles.cardText}>
+            <View style={styles.nameRow}>
+              <Text
+                style={[styles.name, isDarkMode && styles.textWhite]}
+                numberOfLines={1}
+                testID={`following-name-${pet.id}`}>
+                {pet.petName}
+              </Text>
+              {pet.level > 0 ? (
+                <LinearGradient
+                  colors={['#FBBF24', '#F59E0B']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.level}
+                  testID={`following-level-${pet.id}`}>
+                  <Animated.View
+                    style={{
+                      transform: [
+                        {
+                          scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.35] }),
+                        },
+                      ],
+                    }}>
+                    <Ionicons name="star" size={ms(9)} color="#FFFFFF" />
+                  </Animated.View>
+                  <Text style={styles.levelText}>{`Lv ${pet.level}`}</Text>
+                </LinearGradient>
+              ) : null}
+            </View>
+            <Text style={[styles.meta, isDarkMode && styles.mutedDark]} numberOfLines={1}>
+              {petSummaryLine(pet)}
+            </Text>
+            {since ? (
+              <View style={styles.sinceRow}>
+                <Animated.View
+                  style={{
+                    transform: [
+                      { scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] }) },
+                    ],
+                  }}>
+                  <Ionicons name="heart" size={ms(11)} color="#EC4899" />
+                </Animated.View>
+                <Text
+                  style={[styles.since, isDarkMode && styles.mutedDark]}
+                  testID={`following-since-${pet.id}`}>
+                  {`Following since ${since}`}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+        <View style={styles.actions}>
+          <BouncyPressable
+            testID={`following-view-${pet.id}`}
+            activeScale={0.96}
+            disabled={!pet.slug}
+            onPress={() => onView(pet)}
+            style={[styles.btnWrap, !pet.slug && styles.disabled]}>
+            <LinearGradient
+              colors={['#7B2CFF', '#C026D3']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.btn, styles.clip]}>
+              <Ionicons name="paw-outline" size={ms(15)} color="#FFFFFF" />
+              <Text style={styles.viewText}>View</Text>
+              {/* A soft light glides across the button now and then */}
+              <Animated.View
+                pointerEvents="none"
+                testID={`following-shine-${pet.id}`}
+                style={[
+                  styles.shine,
+                  {
+                    transform: [
+                      {
+                        translateX: shine.interpolate({
+                          inputRange: [0, 0.45, 1],
+                          outputRange: [-140, 200, 200],
+                        }),
+                      },
+                      { skewX: '-20deg' },
+                    ],
+                  },
+                ]}
+              />
+            </LinearGradient>
+          </BouncyPressable>
+          <BouncyPressable
+            testID={`following-unfollow-${pet.id}`}
+            activeScale={0.96}
+            disabled={busy}
+            onPress={() => onUnfollow(pet)}
+            style={[
+              styles.btnWrap,
+              styles.btn,
+              styles.unfollowBtn,
+              isDarkMode && styles.unfollowBtnDark,
+              busy && styles.disabled,
+            ]}>
+            {busy ? (
+              <ActivityIndicator size="small" color="#DC2626" testID={`following-busy-${pet.id}`} />
+            ) : (
+              <>
+                <Ionicons name="heart-dislike-outline" size={ms(15)} color="#DC2626" />
+                <Text style={styles.unfollowText}>Unfollow</Text>
+              </>
+            )}
+          </BouncyPressable>
+        </View>
+      </Animated.View>
+    );
+  },
+);
+
+const keyOfPet = item => String(item.id);
 
 // The banner above the list: how big the pack is, with a slowly drifting glow
 const PackBanner = ({ pets, scrollY }) => {
@@ -303,15 +347,33 @@ const PackBanner = ({ pets, scrollY }) => {
       testID="following-banner"
       style={{
         opacity: intro,
-        transform: [{ translateY: intro.interpolate({ inputRange: [0, 1], outputRange: [-14, 0] }) }],
+        transform: [
+          { translateY: intro.interpolate({ inputRange: [0, 1], outputRange: [-14, 0] }) },
+        ],
       }}>
       {/* Scrolling: the banner moves a little slower than the list and fades; pulling down grows it */}
       <Animated.View
         style={{
-          opacity: scrollY.interpolate({ inputRange: [0, 240], outputRange: [1, 0.35], extrapolate: 'clamp' }),
+          opacity: scrollY.interpolate({
+            inputRange: [0, 240],
+            outputRange: [1, 0.35],
+            extrapolate: 'clamp',
+          }),
           transform: [
-            { translateY: scrollY.interpolate({ inputRange: [0, 240], outputRange: [0, 70], extrapolate: 'clamp' }) },
-            { scale: scrollY.interpolate({ inputRange: [-140, 0], outputRange: [1.1, 1], extrapolate: 'clamp' }) },
+            {
+              translateY: scrollY.interpolate({
+                inputRange: [0, 240],
+                outputRange: [0, 70],
+                extrapolate: 'clamp',
+              }),
+            },
+            {
+              scale: scrollY.interpolate({
+                inputRange: [-140, 0],
+                outputRange: [1.1, 1],
+                extrapolate: 'clamp',
+              }),
+            },
           ],
         }}>
         <LinearGradient
@@ -339,10 +401,23 @@ const PackBanner = ({ pets, scrollY }) => {
                 styles.bannerPaw,
                 {
                   left: paw.left,
-                  opacity: drift.interpolate({ inputRange: [0, 1], outputRange: [paw.opacity, paw.opacity * 0.4] }),
+                  opacity: drift.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [paw.opacity, paw.opacity * 0.4],
+                  }),
                   transform: [
-                    { translateY: drift.interpolate({ inputRange: [0, 1], outputRange: [paw.from, paw.to] }) },
-                    { rotate: drift.interpolate({ inputRange: [0, 1], outputRange: ['-14deg', '14deg'] }) },
+                    {
+                      translateY: drift.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [paw.from, paw.to],
+                      }),
+                    },
+                    {
+                      rotate: drift.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['-14deg', '14deg'],
+                      }),
+                    },
                   ],
                 },
               ]}>
@@ -360,8 +435,14 @@ const PackBanner = ({ pets, scrollY }) => {
           </View>
           <View style={styles.bannerStats}>
             {tiles.map((tile, index) => (
-              <View key={tile.label} style={[styles.bannerStat, index > 0 && styles.bannerStatDivider]}>
-                <CountUp value={tile.value} style={styles.bannerStatValue} testID={`following-stat-${index}`} />
+              <View
+                key={tile.label}
+                style={[styles.bannerStat, index > 0 && styles.bannerStatDivider]}>
+                <CountUp
+                  value={tile.value}
+                  style={styles.bannerStatValue}
+                  testID={`following-stat-${index}`}
+                />
                 <Text style={styles.bannerStatLabel}>{tile.label}</Text>
               </View>
             ))}
@@ -412,19 +493,38 @@ export const FollowingScreen = ({ navigation }) => {
     [unfollow],
   );
   const busyId = unfollow.isPending ? unfollow.variables : null;
+  const renderPet = useCallback(
+    ({ item, index }) => (
+      <FollowedPetCard
+        pet={item}
+        index={index}
+        pulse={pulse}
+        spin={spin}
+        shine={shine}
+        isDarkMode={isDarkMode}
+        busy={String(busyId) === String(item.id)}
+        onView={handleView}
+        onUnfollow={handleUnfollow}
+      />
+    ),
+    [pulse, spin, shine, isDarkMode, busyId, handleView, handleUnfollow],
+  );
 
   const header = (
     <View>
       {failedName ? (
         <View style={styles.errorBar} testID="following-error">
           <Ionicons name="alert-circle" size={ms(16)} color="#B91C1C" />
-          <Text style={styles.errorText}>{`Couldn't unfollow ${failedName}. Please try again.`}</Text>
+          <Text
+            style={styles.errorText}>{`Couldn't unfollow ${failedName}. Please try again.`}</Text>
         </View>
       ) : null}
       {pets.length > 0 ? (
         <>
           <PackBanner pets={pets} scrollY={scrollY} />
-          <Text style={[styles.resultLine, isDarkMode && styles.mutedDark]} testID="following-count">
+          <Text
+            style={[styles.resultLine, isDarkMode && styles.mutedDark]}
+            testID="following-count">
             {`Following ${pets.length} ${pets.length === 1 ? 'pet' : 'pets'}`}
           </Text>
         </>
@@ -449,24 +549,19 @@ export const FollowingScreen = ({ navigation }) => {
       />
 
       {isLoading ? (
-        <LoaderCard style={styles.center} label="Loading the pets you follow…" isDarkMode={isDarkMode} />
+        <LoaderCard
+          style={styles.center}
+          label="Loading the pets you follow…"
+          isDarkMode={isDarkMode}
+        />
       ) : (
         <Animated.FlatList
           data={pets}
-          keyExtractor={item => String(item.id)}
-          renderItem={({ item, index }) => (
-            <FollowedPetCard
-              pet={item}
-              index={index}
-              pulse={pulse}
-              spin={spin}
-              shine={shine}
-              isDarkMode={isDarkMode}
-              busy={String(busyId) === String(item.id)}
-              onView={handleView}
-              onUnfollow={handleUnfollow}
-            />
-          )}
+          keyExtractor={keyOfPet}
+          renderItem={renderPet}
+          initialNumToRender={5}
+          maxToRenderPerBatch={5}
+          windowSize={7}
           ListHeaderComponent={header}
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
@@ -482,7 +577,9 @@ export const FollowingScreen = ({ navigation }) => {
               style={[styles.emptyCard, isDarkMode && styles.emptyCardDark]}>
               <Animated.View
                 style={{
-                  transform: [{ translateY: pulse.interpolate({ inputRange: [0, 1], outputRange: [4, -6] }) }],
+                  transform: [
+                    { translateY: pulse.interpolate({ inputRange: [0, 1], outputRange: [4, -6] }) },
+                  ],
                 }}>
                 <LinearGradient
                   colors={isError ? ['#94A3B8', '#64748B'] : ['#8B5CF6', '#EC4899']}
@@ -519,7 +616,9 @@ export const FollowingScreen = ({ navigation }) => {
                     size={ms(16)}
                     color="#FFFFFF"
                   />
-                  <Text style={styles.emptyCtaText}>{isError ? 'Try again' : 'Open leaderboard'}</Text>
+                  <Text style={styles.emptyCtaText}>
+                    {isError ? 'Try again' : 'Open leaderboard'}
+                  </Text>
                 </LinearGradient>
               </BouncyPressable>
             </View>

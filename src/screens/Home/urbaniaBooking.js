@@ -550,11 +550,100 @@ export const readBookingStatus = data => {
   return {
     status: String(source.status || data?.status || ''),
     message: String(data?.message || source.message || source.statusMessage || ''),
+    places: readPlaces(source, data),
+    payment: readPayment(source, data),
     estimate:
       fareSource && typeof fareSource === 'object'
         ? readEstimate({ fare: fareSource, route: source.route ?? data?.route })
         : null,
   };
+};
+
+// The booking's payment block -> { status, received } (rupees), or null when the API sends none.
+// The text is the server's own wording; "received" is the verified total including any deposit.
+export const readPayment = (source, item) => {
+  const block = [source?.payment, source?.payments, item?.payment, item?.payments].find(
+    entry => entry && typeof entry === 'object' && !Array.isArray(entry),
+  );
+  const pickText = (...values) => values.find(v => typeof v === 'string' && v.trim()) || '';
+  const status = pickText(
+    block?.message,
+    block?.statusMessage,
+    block?.summary,
+    source?.paymentMessage,
+    source?.paymentStatusMessage,
+    typeof source?.paymentStatus === 'string' ? source.paymentStatus : '',
+    typeof block?.status === 'string' ? block.status : '',
+  ).trim();
+  const paise = [
+    block?.verifiedTotalPaise,
+    block?.verifiedPaise,
+    block?.receivedPaise,
+    block?.totalVerifiedPaise,
+    source?.verifiedPaymentsPaise,
+    source?.paidPaise,
+  ].find(v => typeof v === 'number');
+  if (!status && typeof paise !== 'number') {
+    return null;
+  }
+  return { status, received: typeof paise === 'number' ? money(paise) : null };
+};
+
+// The trip's addresses -> [{ kind: 'pickup' | 'stop' | 'destination' | 'drop', address }]. The names
+// vary, and a value may be text or { address }; empty ones are left out. (The server keeps only a
+// Place ID for an address picked from the suggestions, so those come back with no address.)
+export const readPlaces = (source, item) => {
+  const text = value => (typeof value === 'string' ? value.trim() : '');
+  const address = value =>
+    typeof value === 'string' ? value.trim() : text(value?.address || value?.name || value?.label);
+  // The address fields may be named a few ways, as a plain string or as { address }
+  const nests = [source, item, source.route, source.trip, source.locations].filter(
+    entry => entry && typeof entry === 'object',
+  );
+  const pick = (...keys) => {
+    for (const nest of nests) {
+      for (const key of keys) {
+        const found = address(nest[key]);
+        if (found) {
+          return found;
+        }
+      }
+    }
+    return '';
+  };
+  const stopList =
+    source.stops ??
+    source.plannedStops ??
+    source.waypoints ??
+    source.route?.stops ??
+    item?.stops ??
+    [];
+  const stops = (Array.isArray(stopList) ? stopList : [])
+    .map(address)
+    .filter(Boolean)
+    .map(place => ({ kind: 'stop', address: place }));
+  const places = [
+    ['pickup', pick('pickupAddress', 'pickup', 'pickupLocation', 'pickup_address')],
+    ...stops.map(stop => ['stop', stop.address]),
+    [
+      'destination',
+      pick('destinationAddress', 'destination', 'destinationLocation', 'destination_address'),
+    ],
+    [
+      'drop',
+      pick(
+        'dropAddress',
+        'dropoffAddress',
+        'dropLocation',
+        'finalDrop',
+        'drop',
+        'drop_address',
+      ),
+    ],
+  ]
+    .map(([kind, value]) => ({ kind, address: value }))
+    .filter(place => place.address);
+  return places;
 };
 
 // The account's booking list -> the records the history page shows. The list may come bare or inside
@@ -564,8 +653,6 @@ export const readAccountBookings = data => {
     ? data
     : data?.bookings || data?.requests || data?.items || data?.data || data?.results || [];
   const text = value => (typeof value === 'string' ? value.trim() : '');
-  const address = value =>
-    typeof value === 'string' ? value.trim() : text(value?.address || value?.name || value?.label);
   return (Array.isArray(list) ? list : [])
     .map(item => {
       const source = item?.request && typeof item.request === 'object' ? item.request : item || {};
@@ -580,43 +667,9 @@ export const readAccountBookings = data => {
           : typeof source.totalPaise === 'number'
           ? money(source.totalPaise)
           : null;
-      // The address fields may be named a few ways, as a plain string or as { address }
-      const pick = (...keys) => {
-        for (const key of keys) {
-          const found = address(source[key] ?? item?.[key]);
-          if (found) {
-            return found;
-          }
-        }
-        return '';
-      };
-      const stopList = source.stops ?? source.plannedStops ?? item?.stops ?? [];
-      const stops = (Array.isArray(stopList) ? stopList : [])
-        .map(address)
-        .filter(Boolean)
-        .map(place => ({ kind: 'stop', address: place }));
-      const places = [
-        ['pickup', pick('pickupAddress', 'pickup', 'pickupLocation', 'pickup_address')],
-        ...stops.map(stop => ['stop', stop.address]),
-        [
-          'destination',
-          pick('destinationAddress', 'destination', 'destinationLocation', 'destination_address'),
-        ],
-        [
-          'drop',
-          pick(
-            'dropAddress',
-            'dropoffAddress',
-            'dropLocation',
-            'finalDrop',
-            'drop',
-            'drop_address',
-          ),
-        ],
-      ]
-        .map(([kind, value]) => ({ kind, address: value }))
-        .filter(place => place.address);
+      const places = readPlaces(source, item);
       return {
+        id: text(source.id || item?.id),
         reference,
         status: text(source.status || item?.status) || 'pending_review',
         tripType: source.tripType === 'local' ? 'local' : 'outstation',
@@ -626,17 +679,64 @@ export const readAccountBookings = data => {
         places,
         fare: total === null ? null : { total, ...(estimate?.summary || {}) },
         message: text(item?.message || source.message || source.statusMessage),
+        payment: readPayment(source, item),
         remote: true,
       };
     })
     .filter(booking => booking.reference);
 };
 
+// One booking's own answer (GET /accounts/me/urbania-bookings/{id}) -> the same record as a list row,
+// or null. The booking may come bare or inside booking / request / data.
+export const readBookingDetail = data => {
+  const inner = [data?.booking, data?.request, data?.data].find(
+    entry => entry && typeof entry === 'object' && !Array.isArray(entry),
+  );
+  const source = inner || data;
+  if (!source || typeof source !== 'object') {
+    return null;
+  }
+  return readAccountBookings([{ ...source, message: data?.message ?? source.message }])[0] || null;
+};
+
+// A list row with the booking's own answer laid over it: whatever the detail has wins, whatever it
+// lacks stays as the list had it
+export const applyBookingDetail = (item, detail) => {
+  if (!detail) {
+    return item;
+  }
+  return {
+    ...item,
+    status: detail.status || item.status,
+    pickupLabel: detail.pickupLabel || item.pickupLabel,
+    returnLabel: detail.returnLabel || item.returnLabel,
+    places: detail.places?.length ? detail.places : item.places,
+    fare: detail.fare || item.fare,
+    payment: detail.payment || item.payment,
+    message: detail.message || item.message,
+  };
+};
+
 // The account's bookings first (they are the source of truth), then any made on this phone that the
 // account list does not have
 export const mergeBookings = (remote, local) => {
   const known = new Set(remote.map(item => item.reference));
-  return [...remote, ...local.filter(item => !known.has(item.reference))];
+  const mine = new Map(local.map(item => [item.reference, item]));
+  // The account list may carry no addresses (the server keeps only a Place ID for an address picked
+  // from the suggestions) and no payment note: fill those from the copy saved on this phone
+  const filled = remote.map(item => {
+    const saved = mine.get(item.reference);
+    if (!saved) {
+      return item;
+    }
+    return {
+      ...item,
+      places: item.places?.length ? item.places : saved.places || [],
+      payment: item.payment || saved.payment || null,
+      message: item.message || saved.message || '',
+    };
+  });
+  return [...filled, ...local.filter(item => !known.has(item.reference))];
 };
 
 // A Google Maps link that searches for the address

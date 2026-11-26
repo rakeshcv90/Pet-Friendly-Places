@@ -14,8 +14,18 @@ export const SPLIT_CROP_RATIO = 1.08;
 // Each half covers this share of the screen height; they overlap a little and fade together
 export const HALF_SHARE = 0.56;
 
+// Screens that would crop more than this (1.2 = 20%) of the login pictures: an iPad (about 33%). A 10-inch
+// Android tablet crops about 11%, which looks fine as a single picture, so it is left as it was.
+export const LOGIN_SPLIT_CROP_RATIO = 1.2;
+
 // Size of the picture when it is as wide as the screen
-export const getBackgroundLayout = (imageWidth, imageHeight, screenWidth, screenHeight) => {
+export const getBackgroundLayout = (
+  imageWidth,
+  imageHeight,
+  screenWidth,
+  screenHeight,
+  splitAbove = SPLIT_CROP_RATIO,
+) => {
   const scale = Math.max(screenWidth / imageWidth, screenHeight / imageHeight);
   const width = imageWidth * scale;
   const height = imageHeight * scale;
@@ -24,15 +34,22 @@ export const getBackgroundLayout = (imageWidth, imageHeight, screenWidth, screen
     height,
     left: (screenWidth - width) / 2,
     top: (screenHeight - height) / 2,
-    split: height / screenHeight > SPLIT_CROP_RATIO,
+    split: height / screenHeight > splitAbove,
   };
 };
 
 // Full-screen decorative background for the sign-in screens
-export const AuthBackground = ({ source, imageWidth, imageHeight, bottom = 0, testID }) => {
+export const AuthBackground = ({
+  source,
+  imageWidth,
+  imageHeight,
+  bottom = 0,
+  splitAbove = SPLIT_CROP_RATIO,
+  testID,
+}) => {
   const { width, height } = useWindowDimensions();
   const screenHeight = height - bottom;
-  const layout = getBackgroundLayout(imageWidth, imageHeight, width, screenHeight);
+  const layout = getBackgroundLayout(imageWidth, imageHeight, width, screenHeight, splitAbove);
 
   if (!layout.split) {
     return (

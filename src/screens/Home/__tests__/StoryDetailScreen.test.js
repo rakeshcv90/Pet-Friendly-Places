@@ -101,6 +101,92 @@ describe('StoryDetailScreen', () => {
     expect(getByTestId('gallery-viewer')).toBeTruthy();
   });
 
+  it('says so, with a Try again button, when a full-screen photo cannot load (not a black screen)', () => {
+    jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'] });
+    const { getByTestId, queryByTestId, UNSAFE_getAllByType } = render(
+      <StoryDetailScreen navigation={navigation} route={route} />
+    );
+    fireEvent.press(getByTestId('gallery-item-g1'));
+    const viewer = within(getByTestId('gallery-viewer'));
+    expect(queryByTestId('viewer-image-failed')).toBeNull();
+
+    // The picture fails on the first try and on both automatic retries
+    const { Image } = require('react-native');
+    const failOnce = () => {
+      const images = within(getByTestId('gallery-viewer')).UNSAFE_getAllByType(Image);
+      fireEvent(images[0], 'error', { nativeEvent: {} });
+    };
+    for (let i = 0; i < 2; i += 1) {
+      failOnce();
+      act(() => {
+        jest.advanceTimersByTime(900 * (i + 1));
+      });
+    }
+    failOnce();
+
+    expect(getByTestId('viewer-image-failed')).toBeTruthy();
+    expect(viewer.queryByText('This photo could not load')).toBeTruthy();
+
+    // Try again loads it from scratch
+    fireEvent.press(getByTestId('viewer-image-retry'));
+    expect(queryByTestId('viewer-image-failed')).toBeNull();
+    expect(UNSAFE_getAllByType(Image).length).toBeGreaterThan(0);
+    jest.useRealTimers();
+  });
+
+  it('explains a video that cannot play, and offers Try again and another app', () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const { getByTestId, queryByTestId, getByText } = render(
+      <StoryDetailScreen navigation={navigation} route={route} />
+    );
+    fireEvent.press(getByTestId('gallery-item-v1'));
+    const failPlayback = () => fireEvent(getByTestId('viewer-video-v1'), 'error', {});
+    failPlayback();
+
+    expect(getByText("This video can't be played right now")).toBeTruthy();
+
+    fireEvent.press(getByTestId('viewer-video-v1-open-external'));
+    expect(openURL).toHaveBeenCalled();
+
+    // Try again puts the player back, and it can fail again without breaking anything
+    fireEvent.press(getByTestId('viewer-video-v1-retry'));
+    expect(queryByTestId('viewer-video-v1-retry')).toBeNull();
+    failPlayback();
+    expect(getByTestId('viewer-video-v1-retry')).toBeTruthy();
+    openURL.mockRestore();
+  });
+
+  it('shows a loader when a story video is opened, and hides it once the video is ready', () => {
+    const { getByTestId, queryByTestId } = render(
+      <StoryDetailScreen navigation={navigation} route={route} />
+    );
+    fireEvent.press(getByTestId('gallery-item-v1'));
+    expect(getByTestId('viewer-video-v1-loading')).toBeTruthy();
+
+    fireEvent(getByTestId('viewer-video-v1'), 'load', { duration: 5 });
+    expect(queryByTestId('viewer-video-v1-loading')).toBeNull();
+  });
+
+  it('keeps the back and share buttons above the header bar that appears on scroll', () => {
+    const { StyleSheet } = require('react-native');
+    const { getByTestId } = render(<StoryDetailScreen navigation={navigation} route={route} />);
+    const styleOf = (testID, key) => {
+      let node = getByTestId(testID);
+      while (node) {
+        const value = StyleSheet.flatten(node.props.style)?.[key];
+        if (value !== undefined) {
+          return value;
+        }
+        node = node.parent;
+      }
+      return undefined;
+    };
+    // Android draws a higher elevation on top; the bar's elevation is 6
+    expect(styleOf('story-back', 'elevation')).toBeGreaterThan(6);
+    expect(styleOf('story-share', 'elevation')).toBeGreaterThan(6);
+    expect(styleOf('story-back', 'zIndex')).toBeGreaterThan(5);
+  });
+
   it('opens the place when a place card is pressed', () => {
     const { getByText } = render(<StoryDetailScreen navigation={navigation} route={route} />);
     fireEvent.press(getByText('Leela Homestay (Jabalpur)'));

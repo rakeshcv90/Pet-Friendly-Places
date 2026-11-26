@@ -13,7 +13,7 @@ import { s } from 'react-native-size-matters';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import FastImage from '../../../components/common/FastImage';
+import { AuthBackground, LOGIN_SPLIT_CROP_RATIO } from '../../../components/common/AuthBackground';
 import { Input } from '../../../components/common/Input';
 import { Button } from '../../../components/common/Button';
 import { Loader } from '../../../components/common/Loader';
@@ -85,10 +85,13 @@ export const ForgotPasswordScreen = ({ navigation }) => {
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <FastImage
+      <AuthBackground
         source={theme.images.backgroundimg}
-        style={[styles.backgroundImage, { bottom: insets.bottom }]}
-        objectFit="cover"
+        imageWidth={941}
+        imageHeight={1672}
+        bottom={insets.bottom}
+        splitAbove={LOGIN_SPLIT_CROP_RATIO}
+        testID="auth-background"
       />
 
       {/* Premium Animated Loader Modal */}
@@ -103,7 +106,8 @@ export const ForgotPasswordScreen = ({ navigation }) => {
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: Math.max(insets.top, s(16)) + s(10) + (isWideScreen ? SCREEN_HEIGHT * 0.06 : 0),
+            paddingTop:
+              Math.max(insets.top, s(16)) + s(10) + (isWideScreen ? SCREEN_HEIGHT * 0.06 : 0),
             paddingBottom: Math.max(insets.bottom, s(16)) + s(20),
           },
         ]}
@@ -256,7 +260,7 @@ export const ForgotPasswordScreen = ({ navigation }) => {
                 <FeatherIcon
                   name="arrow-left"
                   size={s(18)}
-                  color={ theme.colors.primaryDark}
+                  color={theme.colors.primaryDark}
                   style={styles.backToLoginIcon}
                 />
                 <Text style={styles.backToLoginText}>Back to login</Text>

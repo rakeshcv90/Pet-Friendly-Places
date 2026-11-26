@@ -20,7 +20,10 @@ export const ListingNearby = ({ listing, palette, isDarkMode, navigation }) => {
       icon="map-outline"
       palette={palette}
       isDarkMode={isDarkMode}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.row}>
         {listing.nearby.map(place => (
           <BouncyPressable
             key={place.slug}

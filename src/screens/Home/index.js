@@ -207,35 +207,29 @@ export const HomeScreen = ({ navigation }) => {
     searchIconRotate,
 
     categoryScale,
-    categoryRotateX,
     catRow2Scale,
     storyHeaderOpacity,
     storyScale,
-    storyRotateX,
     storyOpacity,
     storyImageParallax,
     storySheenX,
     storyPillScale,
     tailsHeaderOpacity,
     tailsScale,
-    tailsRotateX,
     tailsOpacity,
     tailsImageParallax,
     tailsBadgeScale,
     favoriteBtnScale,
     recentHeaderOpacity,
     recentScale,
-    recentRotateX,
     recentOpacity,
     rehomeScale,
-    rehomeRotateX,
     rehomeOpacity,
     rehomeBtn1Scale,
     rehomeBtn2Scale,
     rehomeBtn3Scale,
     roadTripHeaderOpacity,
     roadTripScale,
-    roadTripRotateX,
     roadTripOpacity,
   } = useHomeAnimations(scrollY);
 
@@ -245,6 +239,23 @@ export const HomeScreen = ({ navigation }) => {
   const quickNudge = useRef(new Animated.Value(0)).current;
   const quickShake = useRef(new Animated.Value(0)).current;
 
+  // The tab stays mounted when another tab is open, so its looping animations would keep the phone's
+  // UI thread busy for nothing, and compete with scrolling when you come back. Run them only while
+  // Home is on screen.
+  const [isScreenFocused, setIsScreenFocused] = useState(true);
+  useEffect(() => {
+    if (!navigation?.addListener) {
+      return undefined;
+    }
+    const offFocus = navigation.addListener('focus', () => setIsScreenFocused(true));
+    const offBlur = navigation.addListener('blur', () => setIsScreenFocused(false));
+    return () => {
+      offFocus?.();
+      offBlur?.();
+    };
+  }, [navigation]);
+
+  // Entrance: the header fades in, then the cards slide in one after another
   useEffect(() => {
     Animated.sequence([
       Animated.timing(quickHeaderAnim, {
@@ -260,6 +271,13 @@ export const HomeScreen = ({ navigation }) => {
         ),
       ),
     ]).start();
+  }, [quickHeaderAnim, quickCardAnims]);
+
+  // Looping call-to-action motion, only while Home is on screen
+  useEffect(() => {
+    if (!isScreenFocused) {
+      return undefined;
+    }
     const nudgeLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(quickNudge, {
@@ -295,7 +313,7 @@ export const HomeScreen = ({ navigation }) => {
       nudgeLoop.stop();
       shakeLoop.stop();
     };
-  }, [quickHeaderAnim, quickCardAnims, quickNudge, quickShake]);
+  }, [isScreenFocused, quickNudge, quickShake]);
 
   // dir: -1 = left card (tilts left, enters from left), 1 = right card
   const quickTileStyle = (anim, dir) => ({
@@ -340,6 +358,8 @@ export const HomeScreen = ({ navigation }) => {
           { transform: [{ translateY: orbTopRightY }, { scale: orbTopRightScale }] },
         ]}
         pointerEvents="none"
+        renderToHardwareTextureAndroid
+        shouldRasterizeIOS
       />
       <Animated.View
         style={[
@@ -348,6 +368,8 @@ export const HomeScreen = ({ navigation }) => {
           { transform: [{ translateY: orbTopLeftY }] },
         ]}
         pointerEvents="none"
+        renderToHardwareTextureAndroid
+        shouldRasterizeIOS
       />
       <Animated.View
         style={[
@@ -356,6 +378,8 @@ export const HomeScreen = ({ navigation }) => {
           { transform: [{ translateY: orbMidRightY }] },
         ]}
         pointerEvents="none"
+        renderToHardwareTextureAndroid
+        shouldRasterizeIOS
       />
       <Animated.View
         style={[
@@ -364,6 +388,8 @@ export const HomeScreen = ({ navigation }) => {
           { transform: [{ translateY: orbMidLeftY }] },
         ]}
         pointerEvents="none"
+        renderToHardwareTextureAndroid
+        shouldRasterizeIOS
       />
       <Animated.View
         style={[
@@ -372,13 +398,18 @@ export const HomeScreen = ({ navigation }) => {
           { transform: [{ translateY: orbBottomRightY }] },
         ]}
         pointerEvents="none"
+        renderToHardwareTextureAndroid
+        shouldRasterizeIOS
       />
+     
       <Animated.View
         style={[
           styles.ambientPawWatermarkTop,
           { transform: [{ rotate: '-25deg' }, { translateY: watermarkTopY }] },
         ]}
-        pointerEvents="none">
+        pointerEvents="none"
+        renderToHardwareTextureAndroid
+        shouldRasterizeIOS>
         <Ionicons
           name="paw"
           size={ms(130)}
@@ -390,7 +421,9 @@ export const HomeScreen = ({ navigation }) => {
           styles.ambientPawWatermarkBottom,
           { transform: [{ rotate: '30deg' }, { translateY: watermarkBottomY }] },
         ]}
-        pointerEvents="none">
+        pointerEvents="none"
+        renderToHardwareTextureAndroid
+        shouldRasterizeIOS>
         <Ionicons
           name="paw"
           size={ms(160)}
@@ -454,9 +487,7 @@ export const HomeScreen = ({ navigation }) => {
               isDarkMode && styles.categoriesCardDark,
               {
                 transform: [
-                  { perspective: 1000 },
                   { scale: categoryScale },
-                  { rotateX: categoryRotateX },
                 ],
               },
             ]}>
@@ -517,9 +548,7 @@ export const HomeScreen = ({ navigation }) => {
                   {
                     opacity: storyOpacity,
                     transform: [
-                      { perspective: 1000 },
                       { scale: storyScale },
-                      { rotateX: storyRotateX },
                     ],
                   },
                 ]}>
@@ -596,9 +625,7 @@ export const HomeScreen = ({ navigation }) => {
                 style={{
                   opacity: storyOpacity,
                   transform: [
-                    { perspective: 1000 },
                     { scale: storyScale },
-                    { rotateX: storyRotateX },
                   ],
                 }}>
                 <ScrollView
@@ -688,9 +715,7 @@ export const HomeScreen = ({ navigation }) => {
                 {
                   opacity: tailsOpacity,
                   transform: [
-                    { perspective: 1000 },
                     { scale: tailsScale },
-                    { rotateX: tailsRotateX },
                   ],
                 },
               ]}>
@@ -850,9 +875,7 @@ export const HomeScreen = ({ navigation }) => {
               style={{
                 opacity: recentOpacity,
                 transform: [
-                  { perspective: 1000 },
                   { scale: recentScale },
-                  { rotateX: recentRotateX },
                 ],
               }}>
               <BouncyPressable
@@ -965,9 +988,7 @@ export const HomeScreen = ({ navigation }) => {
             {
               opacity: rehomeOpacity,
               transform: [
-                { perspective: 1000 },
                 { scale: rehomeScale },
-                { rotateX: rehomeRotateX },
               ],
             },
           ]}>
@@ -1100,9 +1121,7 @@ export const HomeScreen = ({ navigation }) => {
               style={{
                 opacity: roadTripOpacity,
                 transform: [
-                  { perspective: 1000 },
                   { scale: roadTripScale },
-                  { rotateX: roadTripRotateX },
                 ],
               }}>
               <ScrollView

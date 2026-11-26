@@ -93,6 +93,33 @@ export const devLog = (name, data) => {
   }
 };
 
+// Development only: for every booking, the keys the server sent next to what the app read from them,
+// so a field missing on the phone can be matched against Postman.
+export const logBookingCompare = (data, bookings) => {
+  if (!logging()) {
+    return;
+  }
+  const list = Array.isArray(data)
+    ? data
+    : data?.bookings || data?.requests || data?.items || data?.data || data?.results || [];
+  (Array.isArray(list) ? list : []).forEach((raw, index) => {
+    const source = raw?.request && typeof raw.request === 'object' ? raw.request : raw || {};
+    const read = bookings[index] || {};
+    console.log(
+      `[urbania] booking ${read.reference || index} api keys`,
+      Object.keys(source).join(', '),
+    );
+    console.log(
+      `[urbania] booking ${read.reference || index} shown in app`,
+      JSON.stringify(
+        { places: read.places, fare: read.fare, payment: read.payment, status: read.status },
+        null,
+        2,
+      ),
+    );
+  });
+};
+
 const logged = async (name, path, body) => {
   if (!logging()) {
     return post(path, body);

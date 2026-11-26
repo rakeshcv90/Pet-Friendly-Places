@@ -48,6 +48,11 @@ export const API_ENDPOINTS = {
   SAVED_PLACES: '/accounts/me/saved',
   // GET the signed-in account's Urbania bookings (requests and confirmed trips)
   MY_URBANIA_BOOKINGS: '/accounts/me/urbania-bookings',
+  // GET one booking with all its details (addresses, fare, payment note): the list only has a summary
+  URBANIA_BOOKING: id => `/accounts/me/urbania-bookings/${id}`,
+  // POST (no body): emails the signed-in account a one-time link that connects its earlier guest
+  // bookings (made with the same email) to the account
+  URBANIA_CLAIM: '/accounts/me/urbania-bookings/claim',
   // POST { reference, name, phone, details }: asks staff to check ownership of a booking. Path is a
   // best guess until it is confirmed against the API docs.
   URBANIA_STAFF_REVIEW: '/accounts/me/urbania-bookings/ownership-review',

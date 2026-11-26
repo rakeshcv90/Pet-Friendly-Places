@@ -2,6 +2,7 @@ import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-quer
 import { api } from '../services/api/apiClient';
 import { API_ENDPOINTS, API_BASE_URL } from '../services/api/apiList';
 import { getItem, setItem } from '../services/storage/storage';
+import { logListing } from '../utils/listingDebug';
 
 const DISCOVERY_CACHE_KEY = 'CACHED_HOME_DISCOVERY';
 const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, '');
@@ -101,11 +102,22 @@ export const useRoadTripDetail = (slug, options = {}) => {
 
 // Display metadata for mode_hub pages; the list endpoint has no emoji/colour/verdict text.
 const TRANSPORT_MODE_META = {
-  conditional: { verdict: 'partial', verdict_text: 'Allowed with conditions', verdict_color: '#B45309' },
+  conditional: {
+    verdict: 'partial',
+    verdict_text: 'Allowed with conditions',
+    verdict_color: '#B45309',
+  },
   allowed: { verdict: 'allowed', verdict_text: 'Allowed', verdict_color: '#047857' },
   not_allowed: { verdict: 'not_allowed', verdict_text: 'Not allowed', verdict_color: '#B91C1C' },
 };
-const TRANSPORT_MODE_EMOJI = { train: '🚆', taxi: '🚕', flight: '✈️', metro: '🚇', bus: '🚌', auto: '🛺' };
+const TRANSPORT_MODE_EMOJI = {
+  train: '🚆',
+  taxi: '🚕',
+  flight: '✈️',
+  metro: '🚇',
+  bus: '🚌',
+  auto: '🛺',
+};
 
 // Builds the hub the Transport screen renders from the plain `/transport` pages, used when the
 // backend does not send `hub_content` for the `transport-hub` page.
@@ -212,6 +224,8 @@ export const useTravelStory = (slug, options = {}) => {
   });
 };
 
+export const LISTING_TIMEOUT_MS = 60000;
+
 export const useListingDetail = (slug, options = {}) => {
   return useQuery({
     queryKey: ['discovery', 'listingDetail', slug],
@@ -219,10 +233,16 @@ export const useListingDetail = (slug, options = {}) => {
       if (!slug) {
         return null;
       }
-      const data = await api.get(`/listings/${slug}`);
+      logListing(`GET ${API_BASE_URL}/listings/${slug}`);
+      // A place with many photos can take the server 20 seconds or more to answer, longer than the
+      // app's usual 15 seconds, which used to end on "Listing not found". Wait longer for this one.
+      const data = await api.get(`/listings/${slug}`, { timeout: LISTING_TIMEOUT_MS });
       return data;
     },
     enabled: !!slug,
+    // One retry only: with the longer timeout, the app's usual two retries could leave someone
+    // waiting minutes
+    retry: 1,
     staleTime: 1000 * 60 * 5,
     ...options,
   });

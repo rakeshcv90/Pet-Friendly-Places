@@ -37,6 +37,38 @@ describe('Welcome screen (Get Started) on different screens', () => {
     expect(fill.props.colors.length).toBeGreaterThan(1);
   });
 
+  it("extends the picture's own edges across the sides on a foldable, so it looks full", () => {
+    screen(...FOLDABLE);
+    const { getByTestId } = render(<SplashScreen navigation={navigation} />);
+
+    const [width] = FOLDABLE;
+    for (const side of ['left', 'right']) {
+      const strip = StyleSheet.flatten(getByTestId(`splash-edge-${side}`).props.style);
+      // A thin slice of the picture is stretched out to the width of the side area
+      expect(strip.width).toBe(3);
+      const sideWidth = strip.transform[0].scaleX * 3;
+      expect(sideWidth).toBeGreaterThan(100);
+      expect(sideWidth).toBeLessThan(width / 2);
+    }
+    // Left strip starts at the screen edge; right strip starts where the picture ends
+    const left = StyleSheet.flatten(getByTestId('splash-edge-left').props.style);
+    const right = StyleSheet.flatten(getByTestId('splash-edge-right').props.style);
+    expect(left.left).toBe(0);
+    expect(right.left).toBeGreaterThan(width / 2);
+    // Both sides are the same width, since the picture is centred
+    expect(left.transform[0].scaleX).toBeCloseTo(right.transform[0].scaleX);
+  });
+
+  it('adds no edge strips on a phone or a tablet, where the picture fills the screen', () => {
+    for (const size of [PHONE, [1600, 2560]]) {
+      screen(...size);
+      const { queryByTestId, unmount } = render(<SplashScreen navigation={navigation} />);
+      expect(queryByTestId('splash-edge-left')).toBeNull();
+      expect(queryByTestId('splash-edge-right')).toBeNull();
+      unmount();
+    }
+  });
+
   it('uses the wider 2:3 picture on a tablet and the tall one on a phone', () => {
     const { theme } = require('../../../theme');
     const sourceOf = tree => tree.UNSAFE_getAllByType(require('../../../components/common/FastImage').default)

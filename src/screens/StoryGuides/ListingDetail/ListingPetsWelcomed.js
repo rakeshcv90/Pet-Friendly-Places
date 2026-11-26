@@ -23,10 +23,21 @@ export const ListingPetsWelcomed = ({ listing, palette, isDarkMode }) => {
       {listing.attributes.length || listing.levelLabel ? (
         <View style={[styles.chipsWrap, listing.petsWelcomed.length ? styles.gapTop : null]}>
           {listing.levelLabel ? (
-            <Pill label={listing.levelLabel} icon="paw" background={palette.warnSoft} color={palette.warn} />
+            <Pill
+              label={listing.levelLabel}
+              icon="paw"
+              background={palette.warnSoft}
+              color={palette.warn}
+            />
           ) : null}
           {listing.attributes.map(label => (
-            <Pill key={label} label={label} icon="checkmark-circle" background={palette.goodSoft} color={palette.good} />
+            <Pill
+              key={label}
+              label={label}
+              icon="checkmark-circle"
+              background={palette.goodSoft}
+              color={palette.good}
+            />
           ))}
         </View>
       ) : null}

@@ -8,7 +8,7 @@ import {
   StatusBar,
   Dimensions,
 } from 'react-native';
-import FastImage from '../../../components/common/FastImage';
+import { AuthBackground, LOGIN_SPLIT_CROP_RATIO } from '../../../components/common/AuthBackground';
 import { s } from 'react-native-size-matters';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeatherIcon from 'react-native-vector-icons/Feather';
@@ -100,10 +100,13 @@ export const LoginScreen = ({ navigation }) => {
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <FastImage
+      <AuthBackground
         source={theme.images.backgroundimg}
-        style={[styles.backgroundImage, { bottom: insets.bottom }]}
-        objectFit="cover"
+        imageWidth={941}
+        imageHeight={1672}
+        bottom={insets.bottom}
+        splitAbove={LOGIN_SPLIT_CROP_RATIO}
+        testID="auth-background"
       />
 
       {/* Premium Animated Loading Modal */}

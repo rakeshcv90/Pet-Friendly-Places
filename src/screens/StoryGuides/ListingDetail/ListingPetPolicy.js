@@ -45,13 +45,20 @@ export const ListingPetPolicy = ({ listing, palette, isDarkMode }) => {
   }
 
   const rules = showAllRules ? policy.keyRules : policy.keyRules.slice(0, RULES_PREVIEW);
-  const hasFullDetails = policy.keyRules.length > 0 || policy.feeBasis || policy.reviewMethod || policy.reviewDate;
+  const hasFullDetails =
+    policy.keyRules.length > 0 || policy.feeBasis || policy.reviewMethod || policy.reviewDate;
 
   return (
-    <SectionCard title="Pet policy" icon="document-text-outline" palette={palette} isDarkMode={isDarkMode}>
+    <SectionCard
+      title="Pet policy"
+      icon="document-text-outline"
+      palette={palette}
+      isDarkMode={isDarkMode}>
       {rules.length ? (
         <>
-          <Text style={[styles.subHeading, styles.firstSubHeading, { color: palette.muted }]}>KEY RULES</Text>
+          <Text style={[styles.subHeading, styles.firstSubHeading, { color: palette.muted }]}>
+            KEY RULES
+          </Text>
           {rules.map(rule => (
             <View key={rule} style={styles.bulletRow}>
               <Ionicons name="checkmark-circle" size={ms(15)} color={palette.good} />
@@ -72,16 +79,58 @@ export const ListingPetPolicy = ({ listing, palette, isDarkMode }) => {
         <>
           <Text style={[styles.subHeading, { color: palette.muted }]}>AT A GLANCE</Text>
           {rows.map(([icon, label, value], i) => (
-            <FactRow key={label} icon={icon} label={label} value={value} palette={palette} first={i === 0} />
+            <FactRow
+              key={label}
+              icon={icon}
+              label={label}
+              value={value}
+              palette={palette}
+              first={i === 0}
+            />
           ))}
         </>
       ) : null}
 
-      <ChipGroup title="ALLOWED PETS" items={policy.allowedPets} icon="paw" background={palette.soft} color={palette.accent} palette={palette} />
-      <ChipGroup title="DOG SIZES" items={policy.dogSizes} icon="resize-outline" background={palette.soft} color={palette.accent} palette={palette} />
-      <ChipGroup title="PETS ALLOWED IN" items={policy.allowedIn} icon="checkmark-circle" background={palette.goodSoft} color={palette.good} palette={palette} />
-      <ChipGroup title="PET AMENITIES" items={policy.amenities} icon="star" background={palette.warnSoft} color={palette.warn} palette={palette} />
-      <ChipGroup title="BEST FOR" items={bestFor} icon="checkmark" background={palette.goodSoft} color={palette.good} palette={palette} />
+      <ChipGroup
+        title="ALLOWED PETS"
+        items={policy.allowedPets}
+        icon="paw"
+        background={palette.soft}
+        color={palette.accent}
+        palette={palette}
+      />
+      <ChipGroup
+        title="DOG SIZES"
+        items={policy.dogSizes}
+        icon="resize-outline"
+        background={palette.soft}
+        color={palette.accent}
+        palette={palette}
+      />
+      <ChipGroup
+        title="PETS ALLOWED IN"
+        items={policy.allowedIn}
+        icon="checkmark-circle"
+        background={palette.goodSoft}
+        color={palette.good}
+        palette={palette}
+      />
+      <ChipGroup
+        title="PET AMENITIES"
+        items={policy.amenities}
+        icon="star"
+        background={palette.warnSoft}
+        color={palette.warn}
+        palette={palette}
+      />
+      <ChipGroup
+        title="BEST FOR"
+        items={bestFor}
+        icon="checkmark"
+        background={palette.goodSoft}
+        color={palette.good}
+        palette={palette}
+      />
 
       {bestForNotes.length ? (
         <View style={styles.notesBox}>
@@ -104,24 +153,36 @@ export const ListingPetPolicy = ({ listing, palette, isDarkMode }) => {
             <Text style={[styles.toggleText, { color: palette.accent }]}>
               Full pet policy, fee history and review details
             </Text>
-            <Ionicons name={showFull ? 'chevron-up' : 'chevron-down'} size={ms(18)} color={palette.accent} />
+            <Ionicons
+              name={showFull ? 'chevron-up' : 'chevron-down'}
+              size={ms(18)}
+              color={palette.accent}
+            />
           </TouchableOpacity>
           {showFull ? (
             <View>
               {policy.keyRules.length ? (
                 <>
                   <Text style={[styles.subHeading, { color: palette.muted }]}>FULL PET POLICY</Text>
-                  <Text style={[styles.bodyText, { color: palette.body }]}>{policy.keyRules.join(' ')}</Text>
+                  <Text style={[styles.bodyText, { color: palette.body }]}>
+                    {policy.keyRules.join(' ')}
+                  </Text>
                 </>
               ) : null}
               {policy.charges || policy.feeBasis ? (
                 <>
-                  <Text style={[styles.subHeading, { color: palette.muted }]}>FEE HISTORY AND SOURCE NOTES</Text>
+                  <Text style={[styles.subHeading, { color: palette.muted }]}>
+                    FEE HISTORY AND SOURCE NOTES
+                  </Text>
                   {policy.charges ? (
-                    <Text style={[styles.bodyText, { color: palette.body }]}>Additional fee notes: {policy.charges}</Text>
+                    <Text style={[styles.bodyText, { color: palette.body }]}>
+                      Additional fee notes: {policy.charges}
+                    </Text>
                   ) : null}
                   {policy.feeBasis ? (
-                    <Text style={[styles.bodyText, { color: palette.body }]}>Recorded fee basis: {policy.feeBasis}</Text>
+                    <Text style={[styles.bodyText, { color: palette.body }]}>
+                      Recorded fee basis: {policy.feeBasis}
+                    </Text>
                   ) : null}
                 </>
               ) : null}
@@ -129,10 +190,14 @@ export const ListingPetPolicy = ({ listing, palette, isDarkMode }) => {
                 <>
                   <Text style={[styles.subHeading, { color: palette.muted }]}>REVIEW DETAILS</Text>
                   {policy.reviewMethod ? (
-                    <Text style={[styles.bodyText, { color: palette.body }]}>Review method: {policy.reviewMethod}.</Text>
+                    <Text style={[styles.bodyText, { color: palette.body }]}>
+                      Review method: {policy.reviewMethod}.
+                    </Text>
                   ) : null}
                   {policy.reviewDate ? (
-                    <Text style={[styles.bodyText, { color: palette.body }]}>Review date: {policy.reviewDate}</Text>
+                    <Text style={[styles.bodyText, { color: palette.body }]}>
+                      Review date: {policy.reviewDate}
+                    </Text>
                   ) : null}
                 </>
               ) : null}

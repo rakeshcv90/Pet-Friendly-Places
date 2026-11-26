@@ -1,4 +1,5 @@
 import React from 'react';
+import { FlatList } from 'react-native';
 import { render as rtlRender, fireEvent } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReuniteListScreen } from '../ReuniteListScreen';
@@ -45,5 +46,26 @@ describe('ReuniteListScreen', () => {
     fireEvent.press(getByText('Cats'));
     expect(queryByText('Tommy')).toBeNull();
     expect(getByText('Name unknown')).toBeTruthy();
+  });
+
+  it('tunes the list so a long list scrolls smoothly', () => {
+    const { UNSAFE_getByType } = render(
+      <ReuniteListScreen navigation={navigation} route={{ params: {} }} />,
+    );
+    const list = UNSAFE_getByType(FlatList);
+    expect(list.props.initialNumToRender).toBe(6);
+    expect(list.props.maxToRenderPerBatch).toBe(6);
+    expect(list.props.windowSize).toBe(7);
+    expect(list.props.keyExtractor({ id: 'a' })).toBe('a');
+  });
+
+  it('opens the post that was pressed', () => {
+    const { getByText } = render(
+      <ReuniteListScreen navigation={navigation} route={{ params: {} }} />,
+    );
+    fireEvent.press(getByText('Tommy'));
+    expect(navigation.navigate).toHaveBeenCalledWith('ReuniteDetailScreen', {
+      post: mockPosts[0],
+    });
   });
 });

@@ -1,7 +1,12 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
 import useWindowDimensions from 'react-native/Libraries/Utilities/useWindowDimensions';
-import { AuthBackground, getBackgroundLayout, SPLIT_CROP_RATIO } from '../AuthBackground';
+import {
+  AuthBackground,
+  getBackgroundLayout,
+  SPLIT_CROP_RATIO,
+  LOGIN_SPLIT_CROP_RATIO,
+} from '../AuthBackground';
 
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   __esModule: true,
@@ -28,12 +33,66 @@ describe('getBackgroundLayout', () => {
   });
 
   it('always covers the whole screen width', () => {
-    for (const [sw, sh] of [[393, 852], [600, 960], [800, 1280], [1000, 1000]]) {
+    for (const [sw, sh] of [
+      [393, 852],
+      [600, 960],
+      [800, 1280],
+      [1000, 1000],
+    ]) {
       const layout = getBackgroundLayout(W, H, sw, sh);
       expect(layout.left).toBeLessThanOrEqual(1e-6);
       expect(layout.left + layout.width).toBeGreaterThanOrEqual(sw - 1e-6);
       expect(layout.height).toBeGreaterThanOrEqual(sh - 1e-6);
     }
+  });
+});
+
+// background.webp (login and forgot password) is 941 x 1672
+describe('login picture on an iPad but not on an Android tablet', () => {
+  const [lw, lh] = [941, 1672];
+
+  it('splits on an iPad (1024 x 1366 dp), where one picture would lose its top and bottom', () => {
+    const layout = getBackgroundLayout(lw, lh, 1024, 1366, LOGIN_SPLIT_CROP_RATIO);
+    expect(layout.split).toBe(true);
+  });
+
+  it('keeps one picture on a 10-inch Android tablet and on phones, as before', () => {
+    expect(getBackgroundLayout(lw, lh, 600, 960, LOGIN_SPLIT_CROP_RATIO).split).toBe(false);
+    expect(getBackgroundLayout(lw, lh, 393, 852, LOGIN_SPLIT_CROP_RATIO).split).toBe(false);
+    expect(getBackgroundLayout(lw, lh, 360, 800, LOGIN_SPLIT_CROP_RATIO).split).toBe(false);
+  });
+
+  it('would have split the Android tablet with the default rule, which login does not use', () => {
+    expect(getBackgroundLayout(lw, lh, 600, 960).split).toBe(true);
+  });
+
+  it('renders the top and bottom halves on an iPad only', () => {
+    useWindowDimensions.mockReturnValue({ width: 1024, height: 1366 });
+    const ipad = render(
+      <AuthBackground
+        source={1}
+        imageWidth={lw}
+        imageHeight={lh}
+        splitAbove={LOGIN_SPLIT_CROP_RATIO}
+        testID="bg"
+      />,
+    );
+    expect(ipad.getByTestId('bg-top')).toBeTruthy();
+    expect(ipad.getByTestId('bg-bottom')).toBeTruthy();
+    ipad.unmount();
+
+    useWindowDimensions.mockReturnValue({ width: 600, height: 960 });
+    const android = render(
+      <AuthBackground
+        source={1}
+        imageWidth={lw}
+        imageHeight={lh}
+        splitAbove={LOGIN_SPLIT_CROP_RATIO}
+        testID="bg"
+      />,
+    );
+    expect(android.queryByTestId('bg-top')).toBeNull();
+    expect(android.getByTestId('bg')).toBeTruthy();
   });
 });
 

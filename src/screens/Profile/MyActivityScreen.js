@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, StatusBar, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -19,9 +19,24 @@ const PURPLE = '#7B2CFF';
 const DEEP_PURPLE = '#3B108F';
 
 // Full list of the signed-in user's own posts and replies (opened from Profile > Community > Browse)
+// One activity row. Memoised, so switching the filter or refreshing redraws only what changed.
+const ActivityRow = React.memo(({ item, isDarkMode, onOpen }) => (
+  <ActivityCard item={item} isDarkMode={isDarkMode} onPress={() => onOpen(item)} />
+));
+
+const keyOfActivity = item => `${item.kind}-${item.id}`;
+
 export const MyActivityScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
+  const openActivity = useCallback(
+    item => navigation.navigate('CommunityPostDetailScreen', { slug: item.postSlug || item.slug }),
+    [navigation],
+  );
   const isDarkMode = useStore(state => state.isDarkMode) || false;
+  const renderActivity = useCallback(
+    ({ item }) => <ActivityRow item={item} isDarkMode={isDarkMode} onOpen={openActivity} />,
+    [isDarkMode, openActivity],
+  );
   const [filter, setFilter] = useState(route?.params?.initialFilter || 'all');
   const { data, isLoading, isError, refetch, isRefetching } = useMyActivity();
 
@@ -111,7 +126,10 @@ export const MyActivityScreen = ({ navigation, route }) => {
       ) : (
         <FlatList
           data={items}
-          keyExtractor={item => `${item.kind}-${item.id}`}
+          keyExtractor={keyOfActivity}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <>
@@ -144,17 +162,7 @@ export const MyActivityScreen = ({ navigation, route }) => {
               </View>
             </>
           }
-          renderItem={({ item }) => (
-            <ActivityCard
-              item={item}
-              isDarkMode={isDarkMode}
-              onPress={() =>
-                navigation.navigate('CommunityPostDetailScreen', {
-                  slug: item.postSlug || item.slug,
-                })
-              }
-            />
-          )}
+          renderItem={renderActivity}
           contentContainerStyle={{ paddingBottom: insets.bottom + vs(36) }}
           onRefresh={refetch}
           refreshing={isRefetching}

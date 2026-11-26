@@ -656,12 +656,12 @@ export const SearchScreen = ({ navigation, route }) => {
           </View>
 
           {/* Map Button */}
-          <BouncyPressable
+          {/* <BouncyPressable
             activeScale={0.88}
             style={[styles.navSquareBtn, isDarkMode && styles.navSquareBtnDark]}
             onPress={() => navigation?.navigate?.('Map')}>
             <Ionicons name="map-outline" size={ms(19)} color={isDarkMode ? '#FFFFFF' : '#1D1238'} />
-          </BouncyPressable>
+          </BouncyPressable> */}
         </View>
 
         {/* ── Hero Gradient Card ("STAYS AROUND YOU") ── */}

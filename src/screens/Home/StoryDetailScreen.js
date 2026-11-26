@@ -23,6 +23,8 @@ import { s, vs, ms } from 'react-native-size-matters';
 import { useStore } from '../../store';
 import { theme, images } from '../../theme';
 import FastImage from '../../components/common/FastImage';
+import { optimizeImageUrl } from '../../utils/imageUrl';
+import { PlayableVideo } from '../../components/common/GalleryVideo';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { Bob } from '../Community/Motion';
 import { useTravelStory, resolveImageUrl } from '../../hooks/useDiscovery';
@@ -295,10 +297,7 @@ export const SCORE_COLORS = {
 };
 const SCORE_COLOR_FALLBACK = PURPLE;
 
-const humanize = key =>
-  key
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase());
+const humanize = key => key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
 const formatDate = value => {
   if (!value) {
@@ -427,7 +426,9 @@ const LittleDetails = ({ excerpt, stops, facts, tips, isDarkMode }) => {
       ) : null}
 
       {notes.map((stop, index) => {
-        const tone = NOTE_COLORS[stop.badgeColor] ? stop.badgeColor : NOTE_CYCLE[index % NOTE_CYCLE.length];
+        const tone = NOTE_COLORS[stop.badgeColor]
+          ? stop.badgeColor
+          : NOTE_CYCLE[index % NOTE_CYCLE.length];
         return (
           <Note
             key={stop.id || index}
@@ -450,7 +451,11 @@ const LittleDetails = ({ excerpt, stops, facts, tips, isDarkMode }) => {
           {pinned.map((fact, index) => (
             <View
               key={fact.id || index}
-              style={[styles.pinRow, index > 0 && styles.glanceRowBorder, index > 0 && dark && styles.glanceRowBorderDark]}>
+              style={[
+                styles.pinRow,
+                index > 0 && styles.glanceRowBorder,
+                index > 0 && dark && styles.glanceRowBorderDark,
+              ]}>
               <Text style={styles.pinIcon}>{fact.icon || '•'}</Text>
               <View style={styles.factText}>
                 <Text style={styles.pinLabel}>{fact.label}</Text>
@@ -469,11 +474,19 @@ const LittleDetails = ({ excerpt, stops, facts, tips, isDarkMode }) => {
             return (
               <View
                 key={tip?.id || index}
-                style={[styles.pinRow, index > 0 && styles.glanceRowBorder, index > 0 && dark && styles.glanceRowBorderDark]}>
+                style={[
+                  styles.pinRow,
+                  index > 0 && styles.glanceRowBorder,
+                  index > 0 && dark && styles.glanceRowBorderDark,
+                ]}>
                 <Text style={styles.tipSpark}>✦</Text>
                 <View style={styles.factText}>
-                  {heading ? <Text style={[styles.pinValue, dark && styles.textLight]}>{heading}</Text> : null}
-                  {text ? <Text style={[styles.tipBody, dark && styles.textBody]}>{text}</Text> : null}
+                  {heading ? (
+                    <Text style={[styles.pinValue, dark && styles.textLight]}>{heading}</Text>
+                  ) : null}
+                  {text ? (
+                    <Text style={[styles.tipBody, dark && styles.textBody]}>{text}</Text>
+                  ) : null}
                 </View>
               </View>
             );
@@ -504,16 +517,22 @@ const MeetTravellers = ({ travellers, isDarkMode }) => (
               ) : null}
             </View>
             {dog.detail ? (
-              <Text style={[styles.travellerDetail, isDarkMode && styles.textMuted]}>{dog.detail}</Text>
+              <Text style={[styles.travellerDetail, isDarkMode && styles.textMuted]}>
+                {dog.detail}
+              </Text>
             ) : null}
           </View>
         </View>
         {dog.personality ? (
-          <Text style={[styles.travellerText, isDarkMode && styles.textBody]}>{dog.personality}</Text>
+          <Text style={[styles.travellerText, isDarkMode && styles.textBody]}>
+            {dog.personality}
+          </Text>
         ) : null}
         {dog.moment ? (
           <View style={[styles.travellerMoment, isDarkMode && styles.noteBoxDark]}>
-            <Text style={[styles.travellerMomentText, isDarkMode && styles.textMuted]}>{dog.moment}</Text>
+            <Text style={[styles.travellerMomentText, isDarkMode && styles.textMuted]}>
+              {dog.moment}
+            </Text>
           </View>
         ) : null}
       </Card>
@@ -538,7 +557,9 @@ const Callout = ({ block, isDarkMode }) => {
         styles.callout,
         { backgroundColor: isDarkMode ? tone.bgDark : tone.bg, borderColor: tone.border },
       ]}>
-      {block.title ? <Text style={[styles.calloutTitle, { color: tone.title }]}>{block.title}</Text> : null}
+      {block.title ? (
+        <Text style={[styles.calloutTitle, { color: tone.title }]}>{block.title}</Text>
+      ) : null}
       {block.text ? (
         <Text style={[styles.calloutText, isDarkMode && styles.textBody]}>{block.text}</Text>
       ) : null}
@@ -637,46 +658,36 @@ const GalleryVideoThumb = ({ uri, testID }) => {
   );
 };
 
-// One video in the viewer. If this phone cannot decode it, say so and offer another app.
-const ViewerVideo = ({ uri, active, testID }) => {
+// One photo in the viewer: a spinner shows until it has drawn. If it cannot load (FastImage has
+// already tried a few times), say so with a Try again button instead of leaving a black screen.
+const ViewerImage = ({ uri }) => {
+  const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
+  // A new number loads the picture from scratch
+  const [round, setRound] = useState(0);
+
   if (failed) {
     return (
-      <View style={styles.videoFailed}>
-        <Feather name="alert-circle" size={ms(34)} color="#E9D5FF" />
-        <Text style={styles.videoFailedTitle}>This video can't be played here</Text>
-        <Text style={styles.videoFailedText}>
-          Your phone could not decode this file. You can try opening it in another app.
-        </Text>
+      <View style={styles.videoFailed} testID="viewer-image-failed">
+        <Feather name="image" size={ms(34)} color="#E9D5FF" />
+        <Text style={styles.videoFailedTitle}>This photo could not load</Text>
+        <Text style={styles.videoFailedText}>Check your connection and try again.</Text>
         <BouncyPressable
           style={styles.videoFailedBtn}
           activeScale={0.96}
-          onPress={() => Linking.openURL(uri).catch(() => {})}
-          testID={`${testID}-open-external`}>
-          <Feather name="external-link" size={ms(14)} color="#FFFFFF" />
-          <Text style={styles.videoFailedBtnText}>Open in another app</Text>
+          onPress={() => {
+            setFailed(false);
+            setLoaded(false);
+            setRound(value => value + 1);
+          }}
+          testID="viewer-image-retry">
+          <Feather name="refresh-cw" size={ms(14)} color="#FFFFFF" />
+          <Text style={styles.videoFailedBtnText}>Try again</Text>
         </BouncyPressable>
       </View>
     );
   }
-  return (
-    <Video
-      source={{ uri }}
-      style={StyleSheet.absoluteFillObject}
-      resizeMode="contain"
-      controls
-      paused={!active}
-      playInBackground={false}
-      ignoreSilentSwitch="ignore"
-      onError={() => setFailed(true)}
-      testID={testID}
-    />
-  );
-};
 
-// One photo in the viewer: a spinner shows until it has drawn
-const ViewerImage = ({ uri }) => {
-  const [loaded, setLoaded] = useState(false);
   return (
     <>
       {!loaded ? (
@@ -685,11 +696,12 @@ const ViewerImage = ({ uri }) => {
         </View>
       ) : null}
       <FastImage
+        key={round}
         source={{ uri }}
         style={StyleSheet.absoluteFillObject}
         resizeMode={FastImage.resizeMode.contain}
         onLoad={() => setLoaded(true)}
-        onError={() => setLoaded(true)}
+        onError={() => setFailed(true)}
       />
     </>
   );
@@ -721,7 +733,10 @@ const GalleryViewer = ({ items, startIndex, onClose, topInset, bottomInset }) =>
         initialScrollIndex={startIndex}
         // Android drops off-screen items from the native tree, which can leave a photo blank
         removeClippedSubviews={false}
-        initialNumToRender={items.length}
+        // Only the photo on screen and its neighbours are loaded: decoding every big photo at once
+        // can run a phone out of memory and leave some of them black
+        initialNumToRender={Math.min(items.length, 3)}
+        maxToRenderPerBatch={2}
         windowSize={3}
         getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
         keyExtractor={item => String(item.id || item.url)}
@@ -733,7 +748,7 @@ const GalleryViewer = ({ items, startIndex, onClose, topInset, bottomInset }) =>
           return (
             <View style={{ width, height }}>
               {item.kind === 'video' ? (
-                <ViewerVideo
+                <PlayableVideo
                   uri={uri}
                   active={i === index}
                   testID={`viewer-video-${item.id || item.url}`}
@@ -764,13 +779,17 @@ const GalleryViewer = ({ items, startIndex, onClose, topInset, bottomInset }) =>
       </View>
 
       {current?.caption ? (
-        <View style={[styles.viewerCaption, { paddingBottom: bottomInset + s(16) }]} pointerEvents="none">
+        <View
+          style={[styles.viewerCaption, { paddingBottom: bottomInset + s(16) }]}
+          pointerEvents="none">
           <Text style={styles.viewerCaptionText}>{current.caption}</Text>
         </View>
       ) : null}
     </View>
   );
 };
+
+const GALLERY_PREFETCH_COUNT = 4;
 
 // ── Screen ─────────────────────────────────────────────────────────────────
 
@@ -815,7 +834,8 @@ export const StoryDetailScreen = ({ navigation, route }) => {
   const places = useMemo(() => asArray(story?.related_listings), [story]);
   const quickFacts = useMemo(() => asArray(story?.quick_facts), [story]);
   const tips = useMemo(
-    () => (asArray(story?.parent_tips).length ? asArray(story.parent_tips) : asArray(story?.pet_tips)),
+    () =>
+      asArray(story?.parent_tips).length ? asArray(story.parent_tips) : asArray(story?.pet_tips),
     [story],
   );
   const dogs = useMemo(() => asArray(story?.dog_cards), [story]);
@@ -832,13 +852,31 @@ export const StoryDetailScreen = ({ navigation, route }) => {
     [story],
   );
 
-  // Load the gallery photos into the image cache up front, so the full-screen viewer opens at once
+  // Load the first few gallery photos into the image cache, one after another, so the full-screen
+  // viewer opens at once. Not all of them together: that competes with the thumbnails for the
+  // connection and for memory.
   useEffect(() => {
-    gallery
+    let cancelled = false;
+    const urls = gallery
       .filter(item => item.kind !== 'video')
-      .forEach(item => {
-        Promise.resolve(Image.prefetch?.(resolveImageUrl(item.url))).catch(() => {});
-      });
+      .slice(0, GALLERY_PREFETCH_COUNT)
+      // The same resized copy the thumbnails and the viewer request, so it is really cached
+      .map(item => optimizeImageUrl(resolveImageUrl(item.url)));
+    (async () => {
+      for (const url of urls) {
+        if (cancelled) {
+          return;
+        }
+        try {
+          await Image.prefetch?.(url);
+        } catch (e) {
+          // Prefetching is only a speed-up
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [gallery]);
 
   const cover = resolveImageUrl(storyCoverUrl(story));
@@ -870,7 +908,9 @@ export const StoryDetailScreen = ({ navigation, route }) => {
 
   // Up to four headline numbers shown on the gradient bar under the hero
   const stats = [
-    story?.trip_cost ? { label: 'TRIP COST', value: String(story.trip_cost).replace(/INR/i, '').trim() } : null,
+    story?.trip_cost
+      ? { label: 'TRIP COST', value: String(story.trip_cost).replace(/INR/i, '').trim() }
+      : null,
     story?.km_one_way ? { label: 'DISTANCE', value: `${story.km_one_way} km` } : null,
     story?.drive_hours ? { label: 'DRIVE', value: `${story.drive_hours} hr` } : null,
     typeof story?.reality_scores?.dog_happiness === 'number'
@@ -924,7 +964,9 @@ export const StoryDetailScreen = ({ navigation, route }) => {
             <Text style={[styles.errorText, isDarkMode && styles.textLight]}>
               {isError ? 'We could not load this story.' : 'Story not found.'}
             </Text>
-            <BouncyPressable style={styles.retryBtn} onPress={() => (isError ? refetch() : navigation.goBack())}>
+            <BouncyPressable
+              style={styles.retryBtn}
+              onPress={() => (isError ? refetch() : navigation.goBack())}>
               <Text style={styles.retryText}>{isError ? 'Try again' : 'Go back'}</Text>
             </BouncyPressable>
           </>
@@ -946,7 +988,11 @@ export const StoryDetailScreen = ({ navigation, route }) => {
           { height: topInset + s(56), opacity: stickyOpacity },
         ]}>
         <Text
-          style={[styles.stickyTitle, { marginTop: topInset + s(8) }, isDarkMode && styles.textLight]}
+          style={[
+            styles.stickyTitle,
+            { marginTop: topInset + s(8) },
+            isDarkMode && styles.textLight,
+          ]}
           numberOfLines={1}>
           {title}
         </Text>
@@ -1100,8 +1146,12 @@ export const StoryDetailScreen = ({ navigation, route }) => {
                       index > 0 && styles.glanceRowBorder,
                       index > 0 && isDarkMode && styles.glanceRowBorderDark,
                     ]}>
-                    <Text style={[styles.glanceLabel, isDarkMode && styles.textMuted]}>{label}</Text>
-                    <Text style={[styles.glanceValue, isDarkMode && styles.textLight]}>{value}</Text>
+                    <Text style={[styles.glanceLabel, isDarkMode && styles.textMuted]}>
+                      {label}
+                    </Text>
+                    <Text style={[styles.glanceValue, isDarkMode && styles.textLight]}>
+                      {value}
+                    </Text>
                   </View>
                 ))}
               </Card>
@@ -1135,7 +1185,9 @@ export const StoryDetailScreen = ({ navigation, route }) => {
                         numberOfLines={2}>
                         {place.name}
                       </Text>
-                      <Text style={[styles.placeSub, isDarkMode && styles.textMuted]} numberOfLines={1}>
+                      <Text
+                        style={[styles.placeSub, isDarkMode && styles.textMuted]}
+                        numberOfLines={1}>
                         {[place.city, place.state].filter(Boolean).join(', ')}
                       </Text>
                       {place.excerpt ? (
@@ -1217,12 +1269,16 @@ export const StoryDetailScreen = ({ navigation, route }) => {
                       <View key={name} style={[styles.dogChip, isDarkMode && styles.chipDark]}>
                         <Text style={styles.dogChipEmoji}>🐕</Text>
                         <Text style={[styles.dogChipText, isDarkMode && styles.textLight]}>
-                          {breeds[name.toLowerCase()] ? `${name} · ${breeds[name.toLowerCase()]}` : name}
+                          {breeds[name.toLowerCase()]
+                            ? `${name} · ${breeds[name.toLowerCase()]}`
+                            : name}
                         </Text>
                       </View>
                     ))}
                   </View>
-                  <Text style={[styles.crewNote, isDarkMode && styles.textMuted]} testID="story-crew-note">
+                  <Text
+                    style={[styles.crewNote, isDarkMode && styles.textMuted]}
+                    testID="story-crew-note">
                     Dog details for this story are still being verified. We will add the traveller
                     card when the source information is confirmed.
                   </Text>
@@ -1232,7 +1288,9 @@ export const StoryDetailScreen = ({ navigation, route }) => {
               {dogs.length > 0 ? (
                 <View style={styles.dogChipRow}>
                   {dogs.map(dog => (
-                    <View key={dog.id || dog.name} style={[styles.dogChip, isDarkMode && styles.chipDark]}>
+                    <View
+                      key={dog.id || dog.name}
+                      style={[styles.dogChip, isDarkMode && styles.chipDark]}>
                       <Text style={styles.dogChipEmoji}>{dog.emoji || '🐕'}</Text>
                       <Text style={[styles.dogChipText, isDarkMode && styles.textLight]}>
                         {dog.name}
@@ -1273,7 +1331,9 @@ export const StoryDetailScreen = ({ navigation, route }) => {
                     </View>
 
                     {stop.body ? (
-                      <Text style={[styles.stopBody, isDarkMode && styles.textBody]}>{stop.body}</Text>
+                      <Text style={[styles.stopBody, isDarkMode && styles.textBody]}>
+                        {stop.body}
+                      </Text>
                     ) : null}
 
                     {stop.notes.length > 0 ? (
@@ -1335,11 +1395,14 @@ export const StoryDetailScreen = ({ navigation, route }) => {
 
                     {stop.tags.length > 0 ? (
                       <View style={styles.tagWrap}>
-                        {stop.tags.map(textOf).filter(Boolean).map(tag => (
-                          <View key={tag} style={styles.smallTag}>
-                            <Text style={styles.smallTagText}>{tag}</Text>
-                          </View>
-                        ))}
+                        {stop.tags
+                          .map(textOf)
+                          .filter(Boolean)
+                          .map(tag => (
+                            <View key={tag} style={styles.smallTag}>
+                              <Text style={styles.smallTagText}>{tag}</Text>
+                            </View>
+                          ))}
                       </View>
                     ) : null}
 
@@ -1369,7 +1432,9 @@ export const StoryDetailScreen = ({ navigation, route }) => {
               <SectionTitle icon="📸" isDarkMode={isDarkMode}>
                 Photo Gallery
               </SectionTitle>
-              <Text style={[styles.galleryCount, isDarkMode && styles.textMuted]} testID="story-gallery-count">
+              <Text
+                style={[styles.galleryCount, isDarkMode && styles.textMuted]}
+                testID="story-gallery-count">
                 {galleryCountLabel(gallery)}
               </Text>
               <ScrollView
@@ -1563,16 +1628,43 @@ const font = theme.typography.fontFamily;
 const styles = StyleSheet.create({
   travellerCard: { marginBottom: s(12) },
   travellerTop: { flexDirection: 'row', alignItems: 'center' },
-  travellerEmoji: { width: s(40), height: s(40), fontSize: s(22), textAlign: 'center', lineHeight: s(40) },
+  travellerEmoji: {
+    width: s(40),
+    height: s(40),
+    fontSize: s(22),
+    textAlign: 'center',
+    lineHeight: s(40),
+  },
   travellerHead: { flex: 1, marginLeft: s(8) },
   travellerNameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: s(8) },
   travellerName: { flexShrink: 1, fontSize: s(15), color: '#1E1B4B', fontFamily: font.extraBold },
-  leadPill: { paddingHorizontal: s(8), paddingVertical: 2, borderRadius: s(10), backgroundColor: '#EDE9FE' },
+  leadPill: {
+    paddingHorizontal: s(8),
+    paddingVertical: 2,
+    borderRadius: s(10),
+    backgroundColor: '#EDE9FE',
+  },
   leadPillText: { fontSize: s(10.5), color: '#6D28D9', fontFamily: font.bold },
   travellerDetail: { marginTop: 2, fontSize: s(12), color: '#64748B', fontFamily: font.medium },
-  travellerText: { marginTop: s(10), fontSize: s(13.5), lineHeight: s(21), color: '#334155', fontFamily: font.medium },
-  travellerMoment: { marginTop: s(10), padding: s(10), borderRadius: s(12), backgroundColor: '#F8F5FF' },
-  travellerMomentText: { fontSize: s(12.5), lineHeight: s(19), color: '#475569', fontFamily: font.medium },
+  travellerText: {
+    marginTop: s(10),
+    fontSize: s(13.5),
+    lineHeight: s(21),
+    color: '#334155',
+    fontFamily: font.medium,
+  },
+  travellerMoment: {
+    marginTop: s(10),
+    padding: s(10),
+    borderRadius: s(12),
+    backgroundColor: '#F8F5FF',
+  },
+  travellerMomentText: {
+    fontSize: s(12.5),
+    lineHeight: s(19),
+    color: '#475569',
+    fontFamily: font.medium,
+  },
   detailsTitle: {
     marginTop: s(20),
     fontSize: s(21),
@@ -1580,7 +1672,14 @@ const styles = StyleSheet.create({
     color: '#1E1B4B',
     fontFamily: font.extraBold,
   },
-  detailsSub: { marginTop: s(6), marginBottom: s(12), fontSize: s(12.5), lineHeight: s(19), color: '#64748B', fontFamily: font.medium },
+  detailsSub: {
+    marginTop: s(6),
+    marginBottom: s(12),
+    fontSize: s(12.5),
+    lineHeight: s(19),
+    color: '#64748B',
+    fontFamily: font.medium,
+  },
   note: {
     marginBottom: s(14),
     padding: s(16),
@@ -1593,7 +1692,13 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   noteLabel: { fontSize: s(10.5), letterSpacing: 1, color: '#6D28D9', fontFamily: font.extraBold },
-  noteBody: { marginTop: s(8), fontSize: s(14), lineHeight: s(22), color: '#1E293B', fontFamily: font.medium },
+  noteBody: {
+    marginTop: s(8),
+    fontSize: s(14),
+    lineHeight: s(22),
+    color: '#1E293B',
+    fontFamily: font.medium,
+  },
   pinCard: {
     marginBottom: s(12),
     padding: s(16),
@@ -1607,7 +1712,13 @@ const styles = StyleSheet.create({
   pinRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: s(10) },
   pinIcon: { width: s(30), fontSize: s(18) },
   pinLabel: { fontSize: s(10), letterSpacing: 0.8, color: '#64748B', fontFamily: font.bold },
-  pinValue: { marginTop: 2, fontSize: s(14), lineHeight: s(20), color: '#3B108F', fontFamily: font.extraBold },
+  pinValue: {
+    marginTop: 2,
+    fontSize: s(14),
+    lineHeight: s(20),
+    color: '#3B108F',
+    fontFamily: font.extraBold,
+  },
   tipSpark: { width: s(28), fontSize: s(16), color: '#1E1B4B' },
   callout: {
     marginVertical: s(12),
@@ -1649,8 +1760,20 @@ const styles = StyleSheet.create({
     paddingVertical: s(14),
     borderRadius: s(16),
   },
-  embedPostText: { flex: 1, marginLeft: s(12), fontSize: s(14), color: '#FFFFFF', fontFamily: font.bold },
-  placeExcerpt: { marginTop: 4, fontSize: s(12), lineHeight: s(17), color: '#64748B', fontFamily: font.medium },
+  embedPostText: {
+    flex: 1,
+    marginLeft: s(12),
+    fontSize: s(14),
+    color: '#FFFFFF',
+    fontFamily: font.bold,
+  },
+  placeExcerpt: {
+    marginTop: 4,
+    fontSize: s(12),
+    lineHeight: s(17),
+    color: '#64748B',
+    fontFamily: font.medium,
+  },
   crewNote: {
     marginBottom: s(10),
     fontSize: s(12),
@@ -1664,11 +1787,29 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: '#C4B5FD',
   },
-  stopQuoteText: { fontSize: s(13.5), lineHeight: s(20), fontStyle: 'italic', color: '#334155', fontFamily: font.medium },
+  stopQuoteText: {
+    fontSize: s(13.5),
+    lineHeight: s(20),
+    fontStyle: 'italic',
+    color: '#334155',
+    fontFamily: font.medium,
+  },
   stopQuoteSource: { marginTop: 4, fontSize: s(12), color: '#64748B', fontFamily: font.bold },
   stopPhotos: { gap: s(8), paddingTop: s(10) },
-  stopPhoto: { width: s(120), height: s(120), borderRadius: s(12), overflow: 'hidden', backgroundColor: '#EDE9FE' },
-  galleryCount: { marginTop: -s(4), marginBottom: s(8), fontSize: s(12), color: '#64748B', fontFamily: font.medium },
+  stopPhoto: {
+    width: s(120),
+    height: s(120),
+    borderRadius: s(12),
+    overflow: 'hidden',
+    backgroundColor: '#EDE9FE',
+  },
+  galleryCount: {
+    marginTop: -s(4),
+    marginBottom: s(8),
+    fontSize: s(12),
+    color: '#64748B',
+    fontFamily: font.medium,
+  },
   container: { flex: 1, backgroundColor: '#FAF8FF' },
   containerDark: { backgroundColor: '#0F071D' },
   centered: { alignItems: 'center', justifyContent: 'center', padding: s(24) },
@@ -1688,7 +1829,11 @@ const styles = StyleSheet.create({
 
   // Hero
   hero: { width: '100%', backgroundColor: '#FDF8FB', overflow: 'hidden' },
-  heroPlaceholder: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  heroPlaceholder: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   heroPlaceholderImage: { height: '100%', aspectRatio: 1230 / 1278 },
   topBar: {
     position: 'absolute',
@@ -1696,6 +1841,11 @@ const styles = StyleSheet.create({
     right: s(16),
     flexDirection: 'row',
     justifyContent: 'space-between',
+    // Above the header bar that fades in on scroll. On Android a view with a shadow ("elevation")
+    // is drawn over later ones whatever their zIndex, so the buttons need a higher elevation than
+    // the bar's, or they disappear behind it once you scroll.
+    zIndex: 10,
+    elevation: 10,
   },
   roundBtn: {
     width: s(38),
@@ -1716,7 +1866,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.35)',
   },
-  glassPillText: { color: '#FFFFFF', fontSize: s(10.5), fontFamily: font.bold, letterSpacing: 1, textTransform: 'uppercase' },
+  glassPillText: {
+    color: '#FFFFFF',
+    fontSize: s(10.5),
+    fontFamily: font.bold,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
   heroPlace: { flexDirection: 'row', alignItems: 'center', gap: s(5), flexShrink: 1 },
   heroPlaceText: { color: '#E9D5FF', fontSize: s(12.5), fontFamily: font.medium, flexShrink: 1 },
   heroTitle: {
@@ -1728,7 +1884,12 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
   },
-  heroAuthor: { marginTop: s(10), color: 'rgba(255,255,255,0.85)', fontSize: s(12.5), fontFamily: font.medium },
+  heroAuthor: {
+    marginTop: s(10),
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: s(12.5),
+    fontFamily: font.medium,
+  },
 
   stickyBar: {
     position: 'absolute',
@@ -1757,7 +1918,14 @@ const styles = StyleSheet.create({
     paddingTop: s(10),
   },
   bodyDark: { backgroundColor: '#0F071D' },
-  sheetGrip: { alignSelf: 'center', width: s(44), height: s(4), borderRadius: s(2), backgroundColor: '#E2D9F3', marginBottom: s(18) },
+  sheetGrip: {
+    alignSelf: 'center',
+    width: s(44),
+    height: s(4),
+    borderRadius: s(2),
+    backgroundColor: '#E2D9F3',
+    marginBottom: s(18),
+  },
   sheetGripDark: { backgroundColor: 'rgba(255,255,255,0.2)' },
 
   statsBar: {
@@ -1773,7 +1941,13 @@ const styles = StyleSheet.create({
   statItem: { flex: 1, alignItems: 'center', paddingHorizontal: s(6) },
   statDivider: { borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.25)' },
   statValue: { color: '#FFFFFF', fontSize: s(19), fontFamily: font.extraBold },
-  statLabel: { marginTop: s(3), color: 'rgba(255,255,255,0.75)', fontSize: s(9.5), fontFamily: font.bold, letterSpacing: 1 },
+  statLabel: {
+    marginTop: s(3),
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: s(9.5),
+    fontFamily: font.bold,
+    letterSpacing: 1,
+  },
   leadWrap: { flexDirection: 'row', marginTop: s(20) },
   leadBar: { width: 3, borderRadius: 2, backgroundColor: '#8B5CF6', marginRight: s(12) },
   tagRow: { flexDirection: 'row', alignItems: 'center', gap: s(10), marginBottom: s(10) },
@@ -1818,7 +1992,13 @@ const styles = StyleSheet.create({
   loadingText: { fontSize: s(12), fontFamily: font.medium, color: '#6B5C85' },
 
   // Sections
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: s(8), marginTop: s(30), marginBottom: s(14) },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(8),
+    marginTop: s(30),
+    marginBottom: s(14),
+  },
   sectionAccent: { width: 4, height: s(20), borderRadius: 2, marginRight: s(2) },
   sectionTitleIcon: { fontSize: s(17) },
   sectionTitle: { fontSize: s(18), fontFamily: font.extraBold, color: DEEP },
@@ -1837,7 +2017,12 @@ const styles = StyleSheet.create({
   cardDark: { backgroundColor: '#1E1435', borderColor: '#37275C', shadowOpacity: 0.25 },
 
   // Trip at a glance
-  glanceRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: s(8), gap: s(12) },
+  glanceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: s(8),
+    gap: s(12),
+  },
   glanceRowBorder: { borderTopWidth: 1, borderTopColor: '#F1EAFE' },
   glanceRowBorderDark: { borderTopColor: '#37275C' },
   glanceLabel: { fontSize: s(12.5), fontFamily: font.medium, color: '#6B5C85' },
@@ -1879,10 +2064,33 @@ const styles = StyleSheet.create({
 
   // Story body
   storyWrap: { marginTop: s(22) },
-  storyHeadingRow: { flexDirection: 'row', alignItems: 'center', marginTop: s(22), marginBottom: s(10) },
-  storyHeadingBar: { width: 4, alignSelf: 'stretch', borderRadius: 2, backgroundColor: '#EE2A7B', marginRight: s(10) },
-  storyHeading: { flex: 1, fontSize: s(18), lineHeight: s(25), fontFamily: font.extraBold, color: DEEP },
-  storyText: { fontSize: s(14.5), lineHeight: s(24), fontFamily: font.regular, color: '#374151', marginBottom: s(10) },
+  storyHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: s(22),
+    marginBottom: s(10),
+  },
+  storyHeadingBar: {
+    width: 4,
+    alignSelf: 'stretch',
+    borderRadius: 2,
+    backgroundColor: '#EE2A7B',
+    marginRight: s(10),
+  },
+  storyHeading: {
+    flex: 1,
+    fontSize: s(18),
+    lineHeight: s(25),
+    fontFamily: font.extraBold,
+    color: DEEP,
+  },
+  storyText: {
+    fontSize: s(14.5),
+    lineHeight: s(24),
+    fontFamily: font.regular,
+    color: '#374151',
+    marginBottom: s(10),
+  },
   storyLead: { fontSize: s(16), lineHeight: s(26), fontFamily: font.medium, color: '#1E1B4B' },
 
   // Timeline
@@ -1905,20 +2113,48 @@ const styles = StyleSheet.create({
   stopTime: { fontSize: s(11), fontFamily: font.medium, color: '#6B5C85', marginBottom: 2 },
   stopTitle: { fontSize: s(15), lineHeight: s(20), fontFamily: font.bold, color: DEEP },
   stopSub: { fontSize: s(12), fontFamily: font.medium, color: PURPLE, marginTop: 2 },
-  stopBadge: { paddingHorizontal: s(9), paddingVertical: s(3), borderRadius: s(10), marginLeft: s(8) },
+  stopBadge: {
+    paddingHorizontal: s(9),
+    paddingVertical: s(3),
+    borderRadius: s(10),
+    marginLeft: s(8),
+  },
   stopBadgeText: { fontSize: s(10.5), fontFamily: font.bold },
-  stopBody: { marginTop: s(10), fontSize: s(13), lineHeight: s(20), fontFamily: font.regular, color: '#4B5563' },
+  stopBody: {
+    marginTop: s(10),
+    fontSize: s(13),
+    lineHeight: s(20),
+    fontFamily: font.regular,
+    color: '#4B5563',
+  },
   notesWrap: { marginTop: s(10), gap: s(8) },
-  noteBox: { borderRadius: s(12), backgroundColor: '#F8F5FF', padding: s(10), borderLeftWidth: 3, borderLeftColor: '#8B5CF6' },
+  noteBox: {
+    borderRadius: s(12),
+    backgroundColor: '#F8F5FF',
+    padding: s(10),
+    borderLeftWidth: 3,
+    borderLeftColor: '#8B5CF6',
+  },
   noteBoxDark: { backgroundColor: 'rgba(255,255,255,0.06)' },
   noteName: { fontSize: s(11.5), fontFamily: font.bold, color: PURPLE, marginBottom: 2 },
   noteText: { fontSize: s(12), lineHeight: s(18), fontFamily: font.regular, color: '#4B5563' },
   bulletList: { marginTop: s(10), gap: s(5) },
   bulletRow: { flexDirection: 'row', alignItems: 'flex-start' },
   bulletIcon: { marginRight: s(8), marginTop: 3 },
-  bulletText: { flex: 1, fontSize: s(12.5), lineHeight: s(18), fontFamily: font.regular, color: '#4B5563' },
+  bulletText: {
+    flex: 1,
+    fontSize: s(12.5),
+    lineHeight: s(18),
+    fontFamily: font.regular,
+    color: '#4B5563',
+  },
   tagWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: s(6), marginTop: s(10) },
-  smallTag: { paddingHorizontal: s(9), paddingVertical: s(3), borderRadius: s(10), backgroundColor: '#F1EAFE' },
+  smallTag: {
+    paddingHorizontal: s(9),
+    paddingVertical: s(3),
+    borderRadius: s(10),
+    backgroundColor: '#F1EAFE',
+  },
   smallTagText: { fontSize: s(10.5), fontFamily: font.medium, color: '#6D28D9' },
   listingLink: {
     flexDirection: 'row',
@@ -1934,26 +2170,107 @@ const styles = StyleSheet.create({
   listingLinkText: { color: '#FFFFFF', fontSize: s(12.5), fontFamily: font.bold },
 
   // Full-screen gallery viewer
-  videoFailed: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', paddingHorizontal: s(32) },
-  videoFailedTitle: { marginTop: s(14), color: '#FFFFFF', fontSize: s(16), fontFamily: font.bold, textAlign: 'center' },
-  videoFailedText: { marginTop: s(8), color: 'rgba(255,255,255,0.7)', fontSize: s(13), lineHeight: s(19), fontFamily: font.regular, textAlign: 'center' },
-  videoFailedBtn: { flexDirection: 'row', alignItems: 'center', gap: s(8), marginTop: s(18), paddingHorizontal: s(18), paddingVertical: s(10), borderRadius: s(20), backgroundColor: '#7B2CFF' },
+  videoFailed: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: s(32),
+  },
+  videoFailedTitle: {
+    marginTop: s(14),
+    color: '#FFFFFF',
+    fontSize: s(16),
+    fontFamily: font.bold,
+    textAlign: 'center',
+  },
+  videoFailedText: {
+    marginTop: s(8),
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: s(13),
+    lineHeight: s(19),
+    fontFamily: font.regular,
+    textAlign: 'center',
+  },
+  videoFailedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(8),
+    marginTop: s(18),
+    paddingHorizontal: s(18),
+    paddingVertical: s(10),
+    borderRadius: s(20),
+    backgroundColor: '#7B2CFF',
+  },
+  videoFailedBtnSecondary: { marginTop: s(10), backgroundColor: 'rgba(255,255,255,0.16)' },
   videoFailedBtnText: { color: '#FFFFFF', fontSize: s(13), fontFamily: font.bold },
-  viewerSpinner: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
-  viewerRoot: { ...StyleSheet.absoluteFillObject, backgroundColor: '#000000', zIndex: 100, elevation: 100 },
-  viewerTop: { position: 'absolute', left: s(16), right: s(16), flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 2 },
-  viewerCount: { paddingHorizontal: s(12), paddingVertical: s(6), borderRadius: s(14), backgroundColor: 'rgba(255,255,255,0.18)' },
+  viewerSpinner: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewerRoot: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000000',
+    zIndex: 100,
+    elevation: 100,
+  },
+  viewerTop: {
+    position: 'absolute',
+    left: s(16),
+    right: s(16),
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  viewerCount: {
+    paddingHorizontal: s(12),
+    paddingVertical: s(6),
+    borderRadius: s(14),
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
   viewerCountText: { color: '#FFFFFF', fontSize: s(12), fontFamily: font.bold },
-  viewerCaption: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: s(20), paddingTop: s(24), backgroundColor: 'rgba(0,0,0,0.55)' },
-  viewerCaptionText: { color: '#FFFFFF', fontSize: s(13), lineHeight: s(19), fontFamily: font.medium, textAlign: 'center' },
+  viewerCaption: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: s(20),
+    paddingTop: s(24),
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  viewerCaptionText: {
+    color: '#FFFFFF',
+    fontSize: s(13),
+    lineHeight: s(19),
+    fontFamily: font.medium,
+    textAlign: 'center',
+  },
 
   // Gallery
   galleryRow: { gap: s(12), paddingRight: s(16) },
   galleryItem: { width: s(250) },
   galleryItemVideo: { width: s(170) },
-  galleryImage: { width: '100%', height: s(226), borderRadius: s(18), backgroundColor: '#E9E1FB', overflow: 'hidden' },
-  videoThumb: { width: '100%', height: s(226), borderRadius: s(18), backgroundColor: '#1E1435', overflow: 'hidden' },
-  playOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.12)' },
+  galleryImage: {
+    width: '100%',
+    height: s(226),
+    borderRadius: s(18),
+    backgroundColor: '#E9E1FB',
+    overflow: 'hidden',
+  },
+  videoThumb: {
+    width: '100%',
+    height: s(226),
+    borderRadius: s(18),
+    backgroundColor: '#1E1435',
+    overflow: 'hidden',
+  },
+  playOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.12)',
+  },
   playCircle: {
     width: s(52),
     height: s(52),
@@ -1965,14 +2282,26 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.7)',
   },
   playIcon: { marginLeft: s(3) },
-  galleryCaption: { marginTop: s(6), fontSize: s(11.5), lineHeight: s(16), fontFamily: font.regular, color: '#6B5C85' },
+  galleryCaption: {
+    marginTop: s(6),
+    fontSize: s(11.5),
+    lineHeight: s(16),
+    fontFamily: font.regular,
+    color: '#6B5C85',
+  },
 
   // Quick facts
   factRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: s(9) },
   factIcon: { fontSize: s(18), marginRight: s(12), width: s(26) },
   factText: { flex: 1 },
   factLabel: { fontSize: s(10.5), fontFamily: font.bold, color: PURPLE, letterSpacing: 0.6 },
-  factValue: { fontSize: s(13), lineHeight: s(19), fontFamily: font.medium, color: '#374151', marginTop: 2 },
+  factValue: {
+    fontSize: s(13),
+    lineHeight: s(19),
+    fontFamily: font.medium,
+    color: '#374151',
+    marginTop: 2,
+  },
 
   // Reality score
   scoreRow: { marginBottom: s(12) },
@@ -1987,7 +2316,13 @@ const styles = StyleSheet.create({
   tipCard: { flexDirection: 'row', marginBottom: s(10) },
   tipIcon: { fontSize: s(20), marginRight: s(12) },
   tipText: { flex: 1 },
-  tipHeading: { fontSize: s(14), lineHeight: s(19), fontFamily: font.bold, color: DEEP, marginBottom: s(4) },
+  tipHeading: {
+    fontSize: s(14),
+    lineHeight: s(19),
+    fontFamily: font.bold,
+    color: DEEP,
+    marginBottom: s(4),
+  },
   tipBody: { fontSize: s(12.5), lineHeight: s(19), fontFamily: font.regular, color: '#4B5563' },
 
   // Watch and end
@@ -2002,5 +2337,12 @@ const styles = StyleSheet.create({
     backgroundColor: DEEP,
   },
   watchText: { color: '#FFFFFF', fontSize: s(14), fontFamily: font.bold },
-  endSummary: { marginTop: s(22), fontSize: s(13.5), lineHeight: s(21), fontFamily: font.medium, color: '#4B5563', textAlign: 'center' },
+  endSummary: {
+    marginTop: s(22),
+    fontSize: s(13.5),
+    lineHeight: s(21),
+    fontFamily: font.medium,
+    color: '#4B5563',
+    textAlign: 'center',
+  },
 });

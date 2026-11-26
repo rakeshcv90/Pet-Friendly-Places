@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   View,
   Text,
@@ -19,6 +20,7 @@ import { s, vs, ms } from 'react-native-size-matters';
 import { theme } from '../../theme';
 import { useStore } from '../../store';
 import { useUrbaniaBookings } from '../../hooks/useUrbaniaBookings';
+import { useUrbaniaBookingDetail } from '../../hooks/useUrbaniaBookingDetail';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { ScreenHeader } from '../../components/common/AppHeader/ScreenHeader';
 import { Enter } from '../Community/Motion';
@@ -26,13 +28,14 @@ import { AmbientBackground } from './components/AmbientBackground';
 import { UrbaniaVanScene } from './components/UrbaniaBanner';
 import { api } from '../../services/api/apiClient';
 import { API_ENDPOINTS } from '../../services/api/apiList';
-import { apiMessage, claimBooking, fetchStatus } from '../../services/urbania/urbaniaApi';
+import { apiMessage, devLog, fetchStatus } from '../../services/urbania/urbaniaApi';
 import { loadStatusToken } from '../../services/urbania/statusTokenStore';
 import { loadBookings, updateBooking } from '../../services/urbania/bookingHistory';
 import {
   formatRupeesExact,
   mapUrl,
   mergeBookings,
+  applyBookingDetail,
   readBookingStatus,
   statusLabel,
 } from './urbaniaBooking';
@@ -71,7 +74,16 @@ const Fact = ({ label, children, isDarkMode, half }) => (
   </View>
 );
 
-const BookingCard = ({ item, open, onToggle, onRefresh, refreshing, isDarkMode }) => {
+const BookingCard = ({
+  item,
+  open,
+  onToggle,
+  onRefresh,
+  refreshing,
+  isDarkMode,
+  detailLoading,
+  detailError,
+}) => {
   const id = item.reference;
   const places = item.places || [];
   const place = name => places.find(entry => entry.kind === name);
@@ -93,10 +105,10 @@ const BookingCard = ({ item, open, onToggle, onRefresh, refreshing, isDarkMode }
           <Ionicons name="bus-outline" size={ms(18)} color={isDarkMode ? '#C4B5FD' : '#4C1D95'} />
         </LinearGradient>
         <View style={styles.headText}>
-          <Text style={[styles.ref, text]} numberOfLines={1}>
+          <Text style={[styles.ref, text]} numberOfLines={2}>
             {id}
           </Text>
-          <Text style={[styles.meta, isDarkMode && styles.mutedDark]} numberOfLines={1}>
+          <Text style={[styles.meta, isDarkMode && styles.mutedDark]} numberOfLines={2}>
             {item.tripType === 'local' ? 'Local' : 'Outstation'} · {item.pickupLabel}
           </Text>
         </View>
@@ -157,6 +169,19 @@ const BookingCard = ({ item, open, onToggle, onRefresh, refreshing, isDarkMode }
         <View
           testID={`booking-${id}-details`}
           style={[styles.details, isDarkMode && styles.detailsDark]}>
+          {detailLoading ? (
+            <View testID={`booking-${id}-detail-loading`} style={styles.detailNote}>
+              <ActivityIndicator size="small" color="#7C3AED" />
+              <Text style={[styles.actionsLine, isDarkMode && styles.mutedDark]}>
+                Loading the trip details…
+              </Text>
+            </View>
+          ) : null}
+          {detailError ? (
+            <Text testID={`booking-${id}-detail-error`} style={styles.error}>
+              We could not load every detail. Showing what we have.
+            </Text>
+          ) : null}
           <View style={styles.facts}>
             {place('pickup') ? (
               <Fact label="Pickup" isDarkMode={isDarkMode}>
@@ -219,10 +244,10 @@ const BookingCard = ({ item, open, onToggle, onRefresh, refreshing, isDarkMode }
           {typeof fare.total === 'number' ? (
             <View testID={`booking-${id}-fare`} style={styles.fareRow}>
               {[
-                ['Quoted total', fare.total, true],
-                ['Advance', fare.advance],
-                ['Balance', fare.balance],
-                ['Refundable deposit', fare.deposit],
+                ['Estimated total', fare.total, true],
+                ['Estimated advance', fare.advance],
+                ['Estimated balance after advance', fare.balance],
+                ['Refundable deposit at pickup (separate)', fare.deposit],
               ]
                 .filter(([, value]) => typeof value === 'number')
                 .map(([label, value, strong]) => (
@@ -247,6 +272,24 @@ const BookingCard = ({ item, open, onToggle, onRefresh, refreshing, isDarkMode }
                 {(item.status || 'pending_review').replace(/_/g, ' ')}
               </Text>
             </Text>
+            {item.payment ? (
+              <View
+                testID={`booking-${id}-payment`}
+                style={[styles.paymentBox, isDarkMode && styles.fareChipDark]}>
+                {item.payment.status ? (
+                  <Text style={[styles.actionsLine, text]}>
+                    <Text style={styles.fareStrong}>Payment status: </Text>
+                    {item.payment.status}
+                  </Text>
+                ) : null}
+                {typeof item.payment.received === 'number' ? (
+                  <Text style={[styles.actionsLine, text]}>
+                    Verified payments received, including any deposit:{' '}
+                    <Text style={styles.fareStrong}>{formatRupeesExact(item.payment.received)}</Text>
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
             <Text style={[styles.actionsLine, isDarkMode && styles.mutedDark]}>
               {item.message ||
                 (isProvisional(item.status)
@@ -458,6 +501,20 @@ const Glow = () => {
 
 // Profile -> Urbania bookings: the account's bookings (GET /accounts/me/urbania-bookings), plus any
 // made on this phone that the account does not have yet; each is refreshed from its private status
+// The open card asks for the booking's own answer, and shows it over the list's summary
+const OpenableCard = ({ item, open, ...rest }) => {
+  const detail = useUrbaniaBookingDetail(item.id, open);
+  return (
+    <BookingCard
+      {...rest}
+      item={open ? applyBookingDetail(item, detail.data) : item}
+      open={open}
+      detailLoading={open && !!item.id && detail.isLoading}
+      detailError={open && !!item.id && detail.isError}
+    />
+  );
+};
+
 export const UrbaniaBookingsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const isDarkMode = useStore(state => state.isDarkMode);
@@ -479,6 +536,8 @@ export const UrbaniaBookingsScreen = ({ navigation }) => {
         updateBooking(reference, {
           ...(answer.status ? { status: answer.status } : {}),
           message: answer.message,
+          ...(answer.places.length ? { places: answer.places } : {}),
+          ...(answer.payment ? { payment: answer.payment } : {}),
         });
         setLocal(loadBookings());
       }
@@ -488,31 +547,22 @@ export const UrbaniaBookingsScreen = ({ navigation }) => {
     setBusy(current => ({ ...current, [reference]: false }));
   }, []);
 
-  // Emails a one-time claim link. It uses each booking's own private token, so it covers the bookings
-  // made on this phone.
+  // Asks the API to email the account a one-time claim link (POST /accounts/me/urbania-bookings/claim)
+  // for earlier guest bookings made with the same email, from any device
   const handleClaim = useCallback(async () => {
     setClaim({ busy: true, message: '', failed: false });
     try {
-      const tokens = (
-        await Promise.all(loadBookings().map(item => loadStatusToken(item.reference)))
-      ).filter(Boolean);
-      if (!tokens.length) {
-        setClaim({
-          busy: false,
-          failed: true,
-          message:
-            'There are no guest bookings on this phone to claim. Use the staff review below.',
-        });
-        return;
-      }
-      await Promise.all(tokens.map(token => claimBooking(token)));
+      const data = await api.post(API_ENDPOINTS.URBANIA_CLAIM, {});
+      devLog('claim response', data);
       setClaim({
         busy: false,
         failed: false,
         message:
+          (typeof data?.message === 'string' && data.message.trim()) ||
           'If earlier guest bookings match this account email, a one-time link is on its way.',
       });
     } catch (error) {
+      devLog('claim failed', error?.response?.data ?? error?.message);
       setClaim({
         busy: false,
         failed: true,
@@ -617,7 +667,7 @@ export const UrbaniaBookingsScreen = ({ navigation }) => {
             </Enter>
             {shown.map((item, index) => (
               <Enter key={item.reference} index={2 + index}>
-                <BookingCard
+                <OpenableCard
                   item={item}
                   open={openId === item.reference}
                   onToggle={id => setOpenId(current => (current === id ? null : id))}
@@ -858,6 +908,8 @@ const styles = StyleSheet.create({
   factValue: { fontSize: s(13), color: '#1F1236', marginTop: vs(2) },
   mapLink: { flexDirection: 'row', alignItems: 'center', gap: s(4), marginTop: vs(2) },
   link: { fontSize: s(13), color: '#6D28D9', textDecorationLine: 'underline' },
+  detailNote: { flexDirection: 'row', alignItems: 'center', gap: s(8), marginBottom: vs(8) },
+  paymentBox: { backgroundColor: '#F6F4FA', borderRadius: s(10), padding: s(10), marginTop: vs(8) },
   fareRow: { flexDirection: 'row', flexWrap: 'wrap', gap: s(8), marginTop: vs(12) },
   fareChip: {
     backgroundColor: '#F1EAFB',

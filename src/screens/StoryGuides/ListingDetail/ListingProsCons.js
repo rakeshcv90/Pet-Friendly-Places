@@ -17,18 +17,45 @@ const BulletList = ({ items, icon, color, palette }) =>
 export const ListingProsCons = ({ listing, palette, isDarkMode }) => (
   <>
     {listing.pros.length ? (
-      <SectionCard title="What pets will love" icon="happy-outline" palette={palette} isDarkMode={isDarkMode}>
-        <BulletList items={listing.pros} icon="checkmark-circle" color={palette.good} palette={palette} />
+      <SectionCard
+        title="What pets will love"
+        icon="happy-outline"
+        palette={palette}
+        isDarkMode={isDarkMode}>
+        <BulletList
+          items={listing.pros}
+          icon="checkmark-circle"
+          color={palette.good}
+          palette={palette}
+        />
       </SectionCard>
     ) : null}
     {listing.cons.length ? (
-      <SectionCard title="Good to know" icon="alert-circle-outline" palette={palette} isDarkMode={isDarkMode}>
-        <BulletList items={listing.cons} icon="information-circle" color={palette.warn} palette={palette} />
+      <SectionCard
+        title="Good to know"
+        icon="alert-circle-outline"
+        palette={palette}
+        isDarkMode={isDarkMode}>
+        <BulletList
+          items={listing.cons}
+          icon="information-circle"
+          color={palette.warn}
+          palette={palette}
+        />
       </SectionCard>
     ) : null}
     {listing.knowBeforeYouGo.length ? (
-      <SectionCard title="Know before you go" icon="bulb-outline" palette={palette} isDarkMode={isDarkMode}>
-        <BulletList items={listing.knowBeforeYouGo} icon="arrow-forward-circle" color={palette.accent} palette={palette} />
+      <SectionCard
+        title="Know before you go"
+        icon="bulb-outline"
+        palette={palette}
+        isDarkMode={isDarkMode}>
+        <BulletList
+          items={listing.knowBeforeYouGo}
+          icon="arrow-forward-circle"
+          color={palette.accent}
+          palette={palette}
+        />
       </SectionCard>
     ) : null}
   </>

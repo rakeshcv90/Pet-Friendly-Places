@@ -13,6 +13,48 @@ import { getFitLayout } from './splashLayout';
 const SIDE_FILL_COLORS = ['#7FAEE3', '#F3C77E', '#C9A24C', '#4E6B2B'];
 const SIDE_FILL_LOCATIONS = [0, 0.3, 0.55, 1];
 
+// How much of the picture's outer edge is stretched across a side strip, in dp
+const EDGE_STRIP = 3;
+const EDGE_BLUR = 14;
+
+// Fills a strip beside the picture by stretching the picture's own outermost edge across it, so the
+// sky, glow and forest simply carry on to the edge of the screen. Only a thin slice of the picture
+// is shown (clipped), then stretched sideways.
+const EdgeExtension = ({ side, source, layout, screenWidth, testID }) => {
+  const sideWidth =
+    side === 'left' ? layout.left : Math.max(screenWidth - layout.left - layout.width, 0);
+  if (sideWidth <= 0.5) {
+    return null;
+  }
+  return (
+    <View
+      testID={testID}
+      pointerEvents="none"
+      style={[
+        styles.edgeStrip,
+        {
+          top: layout.top,
+          height: layout.height,
+          left: side === 'left' ? 0 : layout.left + layout.width,
+          transform: [{ scaleX: sideWidth / EDGE_STRIP }],
+        },
+      ]}>
+      <FastImage
+        source={source}
+        blurRadius={EDGE_BLUR}
+        style={{
+          position: 'absolute',
+          top: 0,
+          width: layout.width,
+          height: layout.height,
+          left: side === 'left' ? 0 : -(layout.width - EDGE_STRIP),
+        }}
+        resizeMode="stretch"
+      />
+    </View>
+  );
+};
+
 // Phones use the tall picture; tablets and foldables (screens at least this wide) use the 2:3 one
 const PHONE_IMAGE = { width: 887, height: 1773 };
 const TABLET_IMAGE = { width: 1024, height: 1536 };
@@ -57,14 +99,24 @@ export const SplashScreen = ({ navigation }) => {
       <View style={styles.imageContainer}>
         {layout.mode === 'contain' && (
           <>
-            {/* The picture does not reach the sides: a calm gradient in the picture's own colours
-                (sky, sunset glow, forest) sits behind, in case a side is wider than one mirrored copy */}
+            {/* The picture does not reach the sides: its own edges are stretched out to fill them,
+                over a calm gradient in the same colours (sky, sunset glow, forest) */}
             <LinearGradient
               testID="splash-side-fill"
               colors={SIDE_FILL_COLORS}
               locations={SIDE_FILL_LOCATIONS}
               style={StyleSheet.absoluteFill}
             />
+            {['left', 'right'].map(side => (
+              <EdgeExtension
+                key={side}
+                side={side}
+                source={pictureSource}
+                layout={layout}
+                screenWidth={screenWidth}
+                testID={`splash-edge-${side}`}
+              />
+            ))}
           </>
         )}
         <FastImage
@@ -96,6 +148,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  edgeStrip: {
+    position: 'absolute',
+    width: EDGE_STRIP,
+    overflow: 'hidden',
+    // Stretch from the strip's own left edge, so it grows outwards from the picture
+    transformOrigin: 'left center',
   },
   imageContainer: {
     ...StyleSheet.absoluteFillObject,

@@ -23,6 +23,8 @@ import {
   readRequestResult,
   readAccountBookings,
   mergeBookings,
+  readBookingDetail,
+  applyBookingDetail,
   hasAllConsents,
   returnForPayload,
   readBookingStatus,
@@ -673,6 +675,27 @@ describe('account bookings', () => {
     ]);
   });
 
+  it('finds addresses nested in route and the payment block', () => {
+    const [booking] = readAccountBookings([
+      {
+        reference: 'URB-7',
+        route: { pickupAddress: 'Uttam Nagar, Delhi', destinationAddress: 'Uttarakhand' },
+        waypoints: ['Nainital, Uttarakhand'],
+        payment: {
+          message: 'No payment has been received.',
+          verifiedTotalPaise: 0,
+        },
+      },
+    ]);
+    expect(booking.places).toEqual([
+      { kind: 'pickup', address: 'Uttam Nagar, Delhi' },
+      { kind: 'stop', address: 'Nainital, Uttarakhand' },
+      { kind: 'destination', address: 'Uttarakhand' },
+    ]);
+    expect(booking.payment).toEqual({ status: 'No payment has been received.', received: 0 });
+    expect(readAccountBookings([{ reference: 'URB-8' }])[0].payment).toBeNull();
+  });
+
   it('reads a booking nested in request, and one with no fare', () => {
     const [booking] = readAccountBookings([
       { request: { ...item, fare: undefined }, message: 'Hi' },
@@ -694,5 +717,63 @@ describe('account bookings', () => {
       [{ reference: 'B' }, { reference: 'C' }],
     );
     expect(merged.map(entry => entry.reference)).toEqual(['A', 'B', 'C']);
+  });
+
+  it('fills addresses the account list lacks from the copy on this phone', () => {
+    // The server sends "" for an address picked from the suggestions (only the Place ID is kept)
+    const [remote] = readAccountBookings([
+      { reference: 'URB-5', pickupAddress: '', destinationAddress: '', stops: [''] },
+    ]);
+    expect(remote.places).toEqual([]);
+    const saved = {
+      reference: 'URB-5',
+      places: [{ kind: 'pickup', address: 'Uttam Nagar, Delhi' }],
+      payment: { status: 'No payment has been received.', received: 0 },
+    };
+    const [merged] = mergeBookings([remote], [saved]);
+    expect(merged.places).toEqual(saved.places);
+    expect(merged.payment).toEqual(saved.payment);
+    // The account's own addresses are never replaced
+    const own = { ...remote, places: [{ kind: 'pickup', address: 'Noida' }] };
+    expect(mergeBookings([own], [saved])[0].places).toEqual(own.places);
+  });
+
+  it('reads one booking answer, bare or wrapped, and lays it over the list row', () => {
+    const body = {
+      id: 'uuid-1',
+      reference: 'URB-1',
+      pickupAddress: 'Uttam Nagar, Delhi',
+      destinationAddress: 'Uttarakhand',
+      stops: ['Nainital, Uttarakhand'],
+      fare: { totalPaise: 100000 },
+    };
+    [body, { booking: body }, { data: body }].forEach(shape => {
+      expect(readBookingDetail(shape).places).toHaveLength(3);
+    });
+    expect(readBookingDetail(null)).toBeNull();
+    expect(readBookingDetail(body).id).toBe('uuid-1');
+
+    const row = { reference: 'URB-1', status: 'pending_review', places: [], fare: null };
+    const merged = applyBookingDetail(row, readBookingDetail(body));
+    expect(merged.places[0]).toEqual({ kind: 'pickup', address: 'Uttam Nagar, Delhi' });
+    expect(merged.fare.total).toBe(1000);
+    expect(applyBookingDetail(row, null)).toBe(row);
+    // Whatever the detail lacks stays as the list had it
+    const kept = applyBookingDetail({ ...row, places: [{ kind: 'pickup', address: 'X' }] }, {
+      places: [],
+    });
+    expect(kept.places).toEqual([{ kind: 'pickup', address: 'X' }]);
+  });
+
+  it('reads addresses and payment from the status answer', () => {
+    const answer = readBookingStatus({
+      request: {
+        status: 'pending_review',
+        pickupAddress: 'Delhi',
+        payment: { message: 'No payment has been received.', verifiedTotalPaise: 0 },
+      },
+    });
+    expect(answer.places).toEqual([{ kind: 'pickup', address: 'Delhi' }]);
+    expect(answer.payment).toEqual({ status: 'No payment has been received.', received: 0 });
   });
 });

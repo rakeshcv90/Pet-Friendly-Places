@@ -4,7 +4,7 @@ import { render, fireEvent, act } from '@testing-library/react-native';
 import { UrbaniaBookingsScreen, bookingStatusText } from '../UrbaniaBookingsScreen';
 import { saveBooking, loadBookings } from '../../../services/urbania/bookingHistory';
 import { saveStatusToken } from '../../../services/urbania/statusTokenStore';
-import { fetchStatus, claimBooking } from '../../../services/urbania/urbaniaApi';
+import { fetchStatus } from '../../../services/urbania/urbaniaApi';
 import { api } from '../../../services/api/apiClient';
 import { s } from 'react-native-size-matters';
 import { useStore } from '../../../store';
@@ -25,6 +25,12 @@ jest.mock('../../../hooks/useUrbaniaBookings', () => ({
   useUrbaniaBookings: () => mockAccount,
 }));
 
+let mockDetail = { data: undefined, isLoading: false, isError: false };
+const mockDetailHook = jest.fn(() => mockDetail);
+jest.mock('../../../hooks/useUrbaniaBookingDetail', () => ({
+  useUrbaniaBookingDetail: (...args) => mockDetailHook(...args),
+}));
+
 jest.mock('../../../services/api/apiClient', () => ({
   api: { post: jest.fn(), get: jest.fn() },
 }));
@@ -32,7 +38,6 @@ jest.mock('../../../services/api/apiClient', () => ({
 jest.mock('../../../services/urbania/urbaniaApi', () => ({
   ...jest.requireActual('../../../services/urbania/urbaniaApi'),
   fetchStatus: jest.fn(),
-  claimBooking: jest.fn(),
 }));
 
 const navigation = { goBack: jest.fn(), navigate: jest.fn() };
@@ -117,13 +122,68 @@ describe('UrbaniaBookingsScreen', () => {
     expect(queryByTestId(`booking-${id}-details`)).toBeNull();
   });
 
+  it('asks for the booking only once its details are opened, and shows its answer', () => {
+    mockAccount = { ...mockAccount, data: [{ ...FIRST, id: 'uuid-1', places: [], fare: null }] };
+    mockDetail = {
+      data: {
+        ...FIRST,
+        id: 'uuid-1',
+        payment: { status: 'No payment has been received.', received: 0 },
+      },
+      isLoading: false,
+      isError: false,
+    };
+    const { getByTestId, getByText, queryByText } = render(
+      <UrbaniaBookingsScreen navigation={navigation} />,
+    );
+    expect(mockDetailHook).toHaveBeenCalledWith('uuid-1', false);
+    expect(queryByText('Pickup')).toBeNull();
+
+    fireEvent.press(getByTestId(`booking-${FIRST.reference}-toggle`));
+
+    expect(mockDetailHook).toHaveBeenCalledWith('uuid-1', true);
+    expect(getByTestId(`booking-${FIRST.reference}-pickup`)).toBeTruthy();
+    expect(getByTestId(`booking-${FIRST.reference}-destination`)).toBeTruthy();
+    expect(getByText(/No payment has been received/)).toBeTruthy();
+  });
+
+  it('says so while the details load and when they fail', () => {
+    mockAccount = { ...mockAccount, data: [{ ...FIRST, id: 'uuid-1', places: [] }] };
+    mockDetail = { data: undefined, isLoading: true, isError: false };
+    const view = render(<UrbaniaBookingsScreen navigation={navigation} />);
+    fireEvent.press(view.getByTestId(`booking-${FIRST.reference}-toggle`));
+    expect(view.getByTestId(`booking-${FIRST.reference}-detail-loading`)).toBeTruthy();
+
+    mockDetail = { data: undefined, isLoading: false, isError: true };
+    view.rerender(<UrbaniaBookingsScreen navigation={navigation} />);
+    expect(view.getByTestId(`booking-${FIRST.reference}-detail-error`)).toBeTruthy();
+  });
+
+  it('shows the payment status the server sent', () => {
+    saveBooking({
+      ...FIRST,
+      payment: { status: 'No payment has been received.', received: 0 },
+    });
+    const { getByTestId, getByText } = render(<UrbaniaBookingsScreen navigation={navigation} />);
+    fireEvent.press(getByTestId(`booking-${FIRST.reference}-toggle`));
+
+    expect(getByTestId(`booking-${FIRST.reference}-payment`)).toBeTruthy();
+    expect(getByText(/No payment has been received/)).toBeTruthy();
+    expect(getByText('₹0.00')).toBeTruthy();
+  });
+
   it('shows the quoted totals', () => {
     saveBooking(FIRST);
     const { getByTestId, getByText } = render(<UrbaniaBookingsScreen navigation={navigation} />);
     fireEvent.press(getByTestId(`booking-${FIRST.reference}-toggle`));
 
     expect(getByTestId(`booking-${FIRST.reference}-fare`)).toBeTruthy();
-    ['Quoted total', 'Advance', 'Balance', 'Refundable deposit'].forEach(label =>
+    [
+      'Estimated total',
+      'Estimated advance',
+      'Estimated balance after advance',
+      'Refundable deposit at pickup (separate)',
+    ].forEach(label =>
       expect(getByText(label)).toBeTruthy(),
     );
     ['₹33,890.66', '₹8,472.67', '₹25,417.99', '₹5,000.00'].forEach(value =>
@@ -320,7 +380,7 @@ describe('UrbaniaBookingsScreen', () => {
     const value = StyleSheet.flatten(getByText('₹33,890.66').props.style);
     expect(value.color).toBe('#FFFFFF');
     const chip = StyleSheet.flatten(
-      getByTestId(`booking-${FIRST.reference}-chip-Quoted total`).props.style,
+      getByTestId(`booking-${FIRST.reference}-chip-Estimated total`).props.style,
     );
     expect(chip.backgroundColor).toBe('#27104B');
     useStore.setState({ isDarkMode: false });
@@ -343,21 +403,15 @@ describe('UrbaniaBookingsScreen', () => {
       expect(getByTestId('urbania-review-submit')).toBeTruthy();
     });
 
-    it('emails a claim link using the private token of each booking on this phone', async () => {
-      saveBooking(FIRST);
-      saveBooking(SECOND);
-      await saveStatusToken(FIRST.reference, 'tok-1');
-      await saveStatusToken(SECOND.reference, 'tok-2');
-      claimBooking.mockResolvedValue({});
+    it('asks the API to email a claim link for the account', async () => {
+      api.post.mockResolvedValue({});
       const { getByTestId, findByText } = render(<UrbaniaBookingsScreen navigation={navigation} />);
 
       await act(async () => {
         fireEvent.press(getByTestId('urbania-claim-button'));
       });
 
-      expect(claimBooking).toHaveBeenCalledTimes(2);
-      expect(claimBooking).toHaveBeenCalledWith('tok-1');
-      expect(claimBooking).toHaveBeenCalledWith('tok-2');
+      expect(api.post).toHaveBeenCalledWith('/accounts/me/urbania-bookings/claim', {});
       expect(
         await findByText(
           'If earlier guest bookings match this account email, a one-time link is on its way.',
@@ -365,21 +419,21 @@ describe('UrbaniaBookingsScreen', () => {
       ).toBeTruthy();
     });
 
-    it('says so when there is nothing on this phone to claim', async () => {
+    it('shows the message the API sends back', async () => {
+      api.post.mockResolvedValue({ message: 'Check your inbox for the link.' });
       const { getByTestId } = render(<UrbaniaBookingsScreen navigation={navigation} />);
 
       await act(async () => {
         fireEvent.press(getByTestId('urbania-claim-button'));
       });
 
-      expect(claimBooking).not.toHaveBeenCalled();
-      expect(getByTestId('urbania-claim-message').props.children).toMatch(/no guest bookings/);
+      expect(getByTestId('urbania-claim-message').props.children).toBe(
+        'Check your inbox for the link.',
+      );
     });
 
     it('shows the server reason when the claim link fails', async () => {
-      saveBooking(FIRST);
-      await saveStatusToken(FIRST.reference, 'tok-1');
-      claimBooking.mockRejectedValue({ response: { data: { message: 'Too many requests' } } });
+      api.post.mockRejectedValue({ response: { data: { message: 'Too many requests' } } });
       const { getByTestId } = render(<UrbaniaBookingsScreen navigation={navigation} />);
 
       await act(async () => {

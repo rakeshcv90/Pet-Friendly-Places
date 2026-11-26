@@ -1,13 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  Animated,
-  ScrollView,
-  StyleSheet,
-  StatusBar,
-  TextInput,
-} from 'react-native';
+import { View, Text, Animated, ScrollView, StyleSheet, StatusBar, TextInput } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -25,6 +17,20 @@ import { ScreenHeader } from '../../components/common/AppHeader/ScreenHeader';
 import { AmbientBackground } from '../Home/components';
 
 // All places the signed-in user saved (opened from Profile > Saved Places)
+// One saved place. Memoised, so scrolling or an undo bar does not redraw every card.
+const SavedPlaceRow = React.memo(({ item, index, scrollY, isDarkMode, onOpenPlace, onRemove }) => (
+  <SavedPlaceCard
+    item={item}
+    index={index}
+    scrollY={scrollY}
+    isDarkMode={isDarkMode}
+    onOpen={() => onOpenPlace(item)}
+    onRemove={onRemove}
+  />
+));
+
+const keyOfPlace = (item, index) => String(item.id ?? item.slug ?? index);
+
 export const SavedPlacesScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const isDarkMode = useStore(state => state.isDarkMode) || false;
@@ -57,6 +63,27 @@ export const SavedPlacesScreen = ({ navigation }) => {
     unsave.mutate(id);
     setUndo({ id, name: entry?.name, entry: entry || { id } });
   };
+  // The card list is memoised, so it gets one function that never changes and always runs the latest
+  const unsaveRef = useRef(handleUnsave);
+  unsaveRef.current = handleUnsave;
+  const removePlace = useCallback(id => unsaveRef.current(id), []);
+  const openPlace = useCallback(
+    item => item.slug && navigation.navigate('ListingDetailScreen', { slug: item.slug }),
+    [navigation],
+  );
+  const renderPlace = useCallback(
+    ({ item, index }) => (
+      <SavedPlaceRow
+        item={item}
+        index={index}
+        scrollY={scrollY}
+        isDarkMode={isDarkMode}
+        onOpenPlace={openPlace}
+        onRemove={removePlace}
+      />
+    ),
+    [scrollY, isDarkMode, openPlace, removePlace],
+  );
   const handleUndo = useCallback(() => {
     if (undo) {
       restore.mutate({ ...undo.entry, id: undo.id });
@@ -129,7 +156,9 @@ export const SavedPlacesScreen = ({ navigation }) => {
             { value: verifiedCount, label: 'Verified' },
             { value: cityCount, label: cityCount === 1 ? 'City' : 'Cities' },
           ].map((tile, index) => (
-            <View key={tile.label} style={[styles.bannerStat, index > 0 && styles.bannerStatDivider]}>
+            <View
+              key={tile.label}
+              style={[styles.bannerStat, index > 0 && styles.bannerStatDivider]}>
               <Text style={styles.bannerStatValue}>{tile.value}</Text>
               <Text style={styles.bannerStatLabel}>{tile.label}</Text>
             </View>
@@ -150,7 +179,10 @@ export const SavedPlacesScreen = ({ navigation }) => {
             returnKeyType="search"
           />
           {query ? (
-            <BouncyPressable activeScale={0.85} onPress={() => setQuery('')} testID="saved-search-clear">
+            <BouncyPressable
+              activeScale={0.85}
+              onPress={() => setQuery('')}
+              testID="saved-search-clear">
               <Ionicons name="close-circle" size={ms(18)} color="#94A3B8" />
             </BouncyPressable>
           ) : null}
@@ -181,7 +213,9 @@ export const SavedPlacesScreen = ({ navigation }) => {
                   {name}
                 </Text>
                 <View style={[styles.chipCount, active && styles.chipCountActive]}>
-                  <Text style={[styles.chipCountText, active && styles.chipTextActive]}>{count}</Text>
+                  <Text style={[styles.chipCountText, active && styles.chipTextActive]}>
+                    {count}
+                  </Text>
                 </View>
               </BouncyPressable>
             );
@@ -222,19 +256,11 @@ export const SavedPlacesScreen = ({ navigation }) => {
       ) : (
         <Animated.FlatList
           data={visible}
-          keyExtractor={(item, index) => String(item.id ?? item.slug ?? index)}
-          renderItem={({ item, index }) => (
-            <SavedPlaceCard
-              item={item}
-              index={index}
-              scrollY={scrollY}
-              isDarkMode={isDarkMode}
-              onOpen={() =>
-                item.slug && navigation.navigate('ListingDetailScreen', { slug: item.slug })
-              }
-              onRemove={handleUnsave}
-            />
-          )}
+          keyExtractor={keyOfPlace}
+          renderItem={renderPlace}
+          initialNumToRender={5}
+          maxToRenderPerBatch={5}
+          windowSize={7}
           ListHeaderComponent={header}
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
@@ -422,7 +448,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#E2E8F0',
   },
   chipCountActive: { backgroundColor: 'rgba(255,255,255,0.25)' },
-  chipCountText: { fontSize: s(10.5), color: '#64748B', fontFamily: theme.typography.fontFamily.bold },
+  chipCountText: {
+    fontSize: s(10.5),
+    color: '#64748B',
+    fontFamily: theme.typography.fontFamily.bold,
+  },
   emptyIcon: {
     width: s(68),
     height: s(68),
@@ -445,7 +475,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: s(22),
     paddingVertical: vs(11),
   },
-  emptyCtaText: { color: '#FFFFFF', fontFamily: theme.typography.fontFamily.bold, fontSize: s(13.5) },
+  emptyCtaText: {
+    color: '#FFFFFF',
+    fontFamily: theme.typography.fontFamily.bold,
+    fontSize: s(13.5),
+  },
   undoBar: {
     position: 'absolute',
     left: s(16),
@@ -463,8 +497,17 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 10,
   },
-  undoText: { flex: 1, color: '#FFFFFF', fontFamily: theme.typography.fontFamily.medium, fontSize: s(13) },
-  undoAction: { color: '#C4B5FD', fontFamily: theme.typography.fontFamily.extraBold, fontSize: s(13.5) },
+  undoText: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontFamily: theme.typography.fontFamily.medium,
+    fontSize: s(13),
+  },
+  undoAction: {
+    color: '#C4B5FD',
+    fontFamily: theme.typography.fontFamily.extraBold,
+    fontSize: s(13.5),
+  },
   headerSpacer: { height: vs(16) },
   chips: { paddingHorizontal: s(16), paddingVertical: vs(14) },
   chip: {

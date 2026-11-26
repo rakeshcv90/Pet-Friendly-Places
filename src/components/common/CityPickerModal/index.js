@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,51 @@ import { theme } from '../../../theme';
 import { POPULAR_CITIES } from '../../../utils/cities';
 import { useStore } from '../../../store';
 
+// One city row. Memoised, so typing in the search box or picking a city does not redraw them all.
+const CityOption = React.memo(({ city, isSelected, isDarkMode, onSelect }) => (
+  <TouchableOpacity
+    style={[
+      styles.cityOption,
+      isDarkMode && styles.cityOptionDark,
+      isSelected && (isDarkMode ? styles.cityOptionSelectedDark : styles.cityOptionSelected),
+    ]}
+    onPress={() => onSelect(city)}
+    activeOpacity={0.7}>
+    <View style={styles.cityOptionLeft}>
+      <View
+        style={[
+          styles.cityPinBadge,
+          isDarkMode && styles.cityPinBadgeDark,
+          isSelected && styles.cityPinBadgeSelected,
+        ]}>
+        <FeatherIcon
+          name="map-pin"
+          size={s(14)}
+          color={isSelected ? '#FFFFFF' : isDarkMode ? '#A855F7' : theme.colors.primaryDark}
+        />
+      </View>
+      <Text
+        style={[
+          styles.cityOptionText,
+          isDarkMode && styles.cityOptionTextDark,
+          isSelected &&
+            (isDarkMode ? styles.cityOptionTextSelectedDark : styles.cityOptionTextSelected),
+        ]}>
+        {city}
+      </Text>
+    </View>
+    {isSelected ? (
+      <View style={styles.checkedCircle}>
+        <Ionicons name="checkmark" size={s(13)} color="#FFFFFF" />
+      </View>
+    ) : (
+      <View style={[styles.uncheckedCircle, isDarkMode && styles.uncheckedCircleDark]} />
+    )}
+  </TouchableOpacity>
+));
+
+const keyOfCity = item => item;
+
 export const CityPickerModal = ({
   visible = false,
   selectedCity = '',
@@ -31,8 +76,9 @@ export const CityPickerModal = ({
   const [citySearch, setCitySearch] = useState('');
   const searchInputRef = useRef(null);
 
-  const filteredCities = cities.filter(c =>
-    c.toLowerCase().includes(citySearch.trim().toLowerCase()),
+  const filteredCities = useMemo(
+    () => cities.filter(c => c.toLowerCase().includes(citySearch.trim().toLowerCase())),
+    [cities, citySearch],
   );
 
   const handleClose = () => {
@@ -44,23 +90,33 @@ export const CityPickerModal = ({
     }
   };
 
-  const handleSelect = item => {
-    Keyboard.dismiss();
-    searchInputRef.current?.blur();
-    setCitySearch('');
-    requestAnimationFrame(() => {
-      if (onSelectCity) {
-        onSelectCity(item);
-      }
-    });
-  };
+  const handleSelect = useCallback(
+    item => {
+      Keyboard.dismiss();
+      searchInputRef.current?.blur();
+      setCitySearch('');
+      requestAnimationFrame(() => {
+        if (onSelectCity) {
+          onSelectCity(item);
+        }
+      });
+    },
+    [onSelectCity],
+  );
+  const renderCity = useCallback(
+    ({ item }) => (
+      <CityOption
+        city={item}
+        isSelected={selectedCity === item}
+        isDarkMode={isDarkMode}
+        onSelect={handleSelect}
+      />
+    ),
+    [selectedCity, isDarkMode, handleSelect],
+  );
 
   return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={handleClose}>
+    <Modal visible={visible} transparent={true} animationType="slide" onRequestClose={handleClose}>
       <TouchableWithoutFeedback onPress={handleClose}>
         <View style={styles.modalOverlay}>
           <TouchableWithoutFeedback>
@@ -80,7 +136,8 @@ export const CityPickerModal = ({
                     {title}
                   </Text>
                   <Text style={[styles.modalSubtitle, isDarkMode && styles.modalSubtitleDark]}>
-                    {filteredCities.length} {filteredCities.length === 1 ? 'city' : 'cities'} available
+                    {filteredCities.length} {filteredCities.length === 1 ? 'city' : 'cities'}{' '}
+                    available
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -92,7 +149,11 @@ export const CityPickerModal = ({
               </View>
 
               {/* Real-time City Search Bar */}
-              <View style={[styles.modalSearchContainer, isDarkMode && styles.modalSearchContainerDark]}>
+              <View
+                style={[
+                  styles.modalSearchContainer,
+                  isDarkMode && styles.modalSearchContainerDark,
+                ]}>
                 <FeatherIcon
                   name="search"
                   size={s(16)}
@@ -124,7 +185,7 @@ export const CityPickerModal = ({
               {/* City Options List */}
               <FlatList
                 data={filteredCities}
-                keyExtractor={item => item}
+                keyExtractor={keyOfCity}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag"
@@ -134,10 +195,15 @@ export const CityPickerModal = ({
                     <View style={[styles.emptyIconBadge, isDarkMode && styles.emptyIconBadgeDark]}>
                       <FeatherIcon name="map-pin" size={s(26)} color="#94A3B8" />
                     </View>
-                    <Text style={[styles.emptySearchTitle, isDarkMode && styles.emptySearchTitleDark]}>
+                    <Text
+                      style={[styles.emptySearchTitle, isDarkMode && styles.emptySearchTitleDark]}>
                       No cities found
                     </Text>
-                    <Text style={[styles.emptySearchSubtitle, isDarkMode && styles.emptySearchSubtitleDark]}>
+                    <Text
+                      style={[
+                        styles.emptySearchSubtitle,
+                        isDarkMode && styles.emptySearchSubtitleDark,
+                      ]}>
                       No matches found for "{citySearch}".
                     </Text>
                     <TouchableOpacity
@@ -148,49 +214,10 @@ export const CityPickerModal = ({
                     </TouchableOpacity>
                   </View>
                 }
-                renderItem={({ item }) => {
-                  const isSelected = selectedCity === item;
-                  return (
-                    <TouchableOpacity
-                      style={[
-                        styles.cityOption,
-                        isDarkMode && styles.cityOptionDark,
-                        isSelected && (isDarkMode ? styles.cityOptionSelectedDark : styles.cityOptionSelected),
-                      ]}
-                      onPress={() => handleSelect(item)}
-                      activeOpacity={0.7}>
-                      <View style={styles.cityOptionLeft}>
-                        <View
-                          style={[
-                            styles.cityPinBadge,
-                            isDarkMode && styles.cityPinBadgeDark,
-                            isSelected && styles.cityPinBadgeSelected,
-                          ]}>
-                          <FeatherIcon
-                            name="map-pin"
-                            size={s(14)}
-                            color={isSelected ? '#FFFFFF' : isDarkMode ? '#A855F7' : theme.colors.primaryDark}
-                          />
-                        </View>
-                        <Text
-                          style={[
-                            styles.cityOptionText,
-                            isDarkMode && styles.cityOptionTextDark,
-                            isSelected && (isDarkMode ? styles.cityOptionTextSelectedDark : styles.cityOptionTextSelected),
-                          ]}>
-                          {item}
-                        </Text>
-                      </View>
-                      {isSelected ? (
-                        <View style={styles.checkedCircle}>
-                          <Ionicons name="checkmark" size={s(13)} color="#FFFFFF" />
-                        </View>
-                      ) : (
-                        <View style={[styles.uncheckedCircle, isDarkMode && styles.uncheckedCircleDark]} />
-                      )}
-                    </TouchableOpacity>
-                  );
-                }}
+                renderItem={renderCity}
+                initialNumToRender={14}
+                maxToRenderPerBatch={14}
+                windowSize={9}
               />
             </View>
           </TouchableWithoutFeedback>

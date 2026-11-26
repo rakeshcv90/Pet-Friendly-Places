@@ -47,6 +47,22 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 5,
   },
+  viewerCaption: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: s(20),
+    paddingTop: s(24),
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  viewerCaptionText: {
+    color: '#FFFFFF',
+    fontSize: ms(13),
+    lineHeight: ms(19),
+    fontFamily: font.medium,
+    textAlign: 'center',
+  },
   viewerCounter: {
     position: 'absolute',
     alignSelf: 'center',
@@ -77,7 +93,13 @@ export const styles = StyleSheet.create({
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: s(5), marginTop: vs(8) },
   locationText: { flex: 1, fontSize: ms(12.5), fontFamily: font.medium },
   summary: { marginTop: vs(10), fontSize: ms(13), lineHeight: ms(20), fontFamily: font.regular },
-  statRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: s(14), marginTop: vs(12) },
+  statRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: s(14),
+    marginTop: vs(12),
+  },
   stat: { flexDirection: 'row', alignItems: 'center', gap: s(5) },
   statText: { fontSize: ms(12), fontFamily: font.semiBold },
 
@@ -114,7 +136,13 @@ export const styles = StyleSheet.create({
   sectionTitle: { flex: 1, fontSize: ms(15.5), fontFamily: font.bold, letterSpacing: -0.2 },
   sectionRule: { height: StyleSheet.hairlineWidth, marginBottom: vs(12), marginTop: -vs(2) },
   bodyText: { fontSize: ms(13.5), lineHeight: ms(22), fontFamily: font.regular },
-  subHeading: { fontSize: ms(11), fontFamily: font.bold, letterSpacing: 0.8, marginTop: vs(16), marginBottom: vs(8) },
+  subHeading: {
+    fontSize: ms(11),
+    fontFamily: font.bold,
+    letterSpacing: 0.8,
+    marginTop: vs(16),
+    marginBottom: vs(8),
+  },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: s(8) },
   petPill: {
     flexDirection: 'row',
@@ -144,10 +172,21 @@ export const styles = StyleSheet.create({
   /* policy rows */
   factRow: { flexDirection: 'row', alignItems: 'flex-start', gap: s(12), paddingVertical: vs(9) },
   factRowBorder: { borderTopWidth: StyleSheet.hairlineWidth },
-  factIcon: { width: s(30), height: s(30), borderRadius: s(15), alignItems: 'center', justifyContent: 'center' },
+  factIcon: {
+    width: s(30),
+    height: s(30),
+    borderRadius: s(15),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   factTexts: { flex: 1 },
   factLabel: { fontSize: ms(11), fontFamily: font.medium },
-  factValue: { marginTop: vs(1), fontSize: ms(13.5), lineHeight: ms(19), fontFamily: font.semiBold },
+  factValue: {
+    marginTop: vs(1),
+    fontSize: ms(13.5),
+    lineHeight: ms(19),
+    fontFamily: font.semiBold,
+  },
   bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: s(10), paddingVertical: vs(5) },
   bulletText: { flex: 1, fontSize: ms(13), lineHeight: ms(20), fontFamily: font.regular },
   toggleRow: {
@@ -227,7 +266,18 @@ export const styles = StyleSheet.create({
   /* states */
   centerBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: s(28) },
   centerTitle: { marginTop: vs(12), fontSize: ms(17), fontFamily: font.bold, textAlign: 'center' },
-  centerText: { marginTop: vs(6), fontSize: ms(13), lineHeight: ms(19), fontFamily: font.regular, textAlign: 'center' },
-  retryBtn: { marginTop: vs(16), paddingHorizontal: s(22), paddingVertical: vs(10), borderRadius: s(12) },
+  centerText: {
+    marginTop: vs(6),
+    fontSize: ms(13),
+    lineHeight: ms(19),
+    fontFamily: font.regular,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    marginTop: vs(16),
+    paddingHorizontal: s(22),
+    paddingVertical: vs(10),
+    borderRadius: s(12),
+  },
   retryText: { fontSize: ms(13), fontFamily: font.bold },
 });

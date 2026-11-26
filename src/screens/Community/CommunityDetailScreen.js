@@ -65,7 +65,7 @@ const tint = (hex, amount, base = [255, 255, 255]) => {
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 };
 
-const PostCard = ({ post, index, isDarkMode, onPress }) => {
+const PostCard = React.memo(({ post, index, isDarkMode, onOpen }) => {
   const typeStyle = TYPE_STYLES[post.type] || TYPE_STYLES.DISCUSSION;
   const credential = credentialLabel(post.authorVerifiedCredential);
   const avatar = avatarColorsFor(post.authorDisplayName);
@@ -75,7 +75,7 @@ const PostCard = ({ post, index, isDarkMode, onPress }) => {
     <Enter index={index}>
       <BouncyPressable
         activeScale={0.98}
-        onPress={onPress}
+        onPress={() => onOpen(post)}
         style={[
           styles.postCard,
           isDarkMode && styles.postCardDark,
@@ -153,7 +153,9 @@ const PostCard = ({ post, index, isDarkMode, onPress }) => {
       </BouncyPressable>
     </Enter>
   );
-};
+});
+
+const keyOfPost = post => String(post.id);
 
 export const CommunityDetailScreen = ({ navigation, route }) => {
   const community = route?.params?.community || {};
@@ -205,6 +207,17 @@ export const CommunityDetailScreen = ({ navigation, route }) => {
   const countFor = key =>
     key === 'ALL' ? allPosts.length : allPosts.filter(post => post.type === key).length;
 
+  const openPost = useCallback(
+    post =>
+      navigation.navigate('CommunityPostDetailScreen', { slug: post.slug, title: post.title }),
+    [navigation],
+  );
+  const renderPost = useCallback(
+    ({ item, index }) => (
+      <PostCard post={item} index={index} isDarkMode={isDarkMode} onOpen={openPost} />
+    ),
+    [isDarkMode, openPost],
+  );
   const handleEndReached = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
       fetchNextPage();
@@ -469,20 +482,11 @@ export const CommunityDetailScreen = ({ navigation, route }) => {
 
       <FlatList
         data={posts}
-        keyExtractor={post => String(post.id)}
-        renderItem={({ item, index }) => (
-          <PostCard
-            post={item}
-            index={index}
-            isDarkMode={isDarkMode}
-            onPress={() =>
-              navigation.navigate('CommunityPostDetailScreen', {
-                slug: item.slug,
-                title: item.title,
-              })
-            }
-          />
-        )}
+        keyExtractor={keyOfPost}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={9}
+        renderItem={renderPost}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmpty}
         ListFooterComponent={renderFooter}

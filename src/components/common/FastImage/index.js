@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { images } from '../../../theme/images';
 import { useStore } from '../../../store';
+import { optimizeImageUrl, imageWidthForSize } from '../../../utils/imageUrl';
 
 // Drop-in replacement for `react-native-fast-image`, built on React Native's own Image.
 //
@@ -22,6 +23,11 @@ const FADE_MS = 220;
 const PLACEHOLDER_LIGHT = '#EFEAF8';
 const PLACEHOLDER_DARK = '#1E0E38';
 const MIN_ICON_BOX = 44;
+// A picture that fails to load (a dropped connection, a busy server, memory pressure while many
+// big pictures decode at once) is tried again this many times, a little later each time, before
+// the "no image" picture is shown. Most failures are brief, so this saves a blank or missing photo.
+export const MAX_RETRIES = 2;
+export const RETRY_DELAY_MS = 900;
 
 const isRemoteSource = source =>
   !!source &&
@@ -38,10 +44,12 @@ const cleanSource = source => {
 
 // Start downloading pictures before they scroll into view so they are ready when needed.
 export const prefetchImages = (urls = [], limit = 12) => {
-  const unique = [...new Set(urls)].filter(url => typeof url === 'string' && /^https?:\/\//i.test(url));
+  const unique = [...new Set(urls)].filter(
+    url => typeof url === 'string' && /^https?:\/\//i.test(url),
+  );
   unique.slice(0, limit).forEach(url => {
     try {
-      Promise.resolve(Image.prefetch(url)).catch(() => {});
+      Promise.resolve(Image.prefetch(optimizeImageUrl(url))).catch(() => {});
     } catch (e) {
       // prefetch is only a speed-up
     }
@@ -51,17 +59,33 @@ export const prefetchImages = (urls = [], limit = 12) => {
 const RemoteImage = React.forwardRef(
   ({ source, resizeMode, style, onLoad, onError, onLayout, ...rest }, ref) => {
     const isDarkMode = useStore(state => state.isDarkMode);
-    const uri = source.uri;
+    // The address asked for, and the one actually requested: our own uploads are fetched as a resized
+    // copy (see utils/imageUrl.js), with the original as a last resort if that fails
+    const originalUri = source.uri;
+    const [useOriginal, setUseOriginal] = useState(false);
+    const flatStyle = StyleSheet.flatten(style) || {};
+    const requestWidth = imageWidthForSize(
+      typeof flatStyle.width === 'number' ? flatStyle.width : undefined,
+    );
+    const uri = useOriginal ? originalUri : optimizeImageUrl(originalUri, requestWidth);
     const [status, setStatus] = useState('loading'); // loading | loaded | error
     const [box, setBox] = useState(0);
-    const fade = useRef(new Animated.Value(0)).current;
+    // Which try this is; a new number makes React Native request the picture again
+    const [attempt, setAttempt] = useState(0);
+    const retryTimer = useRef(null);
+    // A fresh fade value for every picture and every try, matching the image view React mounts for it
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const fade = useMemo(() => new Animated.Value(0), [uri, attempt]);
     const pulse = useRef(new Animated.Value(0.35)).current;
 
     // A new picture starts again from the placeholder
     useEffect(() => {
       setStatus('loading');
-      fade.setValue(0);
-    }, [uri, fade]);
+      setAttempt(0);
+      setUseOriginal(false);
+    }, [originalUri]);
+
+    useEffect(() => () => clearTimeout(retryTimer.current), []);
 
     useEffect(() => {
       if (status !== 'loading') {
@@ -102,10 +126,25 @@ const RemoteImage = React.forwardRef(
 
     const handleError = useCallback(
       event => {
+        if (attempt < MAX_RETRIES) {
+          // Keep the placeholder showing and ask again shortly
+          clearTimeout(retryTimer.current);
+          retryTimer.current = setTimeout(
+            () => setAttempt(value => value + 1),
+            RETRY_DELAY_MS * (attempt + 1),
+          );
+          return;
+        }
+        // The resized copy failed: try the original once before giving up
+        if (!useOriginal && uri !== originalUri) {
+          setUseOriginal(true);
+          setAttempt(0);
+          return;
+        }
         setStatus('error');
         onError?.(event);
       },
-      [onError],
+      [attempt, onError, useOriginal, uri, originalUri],
     );
 
     const handleLayout = useCallback(
@@ -118,7 +157,11 @@ const RemoteImage = React.forwardRef(
     );
 
     // The caller's layout style goes on the container; the picture and placeholder fill it
-    const { tintColor, resizeMode: styleResizeMode, ...layoutStyle } = StyleSheet.flatten(style) || {};
+    const {
+      tintColor,
+      resizeMode: styleResizeMode,
+      ...layoutStyle
+    } = StyleSheet.flatten(style) || {};
     const background = isDarkMode ? PLACEHOLDER_DARK : PLACEHOLDER_LIGHT;
     const iconSize = Math.max(14, Math.min(40, box * 0.34));
 
@@ -137,18 +180,31 @@ const RemoteImage = React.forwardRef(
               <View
                 testID="fast-image-placeholder"
                 pointerEvents="none"
-                style={[StyleSheet.absoluteFill, styles.placeholder, { backgroundColor: background }]}>
+                style={[
+                  StyleSheet.absoluteFill,
+                  styles.placeholder,
+                  { backgroundColor: background },
+                ]}>
                 {box >= MIN_ICON_BOX ? (
                   <Animated.View style={{ opacity: pulse }}>
-                    <Ionicons name="paw" size={iconSize} color={isDarkMode ? '#7C3AED' : '#B9A5E8'} />
+                    <Ionicons
+                      name="paw"
+                      size={iconSize}
+                      color={isDarkMode ? '#7C3AED' : '#B9A5E8'}
+                    />
                   </Animated.View>
                 ) : null}
               </View>
             ) : null}
             <Animated.Image
+              key={attempt}
               ref={ref}
-              source={source}
+              source={uri === originalUri ? source : { ...source, uri }}
               resizeMode={resizeMode}
+              // Android decodes web pictures at their full size by default ("scale"). The story
+              // photos are 8 MB originals, which can run the phone out of memory and fail to
+              // load. "resize" decodes them at the size they are drawn instead.
+              resizeMethod="resize"
               style={[
                 StyleSheet.absoluteFill,
                 { opacity: fade, resizeMode },

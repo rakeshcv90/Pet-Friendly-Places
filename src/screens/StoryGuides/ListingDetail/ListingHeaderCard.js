@@ -34,7 +34,10 @@ export const ListingHeaderCard = ({ listing, palette, isDarkMode, motion }) => (
         style={hero.accentStrip}
       />
       <Animated.View
-        style={[hero.articleSheen, { transform: [{ translateX: motion.sheenX }, { rotate: '25deg' }] }]}>
+        style={[
+          hero.articleSheen,
+          { transform: [{ translateX: motion.sheenX }, { rotate: '25deg' }] },
+        ]}>
         <LinearGradient
           colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.32)', 'rgba(255,255,255,0)']}
           start={{ x: 0, y: 0 }}
@@ -87,11 +90,14 @@ export const ListingHeaderCard = ({ listing, palette, isDarkMode, motion }) => (
     ) : null}
 
     <View style={styles.statRow}>
-      {listing.photos.length ? (
+      {listing.photos.length || listing.videoCount ? (
         <View style={styles.stat}>
           <Ionicons name="images-outline" size={ms(13)} color={palette.muted} />
           <Text style={[styles.statText, { color: palette.muted }]}>
             {listing.photos.length} {listing.photos.length === 1 ? 'photo' : 'photos'}
+            {listing.videoCount
+              ? ` · ${listing.videoCount} ${listing.videoCount === 1 ? 'video' : 'videos'}`
+              : ''}
           </Text>
         </View>
       ) : null}

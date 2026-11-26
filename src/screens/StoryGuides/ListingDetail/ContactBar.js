@@ -14,17 +14,32 @@ const digits = value => String(value || '').replace(/[^\d]/g, '');
 export const contactActions = contact => {
   const actions = [];
   if (contact.phone) {
-    actions.push({ key: 'call', label: 'Call', icon: 'call', url: `tel:${contact.phone.replace(/\s/g, '')}` });
+    actions.push({
+      key: 'call',
+      label: 'Call',
+      icon: 'call',
+      url: `tel:${contact.phone.replace(/\s/g, '')}`,
+    });
   }
   const wa = digits(contact.whatsapp);
   if (wa) {
-    actions.push({ key: 'whatsapp', label: 'WhatsApp', icon: 'logo-whatsapp', url: `https://wa.me/${wa}` });
+    actions.push({
+      key: 'whatsapp',
+      label: 'WhatsApp',
+      icon: 'logo-whatsapp',
+      url: `https://wa.me/${wa}`,
+    });
   }
   if (contact.website) {
     actions.push({ key: 'website', label: 'Website', icon: 'globe-outline', url: contact.website });
   }
   if (contact.mapsUrl) {
-    actions.push({ key: 'directions', label: 'Directions', icon: 'navigate-outline', url: contact.mapsUrl });
+    actions.push({
+      key: 'directions',
+      label: 'Directions',
+      icon: 'navigate-outline',
+      url: contact.mapsUrl,
+    });
   }
   return actions;
 };

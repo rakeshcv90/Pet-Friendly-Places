@@ -83,3 +83,8 @@ yarn-error.log
 
 # Google Places key (see src/config/googleKeys.example.js)
 src/config/googleKeys.js
+# Android release signing keys
+*.jks
+*.keystore
+*.p12
+!debug.keystore

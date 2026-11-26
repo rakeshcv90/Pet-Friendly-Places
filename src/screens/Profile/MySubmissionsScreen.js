@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { View, Text, FlatList, StyleSheet, StatusBar, Platform, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -53,7 +53,7 @@ const formatSubmitted = value => {
   return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-const SubmissionCard = ({ item, isDarkMode }) => {
+const SubmissionCard = React.memo(({ item, isDarkMode }) => {
   const meta = getStatusMeta(item.status);
   const place = [item.city, item.state].filter(Boolean).join(', ');
   const submitted = formatSubmitted(item.createdAt);
@@ -90,7 +90,9 @@ const SubmissionCard = ({ item, isDarkMode }) => {
       </View>
     </View>
   );
-};
+});
+
+const keyOfSubmission = item => item.id;
 
 // The signed-in user's own place submissions (opened from Profile > My Submissions)
 export const MySubmissionsScreen = ({ navigation }) => {
@@ -100,6 +102,10 @@ export const MySubmissionsScreen = ({ navigation }) => {
   const submissions = data || [];
   // Drives the background glows, as on the Home screen
   const scrollY = useRef(new Animated.Value(0)).current;
+  const renderSubmission = useCallback(
+    ({ item }) => <SubmissionCard item={item} isDarkMode={isDarkMode} />,
+    [isDarkMode],
+  );
 
   const goToAddPlace = () => navigation.navigate('AddPlaceScreen');
 
@@ -173,8 +179,11 @@ export const MySubmissionsScreen = ({ navigation }) => {
       ) : (
         <FlatList
           data={submissions}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => <SubmissionCard item={item} isDarkMode={isDarkMode} />}
+          keyExtractor={keyOfSubmission}
+          renderItem={renderSubmission}
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={7}
           ListHeaderComponent={
             submissions.length > 0 ? (
               <View style={[styles.countPill, isDarkMode && styles.countPillDark]}>

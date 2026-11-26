@@ -1,10 +1,12 @@
 import React from 'react';
 import { Linking, Share } from 'react-native';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, act } from '@testing-library/react-native';
 import { ListingDetailScreen } from '../ListingDetailScreen';
 import {
   parseList,
   buildListing,
+  listingErrorKind,
+  LISTING_ERROR_COPY,
   splitSentences,
   formatLongDate,
   formatMonthYear,
@@ -278,11 +280,135 @@ describe('ListingDetailScreen', () => {
     expect(getByTestId('photo-viewer-close')).toBeTruthy();
   });
 
+  describe('photos and videos (like the website gallery)', () => {
+    const WITH_VIDEOS = {
+      ...RAW,
+      images: [
+        ...RAW.images,
+        { image_url: '/api/storage/objects/uploads/clip1', media_type: 'video', caption: 'Walk' },
+        { image_url: '/api/storage/objects/uploads/clip2', media_type: 'video' },
+      ],
+    };
+
+    it('builds the gallery from the photos (main first) and then the videos', () => {
+      const l = buildListing(WITH_VIDEOS);
+      expect(l.media.map(item => item.type)).toEqual(['image', 'image', 'image', 'video', 'video']);
+      expect(l.media[0].url).toBe('https://site.test/api/storage/objects/uploads/main');
+      expect(l.media[3]).toEqual({
+        type: 'video',
+        url: 'https://site.test/api/storage/objects/uploads/clip1',
+        caption: 'Walk',
+      });
+      // The photo list and counts used elsewhere are unchanged
+      expect(l.photos).toHaveLength(3);
+      expect(l.videoCount).toBe(2);
+    });
+
+    it('still shows the main image alone when the place has no gallery entries', () => {
+      const l = buildListing({ ...RAW, images: [] });
+      expect(l.media).toEqual([
+        { type: 'image', url: 'https://site.test/api/storage/objects/uploads/main', caption: '' },
+      ]);
+    });
+
+    it('counts all five in the gallery, shows a video card, and says how many photos and videos', () => {
+      mockHook(WITH_VIDEOS);
+      const { getByText, getByTestId } = renderScreen();
+      expect(getByText('1/5')).toBeTruthy();
+      expect(getByText(/3 photos · 2 videos/)).toBeTruthy();
+      expect(getByTestId('listing-video-thumb-3')).toBeTruthy();
+      expect(getByTestId('listing-video-thumb-4')).toBeTruthy();
+    });
+
+    it('opens a video in the full-screen viewer and explains a video that cannot play', () => {
+      mockHook(WITH_VIDEOS);
+      const { getByTestId, getByText, queryByTestId } = renderScreen();
+      fireEvent.press(getByTestId('listing-media-3'));
+      expect(getByTestId('photo-viewer-close')).toBeTruthy();
+
+      fireEvent(getByTestId('viewer-video-3'), 'error', {});
+      expect(getByText("This video can't be played right now")).toBeTruthy();
+      fireEvent.press(getByTestId('viewer-video-3-retry'));
+      expect(queryByTestId('viewer-video-3-failed')).toBeNull();
+    });
+
+    it('shows a loader when a video is opened, and hides it once the video is ready', () => {
+      mockHook(WITH_VIDEOS);
+      const { getByTestId, queryByTestId } = renderScreen();
+      fireEvent.press(getByTestId('listing-media-3'));
+      expect(getByTestId('viewer-video-3-loading')).toBeTruthy();
+
+      fireEvent(getByTestId('viewer-video-3'), 'load', { duration: 5 });
+      expect(queryByTestId('viewer-video-3-loading')).toBeNull();
+    });
+
+    it('keeps a place with only photos working: no videos mentioned', () => {
+      mockHook(RAW);
+      const { getByText, queryByText } = renderScreen();
+      expect(getByText('1/3')).toBeTruthy();
+      expect(queryByText(/video/)).toBeNull();
+    });
+  });
+
   it('goes back from the floating back button', () => {
     mockHook(RAW);
     const { getByTestId } = renderScreen();
     fireEvent.press(getByTestId('guide-back-button'));
     expect(nav.goBack).toHaveBeenCalled();
+  });
+
+  describe('why a place could not load', () => {
+    it('tells a missing place from a slow or unreachable server', () => {
+      expect(listingErrorKind(undefined)).toBe('notFound');
+      expect(listingErrorKind({ response: { status: 404 } })).toBe('notFound');
+      expect(listingErrorKind({ response: { status: 500 } })).toBe('server');
+      expect(listingErrorKind({ code: 'ECONNABORTED', message: 'timeout of 15000ms exceeded' })).toBe('timeout');
+      expect(listingErrorKind({ message: 'Network Error' })).toBe('offline');
+    });
+
+    it('says "taking too long" when the request timed out, not "Listing not found"', () => {
+      useListingDetail.mockReturnValue({
+        data: null,
+        isLoading: false,
+        error: { code: 'ECONNABORTED', message: 'timeout of 15000ms exceeded' },
+        refetch: jest.fn(),
+        isRefetching: false,
+      });
+      const { getByText, queryByText } = renderScreen();
+      expect(getByText(LISTING_ERROR_COPY.timeout.title)).toBeTruthy();
+      expect(queryByText('Listing not found')).toBeNull();
+    });
+
+    it('says the server had a problem for a 500', () => {
+      useListingDetail.mockReturnValue({
+        data: null,
+        isLoading: false,
+        error: { response: { status: 500 }, message: 'Request failed with status code 500' },
+        refetch: jest.fn(),
+        isRefetching: false,
+      });
+      const { getByText } = renderScreen();
+      expect(getByText(LISTING_ERROR_COPY.server.title)).toBeTruthy();
+    });
+
+    it('says a slow load is taking longer than usual after a few seconds', () => {
+      jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'] });
+      useListingDetail.mockReturnValue({
+        data: null,
+        isLoading: true,
+        error: null,
+        refetch: jest.fn(),
+        isRefetching: false,
+      });
+      const { getByText, queryByText } = renderScreen();
+      expect(getByText('Fetching place details...')).toBeTruthy();
+      expect(queryByText(/taking longer than usual/)).toBeNull();
+      act(() => {
+        jest.advanceTimersByTime(6500);
+      });
+      expect(getByText(/taking longer than usual/)).toBeTruthy();
+      jest.useRealTimers();
+    });
   });
 
   it('shows a retry state when the listing cannot be loaded', () => {

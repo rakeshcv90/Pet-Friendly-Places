@@ -14,7 +14,7 @@ import { theme, colors } from '../../theme';
 import { useStore } from '../../store';
 import { ScreenHeader } from '../../components/common/AppHeader/ScreenHeader';
 import { useReuniteCases, filterReunitePosts } from '../../hooks/useReunite';
-import { ReunitePostCard } from './components';
+import { ReunitePostCard } from './components/ReunitePostCard';
 import { TABS, PET_FILTER_OPTIONS } from './ReuniteScreen';
 
 // One grid cell. Memoised, so a row only draws again when its own post or the theme changes.

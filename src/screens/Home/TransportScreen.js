@@ -9,7 +9,7 @@ import { useTransportHub } from '../../hooks/useDiscovery';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { Loader } from '../../components/common/Loader';
 import { ScreenHeader } from '../../components/common/AppHeader/ScreenHeader';
-import { AmbientBackground } from './components';
+import { AmbientBackground } from './components/AmbientBackground';
 
 // Dark mode swaps the API's pale verdict colours for readable ones.
 const VERDICT_DARK = {

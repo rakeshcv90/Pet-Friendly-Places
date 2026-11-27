@@ -12,7 +12,7 @@ import FastImage from '../../components/common/FastImage';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { Loader } from '../../components/common/Loader';
 import { ScreenHeader } from '../../components/common/AppHeader/ScreenHeader';
-import { AmbientBackground } from './components';
+import { AmbientBackground } from './components/AmbientBackground';
 
 const decodeText = text =>
   text

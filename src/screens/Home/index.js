@@ -23,22 +23,52 @@ import { useHomeData, resolveImageUrl } from '../../hooks/useDiscovery';
 import { useStore } from '../../store';
 import { mapApiCategories } from '../../utils/categories';
 import { AppHeader } from '../../components/common/AppHeader';
-import {
-  BouncyPressable,
-  AnimatedCategoryItem,
-  AnimatedRehomeOption,
-  useHomeAnimations,
-  StoryCoverImage,
-  StoryOverlay,
-  styles,
-  UrbaniaBanner,
-  PopularDestinations,
-  NatureAccess,
-} from './components';
-import { NATURE_SEARCH_PARAMS } from './components/NatureAccess';
+import { BouncyPressable } from './components/BouncyPressable';
+import { AnimatedCategoryItem } from './components/AnimatedCategoryItem';
+import { AnimatedRehomeOption } from './components/AnimatedRehomeOption';
+import { useHomeAnimations } from './components/useHomeAnimations';
+import { StoryCoverImage, StoryOverlay } from './components/StoryCover';
+import { styles } from './components/styles';
+import { UrbaniaBanner } from './components/UrbaniaBanner';
+import { PopularDestinations } from './components/PopularDestinations';
+import { NatureAccess, NATURE_SEARCH_PARAMS } from './components/NatureAccess';
 import { prefetchGallery } from './components/UrbaniaSections';
 import { LoaderCard } from '../../components/common/Loader';
 import { storyCoverUrl } from './storyCover';
+
+// The header with its search box. The typed text lives here, not in HomeScreen, so each key press
+// draws only the header and not the whole page with its scroll animations. Behaviour is unchanged:
+// submitting opens the search results and clears the box.
+const HomeHeader = React.memo(
+  ({ userName, navigation, avatarScale, avatarRotate, searchBarScale, searchIconRotate }) => {
+    const [searchQuery, setSearchQuery] = useState('');
+      const handleSearchSubmit = useCallback(
+      query => {
+        const text = (query !== undefined ? query : searchQuery || '').trim();
+        if (!text) {
+          return;
+        }
+        // SearchScreen calls GET /listings?q=<text>&page_size=18
+        navigation.navigate('SearchScreen', { query: text });
+        // Clear the Home search box so it's empty when the user comes back
+        setSearchQuery('');
+      },
+      [navigation, searchQuery],
+    );
+    return (
+      <AppHeader
+        userName={userName}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSearchSubmit={handleSearchSubmit}
+        avatarScale={avatarScale}
+        avatarRotate={avatarRotate}
+        searchBarScale={searchBarScale}
+        searchIconRotate={searchIconRotate}
+      />
+    );
+  },
+);
 
 export const HomeScreen = ({ navigation }) => {
   // Start loading the Urbania photos now, so the booking screen opens with them ready
@@ -47,7 +77,6 @@ export const HomeScreen = ({ navigation }) => {
   }, []);
 
   const insets = useSafeAreaInsets();
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const heartBurstAnim = useRef(new Animated.Value(1)).current;
 
@@ -449,21 +478,9 @@ export const HomeScreen = ({ navigation }) => {
           styles.scrollContent,
           { paddingBottom: Math.max(insets.bottom, s(20)) + s(90) },
         ]}>
-        <AppHeader
-          // greeting={greeting}
+        <HomeHeader
           userName={userName}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          onSearchSubmit={query => {
-            const text = (query !== undefined ? query : searchQuery || '').trim();
-            if (!text) {
-              return;
-            }
-            // SearchScreen calls GET /listings?q=<text>&page_size=18
-            navigation.navigate('SearchScreen', { query: text });
-            // Clear the Home search box so it's empty when the user comes back
-            setSearchQuery('');
-          }}
+          navigation={navigation}
           avatarScale={avatarScale}
           avatarRotate={avatarRotate}
           searchBarScale={searchBarScale}

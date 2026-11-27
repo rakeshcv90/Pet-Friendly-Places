@@ -23,7 +23,7 @@ import { useTravelStories, resolveImageUrl } from '../../hooks/useDiscovery';
 import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { Loader } from '../../components/common/Loader';
 import { ScreenHeader } from '../../components/common/AppHeader/ScreenHeader';
-import { AmbientBackground } from './components';
+import { AmbientBackground } from './components/AmbientBackground';
 import { storyCoverUrl } from './storyCover';
 
 const formatStory = item => {

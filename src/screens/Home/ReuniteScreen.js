@@ -19,7 +19,9 @@ import { BouncyPressable } from '../../components/common/BouncyPressable';
 import { ScreenHeader } from '../../components/common/AppHeader/ScreenHeader';
 import { useStore } from '../../store';
 import { useReuniteCases, filterReunitePosts } from '../../hooks/useReunite';
-import { PostPetWizardModal, ReunitePostCard, ReuniteSafetyModal } from './components';
+import { PostPetWizardModal } from './components/PostPetWizardModal';
+import { ReunitePostCard } from './components/ReunitePostCard';
+import { ReuniteSafetyModal } from './components/ReuniteSafetyModal';
 
 const PREVIEW_POSTS_COUNT = 2;
 
@@ -76,7 +78,7 @@ export const ReuniteScreen = ({ navigation, route }) => {
   const [localPosts, setLocalPosts] = useState([]);
   const { data: apiPosts = [], isLoading: isPostsLoading } = useReuniteCases();
 
-  console.log("Cccccccc",apiPosts)
+  
   const posts = useMemo(() => [...localPosts, ...apiPosts], [localPosts, apiPosts]);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isReportModalVisible, setReportModalVisible] = useState(false);
